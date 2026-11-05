@@ -2,25 +2,43 @@
 
 This folder contains the NEX-owned Android integration source:
 
-- `NextendoAuthClient.kt` — OAuth Authorization Code + PKCE, token refresh and the separate `nx2.` game-token request.
+- `NextendoAuthClient.kt` — OAuth Authorization Code + PKCE, registered Client ID header, token refresh, userinfo, presence publishing and the separate `nx2.` game-token request.
 - `NextendoSessionStore.kt` — AES-GCM encrypted OAuth/game session and pending PKCE transaction storage using Android Keystore.
-- `NextendoAuthManager.kt` — Chrome Custom Tab launch, callback verification, background token exchange, game-token acquisition and account panel.
+- `NextendoAuthManager.kt` — Chrome Custom Tab login, callback verification, account panel, friends UI and background session refresh.
 - `NextendoCallbackActivity.kt` — Android deep-link callback handler.
 - `NextendoAccountApi.kt` — authenticated read-only player profile lookup.
+- `NextendoSocialApi.kt` — OAuth `/api/oauth/userinfo` and read-only friends list.
+- `NextendoPresencePublisher.kt` — online presence heartbeat every 60 seconds and offline publication on disconnect.
 
 ## NEX configuration
 
 - Application ID: `com.nex.nx`
-- Public Client ID: `nxc_yAdR-14bOEq7`
+- Client ID used in this branch: `nxc_yAdR-14bOEq7`
 - Redirect URI: `com.nex.nx://oauth/callback`
-- Scopes: `identity friends presence profil game.matchmaking`
+- Scopes: `identity friends presence game.matchmaking`
+- Application identity header: `X-Nextendo-Client-Id`
+
+The README on `main` currently has a different Client ID (`nxc_6BozwtiXy9n`). Confirm the correct value in the Developer Portal before live sign-in.
 
 ## Status and integration
 
 The sources are not compiled as a standalone Android module. `scripts/apply-eden-overlay.py` copies them into the pinned Eden Android project, changes the Optimized flavor package from Eden's original spoofed ID to `com.nex.nx`, adds AndroidX Browser, registers the callback and inserts a Nextendo account entry in the root settings.
 
-GitHub Actions then builds the Optimized release flavor from Eden tag `v0.2.0-rc1`.
+GitHub Actions builds the Optimized release flavor from Eden tag `v0.2.0-rc1`.
 
-The first integration does not yet implement the friends endpoint, presence payload/heartbeat, profile editing, or in-game ACC/BAAS token injection. Those are separate tasks requiring the exact service API contract and emulator network-path changes. A successful OAuth login or retrieval of an `nx2.` token does not by itself prove multiplayer works.
+The Android integration currently has:
+- OAuth login/session scaffold and account profile panel.
+- Read-only friends list from `/api/oauth/userinfo`.
+- App-level online heartbeat and offline publication.
+- Separate `nx2.` game-token request.
 
-Never print access tokens, refresh tokens, game tokens, callback codes, PKCE verifiers or attestation material to Android logs.
+Still missing:
+- Friend request mutations and in-game `nn::friends` IPC projection.
+- Native game lifecycle callback for real in-game presence/title ID.
+- ACC/BAAS `id_token` generation and `nnex` claim injection.
+- DNS mapping, game TLS/SNI validation, game NEX/PRUDP and NAT/P2P socket handling.
+- End-to-end testing with two accounts and a supported game.
+
+A successful OAuth login or retrieval of an `nx2.` token does not by itself prove multiplayer works. See [the online status checklist](../../docs/NEXTENDO_ONLINE_STATUS.md).
+
+Never print access tokens, refresh tokens, game tokens, callback codes or PKCE verifiers to Android logs.
