@@ -131,9 +131,36 @@ object NextendoAuthManager {
         }
 
         executor.execute {
-            val profile = if (stored.pid > 0L) {
+            var activeSession = stored
+
+            // Refresh the account session before profile calls when it is near expiry.
+            if (activeSession.accessTokenExpiresAtEpochSeconds <=
+                (System.currentTimeMillis() / 1000L) + 60L
+            ) {
                 runCatching {
-                    NextendoAccountApi.fetchOwnProfile(stored.accessToken, stored.pid)
+                    NextendoAuthClient.refreshAccessToken(activeSession.refreshToken).also {
+                        NextendoSessionStore.saveOAuthTokens(activity, it)
+                        activeSession = NextendoSessionStore.load(activity) ?: activeSession
+                    }
+                }
+            }
+
+            // Obtain the separate game token if the account panel has no valid PID yet.
+            if (activeSession.pid <= 0L ||
+                activeSession.nexGameTokenExpiresAtEpochSeconds <=
+                (System.currentTimeMillis() / 1000L) + 300L
+            ) {
+                runCatching {
+                    NextendoAuthClient.fetchNexGameToken(activeSession.accessToken).also {
+                        NextendoSessionStore.saveNexGameToken(activity, it)
+                        activeSession = NextendoSessionStore.load(activity) ?: activeSession
+                    }
+                }
+            }
+
+            val profile = if (activeSession.pid > 0L) {
+                runCatching {
+                    NextendoAccountApi.fetchOwnProfile(activeSession.accessToken, activeSession.pid)
                 }.getOrNull()
             } else {
                 null
@@ -142,11 +169,11 @@ object NextendoAuthManager {
             mainHandler.post {
                 if (activity.isFinishing || activity.isDestroyed) return@post
 
-                val username = profile?.username?.ifBlank { stored.username }
-                    ?: stored.username.ifBlank { "Conta conectada" }
-                val friendCode = profile?.friendCode?.ifBlank { stored.friendCode }
-                    ?: stored.friendCode.ifBlank { "Ainda não disponível" }
-                val pid = profile?.pid?.takeIf { it > 0L } ?: stored.pid
+                val username = profile?.username?.ifBlank { activeSession.username }
+                    ?: activeSession.username.ifBlank { "Conta conectada" }
+                val friendCode = profile?.friendCode?.ifBlank { activeSession.friendCode }
+                    ?: activeSession.friendCode.ifBlank { "Ainda não disponível" }
+                val pid = profile?.pid?.takeIf { it > 0L } ?: activeSession.pid
                 val avatar = profile?.avatarUrl.orEmpty()
 
                 val details = buildString {
