@@ -1,129 +1,109 @@
 # Nextendo Network integration — Android
 
-## NEX application identity
+## NEX public client
 
-- Public Client ID: `nxc_yAdR-14bOEq7`
+- Client ID in this integration branch: `nxc_yAdR-14bOEq7`
 - Android application ID: `com.nex.nx`
-- Registered redirect URI: `com.nex.nx://oauth/callback`
-- Requested scopes: `identity friends presence profil game.matchmaking`
+- Redirect URI: `com.nex.nx://oauth/callback`
+- Requested scopes: `identity friends presence game.matchmaking`
+- Required application header on REST requests: `X-Nextendo-Client-Id: <NEX Client ID>`
 
-NEX is a public Android OAuth client. It uses Authorization Code + PKCE (S256); no Client Secret or Bot Token is embedded in the APK.
+NEX is a public Android OAuth client. It uses Authorization Code + PKCE (S256); no Client Secret or Bot Token is embedded in the APK. The standard Developer Portal client is the NEX identity. NEX is not requesting “Official App” endorsement.
 
-## Endpoints verified in Nextendo's developer documentation
+**Configuration warning:** the README on `main` currently lists `nxc_6BozwtiXy9n`, while this integration branch uses `nxc_yAdR-14bOEq7`. Confirm the exact Client ID registered for NEX in the Developer Portal before live sign-in. Do not ship a build while the portal ID and compiled ID differ.
+
+## Documented endpoints used by NEX
 
 - Authorization: `https://nextendo.network/api/oauth/authorize`
 - Token exchange and refresh: `https://nextendo.network/api/oauth/token`
-- Player profile: `https://nextendo.network/api/profile?user={pid}`
+- OAuth identity and friends: `GET https://nextendo.network/api/oauth/userinfo`
+- Player profile: `GET https://nextendo.network/api/profile?user={pid}`
 - Presence publishing: `POST https://nextendo.network/api/presence`
 - Game token: `GET https://nextendo.network/api/nex-token`
 
-The Android authorization sample and endpoint specification use the `/api/oauth/*` paths. Do not use the desktop-only short paths in the NEX Android client.
+All REST calls made by the Android client include the NEX client-identity header. Player-protected calls also include `Authorization: Bearer <access_token>`.
 
-## Sign-in sequence implemented in the NEX scaffold
+## Sign-in sequence
 
-1. Generate a cryptographically random PKCE `code_verifier` (43–128 URL-safe characters), an S256 SHA-256 Base64URL `code_challenge`, and a random `state`.
+1. Generate a cryptographically random PKCE `code_verifier`, an S256 SHA-256 Base64URL `code_challenge`, and a random `state`.
 2. Persist verifier and state encrypted with AES-GCM using Android Keystore. The pending transaction expires after 10 minutes.
 3. Open the authorization URI in a Chrome Custom Tab. NEX never collects the player's Nextendo password.
 4. Receive the callback through `com.nex.nx://oauth/callback`.
-5. Validate the callback scheme, host, path and one-time code. Validate `state` with a constant-time comparison when the server echoes it; the published Android example does not explicitly guarantee a state parameter, so the required PKCE verifier remains the code-binding protection.
+5. Validate the callback scheme, host, path and one-time code. Validate `state` with a constant-time comparison if Nextendo echoes it; PKCE remains mandatory and binds the authorization code to the local verifier.
 6. Exchange the code at `/api/oauth/token` with `grant_type=authorization_code`, the same `client_id`, the exact `redirect_uri`, and original `code_verifier`.
-7. Persist access and refresh tokens encrypted with Android Keystore.
-8. Request the separate game token from `/api/nex-token`; save it separately from OAuth credentials.
+7. Persist access and refresh tokens encrypted with Android Keystore. Refresh-token rotation is saved immediately.
+8. Read the account identity from `/api/oauth/userinfo`.
+9. Request the separate game token from `/api/nex-token`; save it separately from OAuth credentials.
 
-The auth/session code is in `integration/android/src/main/java/com/nex/nx/nextendo`. The repeatable source overlay adds a **Nextendo Network** entry to Eden's root settings.
+The implementation is in `integration/android/src/main/java/com/nex/nx/nextendo`. The repeatable source overlay adds a **Nextendo Network** entry to Eden's root settings.
 
-## Account profile
+## Account profile and friends
 
-After the game-token endpoint returns a PID, NEX can request:
+The profile panel uses `GET /api/profile?user={pid}` with the player's OAuth access token.
 
-`GET /api/profile?user={pid}`
+The friends screen uses `GET /api/oauth/userinfo` with `identity` and `friends` scopes. It displays the basic friend list and available presence fields. This screen is currently read-only. Friend-request sending, accepting, declining, removing, blocking and favoriting are not yet wired because those mutation routes need a confirmed OAuth-client contract before being enabled.
 
-using `Authorization: Bearer <access_token>`. The current NEX account panel displays the username, Friend Code, PID and avatar URL when the profile API responds. Profile editing through the `profil` scope is not yet implemented because the developer reference currently does not specify the write endpoint and payload.
+Files:
+- `NextendoAccountApi.kt` — read-only player profile.
+- `NextendoSocialApi.kt` — OAuth userinfo and friend-list models.
+- `NextendoAuthManager.kt` — account and friends UI.
 
-## Friends and presence
+## App presence
 
-The public developer guide documents `GET /api/oauth/userinfo` for OAuth Bearer tokens. With the `identity` scope it returns PID, username and Friend Code; with `friends` it also returns the basic friend list. The public account API source additionally exposes `GET /api/friends` with friend profile fields and presence, plus `POST /api/friends` and routes for accepting, declining, removing, blocking and favoriting friends. The NEX social client should use typed models, bounded caching and background I/O; it must never make network requests from the emulation/PRUDP thread.
+`NextendoPresencePublisher.kt` publishes online status after successful sign-in and sends a heartbeat every 60 seconds (the public developer guide requires an update at least every 90 seconds). Disconnect sends status 0 (offline).
 
-The public developer guide documents `POST /api/presence` and a heartbeat at least every 90 seconds. The public account-service implementation documents this JSON shape:
+Presence payload fields:
+- `status`: 0 offline, 1 online, 2 online/in-game.
+- `app_id`: actual game title ID while playing.
+- `app_detail`: game/activity detail supplied by the emulator.
+- `app_field`: Base64-encoded game-specific binary data only when a title requires it.
 
-```json
-{
-  "status": 2,
-  "app_field": "",
-  "app_id": "TITLE_ID_DO_JOGO",
-  "app_detail": ""
-}
-```
+Current limitation: app-level online heartbeat is wired. A native emulator callback has not yet been connected to `setGameActivity()`, so NEX does not yet publish the real game title or Nintendo-specific `app_field`. Do not fabricate that field.
 
-Status values in the service are 0 (offline), 1 (online) and 2 (online/in-game). `app_field` is a game/HLE-specific binary field encoded as Base64 when a title needs it; NEX must not fabricate it. The app should publish online/game state from the emulation lifecycle, refresh it in the background, and let the server TTL expire the status after a crash. On a normal shutdown it should send offline status.
+## OAuth account token vs game token
 
-**Authentication contract must be confirmed before wiring these calls:** the public developer guide says OAuth access tokens are used for account APIs, but the public account-service source currently shows `/api/friends`, `/api/presence` and `/api/nex-token` using `accountFromBearer`, which accepts a web session token or an `nx2` game token rather than an OAuth access token. Only `/api/oauth/userinfo` explicitly validates the OAuth access token in that source snapshot. Do not silently substitute a bot token or another user's game token. The NEX account/presence client will remain behind an API adapter until Nextendo confirms the live production bearer-token contract.
+These credentials are separate:
 
-## Account token vs game token
+- OAuth `access_token`: account API access within the scopes approved by the player.
+- OAuth `refresh_token`: renews the account session; refresh tokens may rotate.
+- Game token (`nx2.`): obtained from `GET /api/nex-token` with `game.matchmaking` scope. It is for game authentication only.
 
-These credentials are not interchangeable:
+The developer guide says the access token lasts one hour, the refresh token lasts 30 days, and the game token lasts 24 hours. A successful request for an `nx2.` token does not by itself make a game multiplayer-ready.
 
-- OAuth `access_token`: account APIs such as identity, friends, presence and profile.
-- OAuth `refresh_token`: renews the account session; refresh tokens rotate.
-- NEX game token (`nex_token`, with an `nx2.` token format): obtained from `GET /api/nex-token` with the OAuth bearer token and the `game.matchmaking` scope.
+A public snapshot of the account backend previously showed bearer validation differences for `/api/nex-token`, `/api/presence` and `/api/friends` versus the developer guide. The app currently follows the developer guide. Verify those routes against the live service during end-to-end testing; do not substitute a web-session token, bot token, or another emulator's credential.
 
-The access token lasts one hour; the refresh token lasts 30 days. Each refresh returns a new refresh token, so NEX must persist the rotated value immediately. The game token lasts 24 hours according to the developer guide. Fetch it on game launch or expiry and never put the OAuth token or bare PID in the game's `nnex` claim.
+## In-game BAAS and the `nnex` claim
 
-## In-game authentication still required
+The Nextendo developer guide says the `nx2.` game token belongs in the `nnex` claim of the BAAS `id_token`. This is not implemented in the NEX HLE layer yet.
 
-A successful OAuth login proves only that the user authorized NEX. It does not prove that a game can log in.
+The pinned Eden `src/core/hle/service/acc/acc.cpp` still has account authorization / ID-token cache handlers stubbed. NEX must implement the correct BAAS JWT claims, player PID, token expiry and signing contract for its own build. Do not use the OAuth access token, bare PID, a fake `nx2.` token, or another emulator's key.
 
-The developer guide says the NEX game token (`nx2.`) belongs in the `nnex` claim of the BAAS `id_token`. The HLE ACC/BAAS layer must build the JWT with the correct NEX account PID and sign it with the **NEX-specific BAAS signing key** using the exact JWT parameters and public key/JWKS registration approved by Nextendo. A bare PID, OAuth access token or empty `nnex` claim is not valid.
+## Developer Portal identity and Official App status
 
-The public guide documents `GET /api/nex-token` with OAuth Bearer and the `game.matchmaking` scope. However, the public account-service source snapshot currently validates this route through `verifyToken` (web-session token), not `verifyOAuthToken`. The live gateway may have moved on; confirm the currently accepted bearer type and refresh flow with Nextendo before marking this implemented.
+The standard public client registered through the Developer Portal is the NEX application identity. The NEX client sends `X-Nextendo-Client-Id` with that Client ID.
 
-A valid `nx2.` token alone is not enough: online play also depends on correct BAAS serialization/signing, approved client identity/attestation, DNS redirection, TLS/SNI behavior, game NEX services, matchmaking and NAT/P2P networking. NEX must not claim in-game multiplayer support until a real supported-title session passes testing.
+“Official App” is a separate endorsement/status. NEX is not requesting that endorsement. The current implementation does not invent a separate private key or copy credentials from another emulator. The Nextendo changelog discusses additional security/attestation in emulator releases; the developer conversation clarified that NEX should not request requirements beyond what the Developer Portal provides. Use the registered client identity and validate the live gateway response rather than presuming an additional credential exists.
 
-## Nextendo application approval and client attestation
+## C++ integration still missing
 
-The Nextendo changelog reports that the online gateway was closed to generic clients in v1.8.6 and that cryptographic client attestation became mandatory in v1.8.7. It also says each emulator must use its own registered application identity and required application headers.
+The current overlay copies Android Kotlin sources and adds the settings entry. It does not yet patch the emulator's online stack. The principal Eden files still requiring work are:
 
-Therefore, the NEX Client ID and OAuth PKCE registration are not sufficient proof that the NEX emulator is approved for game/network endpoints. Before enabling online game traffic, the NEX application owner must confirm with Nextendo administrators that this Client ID is provisioned for an emulator client and obtain the NEX-specific application identity/header and attestation requirements. Do not reuse keys, attestations or headers from Ryujinx, Citron, Den2 or another developer.
+- `src/core/hle/service/acc/acc.cpp` — BAAS `id_token` and `nnex` game token.
+- `src/core/hle/service/friend/friend.cpp` — game-facing `nn::friends` IPC and presence.
+- `src/core/hle/service/sockets/sfdnsres.cpp` — per-host Nextendo DNS mapping.
+- `src/common/settings.h` and corresponding config/UI code — server/NAT endpoints and an online toggle.
+- `src/core/hle/service/ssl/ssl.cpp` and `ssl_backend_openssl.cpp` — validate TLS host/SNI flow; Eden already sets SNI when the game supplies a hostname.
+- `src/core/hle/service/sockets/bsd.cpp` and `src/core/internal_network/sockets.h/.cpp` — preserve UDP NAT mapping across NAT-check/P2P transition.
+- Android `NativeLibrary.kt` / JNI bridge — pass actual game lifecycle/title data to the presence publisher.
 
-Any NEX private attestation material provided by Nextendo must be stored as protected GitHub Actions secrets or a protected release environment, never committed to this repository or printed in build logs. The build must remain offline-only until the NEX application is accepted by the current gateway.
+See [NEXTENDO_ONLINE_STATUS.md](NEXTENDO_ONLINE_STATUS.md) for the detailed checklist and completion criteria.
 
-## Android callback manifest contract
-
-The overlay registers an exported callback activity with an intent filter for:
-
-- scheme: `com.nex.nx`
-- host: `oauth`
-- path: `/callback`
-
-PKCE state is validated before exchanging the code. A deep link is never treated as authenticated by itself.
-
-## Build and source overlay
+## Build baseline
 
 - Pinned Eden source: tag `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 - `scripts/apply-eden-overlay.py` applies NEX package identity, Custom Tabs dependency, callback activity, settings entry and Kotlin sources to that exact source tree.
 - `.github/workflows/build-nex-android.yml` builds the Android Optimized variant and uploads an APK/AAB artifact.
 
-## Implementation status
-
-- [x] Record the NEX public Client ID, package and redirect URI.
-- [x] Record all five approved scopes.
-- [x] Add PKCE authorization, state validation and encrypted pending-transaction storage.
-- [x] Add OAuth token exchange and refresh-token rotation handling.
-- [x] Add encrypted OAuth/game-token session storage.
-- [x] Add the separate `/api/nex-token` request and token-format check.
-- [x] Add authenticated player-profile lookup and basic account panel.
-- [x] Add a reproducible Eden overlay and Android Optimized CI workflow.
-- [ ] Confirm the registered URI/scopes in the Nextendo developer portal before live sign-in.
-- [ ] Run and pass the GitHub Actions Android build.
-- [ ] Test OAuth end-to-end with a real NEX account.
-- [ ] Implement friends API after exact endpoint contract is available.
-- [ ] Implement presence publishing and heartbeat (at least every 90 seconds) after request schema is confirmed.
-- [ ] Implement profile editing after exact write endpoint contract is available.
-- [ ] Complete NEX-owned BAAS/app attestation requirements with Nextendo.
-- [ ] Integrate `nex_token` into Eden ACC/BAAS game authentication.
-- [ ] Verify DNS/TLS/SNI, game NEX calls and NAT/P2P behavior.
-- [ ] Test an actual multiplayer session in a title listed as supported by Nextendo.
-
 ## Secret handling
 
-Never print OAuth access tokens, refresh tokens, game tokens, callback codes, PKCE verifiers, private signing material or attestation data to logs, screenshots, issues or commits. Reset any credential accidentally disclosed.
+Never print OAuth access tokens, refresh tokens, game tokens, callback codes, PKCE verifiers or any future private signing material to logs, screenshots, issues or commits.
