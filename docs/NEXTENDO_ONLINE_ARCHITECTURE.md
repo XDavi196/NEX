@@ -31,9 +31,9 @@ Fluxo proposto:
 2. Consultar a lista de amigos com o escopo `friends`.
 3. Normalizar cada registro para um modelo NEX próprio: PID, nome exibido, Friend Code, avatar, estado de presença, title ID, detalhe do jogo e favorito, quando fornecidos pelo serviço.
 4. Cache de curta duração, renovação em segundo plano, cancelamento ao desconectar e limpeza dos dados pessoais no logout.
-5. Ações como enviar/aceitar/recusar/remover pedidos só serão ligadas depois que o Nextendo confirmar os endpoints e os métodos de autenticação autorizados para um OAuth public client.
+5. A camada Android agora consulta `GET /api/oauth/userinfo` com OAuth Bearer e o escopo `friends`, normaliza a lista e mostra uma tela simples de amigos. A consulta é de leitura; enviar/aceitar/recusar/remover pedidos ainda não está ligado, pois os endpoints de mutação e a autenticação de cada rota precisam ser validados no gateway em produção.
 
-A referência publicada documenta `GET /api/oauth/userinfo` com o escopo `friends` para obter a lista básica de amigos. O backend de conta público também publica `GET/POST /api/friends` e rotas de pedidos. Antes de usar essas rotas diretamente com OAuth, confirmar o tipo de bearer token aceito pelo gateway atual.
+O backend público também lista rotas mais completas em `/api/friends`. NEX não as chama até confirmar o contrato OAuth atual.
 
 ### Camada HLE (serviços locais do jogo)
 
@@ -48,16 +48,16 @@ Há dois usos distintos de presença:
 
 A documentação Nextendo descreve `POST /api/presence` e exige uma atualização ao menos a cada 90 segundos; sem heartbeat a presença expira. O modelo de servidor público documenta status 0 (offline), 1 (online) e 2 (online em jogo), além de `app_field`, `app_id` e `app_detail`.
 
-Implementação prevista:
+Implementação Android parcial já adicionada:
 
-1. Um serviço de presença Android com ciclo de vida da sessão, agendamento no executor de rede e renovação de token.
-2. Publicar online quando uma sessão NEX estiver conectada; publicar o estado do título ao iniciar; atualizar mudanças de atividade; publicar offline no fechamento normal.
-3. Heartbeat com margem menor que 90 segundos, sem bloquear a emulação.
-4. Não inventar `app_field`: esse dado é binário e específico de cada serviço/jogo. Só publicar quando o HLE conseguir capturar e serializar o valor correto.
-5. Fallback para expiração pelo servidor após crash/força-parada.
-6. Friends UI usa a presença devolvida pelo serviço, com estados Online / In game / Offline, sem inferir um título apenas pelo status.
+1. Após login OAuth, o NEX publica status 1 (online).
+2. `NextendoPresencePublisher.kt` envia heartbeat a cada 60 segundos, sem bloquear a thread de emulação.
+3. Ao desconectar a conta, tenta publicar status 0 (offline).
+4. `setGameActivity()` está disponível, mas ainda não recebe o Title ID real do núcleo nativo. Portanto o NEX ainda não publica status 2 (in-game) de forma integrada.
+5. `app_field` permanece vazio até o HLE produzir o campo binário real de um título; NEX não inventa esse valor.
+6. O servidor deve expirar a presença após crash/força-parada.
 
-**Contrato pendente:** o guia público diz OAuth Bearer, mas o handler público `/api/presence` chama `accountFromBearer`, que no código publicado aceita token de sessão web ou `nx2`, não o OAuth access token. O Nextendo precisa confirmar o método de autenticação atual para aplicações públicas.
+A documentação do Developer Portal diz OAuth Bearer em `/api/presence`. Um snapshot público antigo do backend mostrava validação diferente para essa rota. O código segue a documentação atual, mas o heartbeat precisa de teste real antes de ser considerado funcional.
 
 ## 3. BAAS e claim nnex
 
@@ -111,21 +111,19 @@ Também precisamos validar:
 - corrida entre peers e retransmissão PRUDP;
 - fallback/erro quando NAT ou UDP é bloqueado.
 
-## 6. Identidade do aplicativo e atestação criptográfica
+## 6. Identidade do cliente pelo Developer Portal
 
-A atualização oficial Nextendo v1.8.6 exige que todas as chamadas de conta/rede apresentem a identidade oficial da aplicação registrada; v1.8.7 adiciona atestação criptográfica obrigatória. O Client ID OAuth público não deve ser presumido como credencial completa para os endpoints de rede.
+NEX usa um **cliente público próprio registrado no Developer Portal**, com OAuth Authorization Code + PKCE. Essa identidade de cliente é gerenciada pelo portal; não estamos solicitando o selo ou endosso separado de **“Official App”**.
 
-O NEX precisa receber autorização/provisionamento específico do Nextendo para:
+As chamadas REST enviam o cabeçalho:
 
-1. confirmar que `nxc_yAdR-14bOEq7` está aprovado como aplicação de emulador e para os endpoints de jogo;
-2. confirmar o valor exato do cabeçalho de identidade de aplicação (por exemplo, se é o Client ID ou um app token distinto);
-3. receber a especificação de assinatura de requisição: algoritmo, formato, cabeçalhos, bytes canônicos assinados, nonce, timestamp, prevenção de replay e rotação;
-4. gerar ou receber um par de chaves específico do NEX e cadastrar a chave pública/identidade no gateway Nextendo;
-5. receber a regra de armazenamento/entrega da chave privada em builds Android e CI;
-6. confirmar se há atestação por build, assinatura de release, certificado Android, hardware-backed key ou combinação desses elementos;
-7. receber a chave pública e metadados necessários para BAAS/JWKS e confirmar os parâmetros JWT aceitos.
+`X-Nextendo-Client-Id: <NEX Client ID>`
 
-A chave privada de atestação nunca deve entrar em commits públicos, issues, logs, APK de teste compartilhado ou arquivo Kotlin hardcoded. Se o Nextendo fornecer segredo de build, guardá-lo em ambiente protegido de release e seguir a política de rotação/obfuscação/provisionamento indicada por eles. Não tentar forjar ou contornar a atestação.
+O código usa o Client ID configurado nesta branch. Não há Client Secret nem Bot Token embutido no APK, e nenhuma chave/credencial de outro emulador é reutilizada.
+
+A equipe Nextendo esclareceu que “Official App” é um status separado e que o cliente deve usar o que o Developer Portal já fornece. Portanto, NEX não deve inventar uma chave privada de atestação, nem pedir credenciais que o portal não disponibiliza. A changelog v1.8.6/v1.8.7 descreve identidade de aplicação e attestation para clientes de emulador, mas a integração NEX deve seguir as instruções atuais do Developer Portal e validar as respostas reais do gateway.
+
+Recursos que a documentação reserva a aplicações oficiais, como cloud saves e gestão da conta, ficam fora do escopo atual do NEX.
 
 ## 7. Inconsistências de contrato a confirmar
 
