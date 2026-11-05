@@ -119,16 +119,9 @@ object NextendoPresencePublisher {
 
     private fun publishCurrentPresence() {
         val context = synchronized(lock) { applicationContext } ?: return
-        var session = runCatching { NextendoSessionStore.load(context) }.getOrNull() ?: return
-
-        val now = System.currentTimeMillis() / 1000L
-        if (session.accessTokenExpiresAtEpochSeconds <= now + TOKEN_REFRESH_MARGIN_SECONDS) {
-            session = runCatching {
-                val refreshed = NextendoAuthClient.refreshAccessToken(session.refreshToken)
-                NextendoSessionStore.saveOAuthTokens(context, refreshed)
-                NextendoSessionStore.load(context)
-            }.getOrNull() ?: return
-        }
+        val session = runCatching {
+            NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
+        }.getOrNull() ?: return
 
         val titleId = gameTitleId
         val inGame = titleId.isNotBlank()
