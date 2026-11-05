@@ -14,8 +14,8 @@ import java.util.concurrent.Executors
 /**
  * Activity-facing Nextendo login coordinator.
  *
- * The PKCE verifier/state are persisted encrypted before the browser opens so
- * the flow survives the Android process being reclaimed while the user signs in.
+ * PKCE verifier/state are persisted encrypted before the browser opens so the
+ * flow survives Android reclaiming the process during browser authentication.
  */
 object NextendoAuthManager {
     private val executor = Executors.newSingleThreadExecutor()
@@ -30,10 +30,7 @@ object NextendoAuthManager {
 
     fun startLogin(activity: Activity) {
         val pending = NextendoAuthClient.beginAuthorization()
-        NextendoSessionStore.savePendingAuthorization(
-            activity,
-            pending
-        )
+        NextendoSessionStore.savePendingAuthorization(activity, pending)
 
         val customTab = CustomTabsIntent.Builder()
             .setShowTitle(true)
@@ -42,7 +39,6 @@ object NextendoAuthManager {
         try {
             customTab.launchUrl(activity, pending.authorizationUri)
         } catch (_: Exception) {
-            // A browser intent is a safe fallback on devices without Custom Tabs.
             activity.startActivity(Intent(Intent.ACTION_VIEW, pending.authorizationUri))
         }
     }
@@ -90,7 +86,6 @@ object NextendoAuthManager {
                     pending = pending
                 )
 
-                // Persist the account session before requesting the separate game token.
                 NextendoSessionStore.saveOAuthTokens(context, tokens)
                 NextendoSessionStore.clearPendingAuthorization(context)
 
@@ -102,16 +97,19 @@ object NextendoAuthManager {
                     NextendoSessionStore.saveNexGameToken(context, gameToken)
                 }
 
+                // App-level online presence is independent from game login.
+                NextendoPresencePublisher.start(context)
+
+                val savedSession = NextendoSessionStore.load(context)
                 LoginOutcome(
-                    pid = gameToken?.pid ?: 0L,
-                    username = gameToken?.username.orEmpty(),
-                    friendCode = gameToken?.friendCode.orEmpty(),
-                    gameTokenReady = gameToken != null
+                    pid = gameToken?.pid ?: savedSession?.pid ?: 0L,
+                    username = gameToken?.username ?: savedSession?.username.orEmpty(),
+                    friendCode = gameToken?.friendCode ?: savedSession?.friendCode.orEmpty(),
+                    gameTokenReady = savedSession?.nexGameToken?.startsWith("nx2.") == true
                 )
             }
 
             if (result.isFailure) {
-                // Authorization codes are single-use; force a fresh transaction.
                 runCatching { NextendoSessionStore.clearPendingAuthorization(context) }
             }
 
@@ -119,45 +117,17 @@ object NextendoAuthManager {
         }
     }
 
-    /**
-     * Opens the NEX account panel. Profile data is requested using the user's
-     * OAuth token and PID; no bot token or client secret is used.
-     */
+    /** Opens the NEX account panel. */
     fun openAccount(activity: Activity) {
         val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
         if (stored == null) {
             startLogin(activity)
             return
         }
+        NextendoPresencePublisher.start(activity)
 
         executor.execute {
-            var activeSession = stored
-
-            // Refresh the account session before profile calls when it is near expiry.
-            if (activeSession.accessTokenExpiresAtEpochSeconds <=
-                (System.currentTimeMillis() / 1000L) + 60L
-            ) {
-                runCatching {
-                    NextendoAuthClient.refreshAccessToken(activeSession.refreshToken).also {
-                        NextendoSessionStore.saveOAuthTokens(activity, it)
-                        activeSession = NextendoSessionStore.load(activity) ?: activeSession
-                    }
-                }
-            }
-
-            // Obtain the separate game token if the account panel has no valid PID yet.
-            if (activeSession.pid <= 0L ||
-                activeSession.nexGameTokenExpiresAtEpochSeconds <=
-                (System.currentTimeMillis() / 1000L) + 300L
-            ) {
-                runCatching {
-                    NextendoAuthClient.fetchNexGameToken(activeSession.accessToken).also {
-                        NextendoSessionStore.saveNexGameToken(activity, it)
-                        activeSession = NextendoSessionStore.load(activity) ?: activeSession
-                    }
-                }
-            }
-
+            val activeSession = refreshSessionIfNeeded(activity, stored)
             val profile = if (activeSession.pid > 0L) {
                 runCatching {
                     NextendoAccountApi.fetchOwnProfile(activeSession.accessToken, activeSession.pid)
@@ -166,14 +136,17 @@ object NextendoAuthManager {
                 null
             }
 
+            // Immutable snapshot avoids the Kotlin smart-cast CI error caused by
+            // capturing the mutable session variable inside this UI closure.
+            val displaySession = activeSession
             mainHandler.post {
                 if (activity.isFinishing || activity.isDestroyed) return@post
 
-                val username = profile?.username?.ifBlank { activeSession.username }
-                    ?: activeSession.username.ifBlank { "Conta conectada" }
-                val friendCode = profile?.friendCode?.ifBlank { activeSession.friendCode }
-                    ?: activeSession.friendCode.ifBlank { "Ainda não disponível" }
-                val pid = profile?.pid?.takeIf { it > 0L } ?: activeSession.pid
+                val username = profile?.username?.ifBlank { displaySession.username }
+                    ?: displaySession.username.ifBlank { "Conta conectada" }
+                val friendCode = profile?.friendCode?.ifBlank { displaySession.friendCode }
+                    ?: displaySession.friendCode.ifBlank { "Ainda não disponível" }
+                val pid = profile?.pid?.takeIf { it > 0L } ?: displaySession.pid
                 val avatar = profile?.avatarUrl.orEmpty()
 
                 val details = buildString {
@@ -195,15 +168,99 @@ object NextendoAuthManager {
                 AlertDialog.Builder(activity)
                     .setTitle("Perfil Nextendo")
                     .setMessage(details)
-                    .setPositiveButton("Reconectar") { _, _ -> startLogin(activity) }
+                    .setPositiveButton("Amigos") { _, _ -> openFriends(activity) }
                     .setNeutralButton("Desconectar") { _, _ ->
+                        NextendoPresencePublisher.stop(activity)
                         runCatching { NextendoSessionStore.clear(activity) }
-                        Toast.makeText(activity, "Conta Nextendo desconectada.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            activity,
+                            "Conta Nextendo desconectada.",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                     .setNegativeButton("Fechar", null)
                     .show()
             }
         }
+    }
+
+    /** Displays the consented friend list returned by /api/oauth/userinfo. */
+    fun openFriends(activity: Activity) {
+        val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
+        if (stored == null) {
+            startLogin(activity)
+            return
+        }
+
+        executor.execute {
+            val result = runCatching {
+                val session = refreshSessionIfNeeded(activity, stored)
+                NextendoSocialApi.fetchFriends(session.accessToken)
+            }
+
+            mainHandler.post {
+                if (activity.isFinishing || activity.isDestroyed) return@post
+
+                result.fold(
+                    onSuccess = { friends ->
+                        val rows = if (friends.isEmpty()) {
+                            arrayOf("Nenhum amigo retornado pela Nextendo.")
+                        } else {
+                            friends.map { item ->
+                                val name = item.username.ifBlank {
+                                    if (item.pid > 0L) "PID " + item.pid else "Jogador"
+                                }
+                                buildString {
+                                    append(name)
+                                    if (item.friendCode.isNotBlank()) {
+                                        append(" · ")
+                                        append(item.friendCode)
+                                    }
+                                    append("\n")
+                                    append(item.presenceLabel())
+                                }
+                            }.toTypedArray()
+                        }
+
+                        AlertDialog.Builder(activity)
+                            .setTitle("Amigos Nextendo (" + friends.size + ")")
+                            .setItems(rows, null)
+                            .setPositiveButton("Atualizar") { _, _ -> openFriends(activity) }
+                            .setNegativeButton("Fechar", null)
+                            .show()
+                    },
+                    onFailure = { error ->
+                        AlertDialog.Builder(activity)
+                            .setTitle("Não foi possível carregar os amigos")
+                            .setMessage(error.message ?: "Falha ao consultar a Nextendo.")
+                            .setPositiveButton("Tentar novamente") { _, _ -> openFriends(activity) }
+                            .setNegativeButton("Fechar", null)
+                            .show()
+                    }
+                )
+            }
+        }
+    }
+
+    /**
+     * Refreshes the rotating OAuth session when it is close to expiry.
+     * The new refresh token is persisted immediately.
+     */
+    private fun refreshSessionIfNeeded(
+        context: Context,
+        stored: NextendoSessionStore.Session
+    ): NextendoSessionStore.Session {
+        if (stored.accessTokenExpiresAtEpochSeconds >
+            (System.currentTimeMillis() / 1000L) + 60L
+        ) {
+            return stored
+        }
+
+        return runCatching {
+            val refreshed = NextendoAuthClient.refreshAccessToken(stored.refreshToken)
+            NextendoSessionStore.saveOAuthTokens(context, refreshed)
+            NextendoSessionStore.load(context)
+        }.getOrNull() ?: stored
     }
 
     fun refreshSession(
@@ -233,6 +290,7 @@ object NextendoAuthManager {
                     null
                 }
 
+                NextendoPresencePublisher.start(context)
                 val session = NextendoSessionStore.load(context)
                 LoginOutcome(
                     pid = gameToken?.pid ?: session?.pid ?: 0L,
