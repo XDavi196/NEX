@@ -86,7 +86,7 @@ object NextendoAuthManager {
                     pending = pending
                 )
 
-                NextendoSessionStore.saveOAuthTokens(context, tokens)
+                NextendoSessionStore.saveFreshOAuthTokens(context, tokens)
                 NextendoSessionStore.clearPendingAuthorization(context)
 
                 // Populate the account identity from the documented OAuth userinfo
