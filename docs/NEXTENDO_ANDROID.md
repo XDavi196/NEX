@@ -64,6 +64,14 @@ The emulator's ACC/BAAS path must construct the game's identity token with the N
 
 A valid `nex_token` alone is not enough: online play also depends on correct ACC/BAAS serialization/signing, DNS redirection, TLS/SNI behavior, game NEX services, matchmaking and NAT/P2P networking. NEX must not claim in-game multiplayer support until a real supported-title session passes testing.
 
+## Nextendo application approval and client attestation
+
+The Nextendo changelog reports that the online gateway was closed to generic clients in v1.8.6 and that cryptographic client attestation became mandatory in v1.8.7. It also says each emulator must use its own registered application identity and required application headers.
+
+Therefore, the NEX Client ID and OAuth PKCE registration are not sufficient proof that the NEX emulator is approved for game/network endpoints. Before enabling online game traffic, the NEX application owner must confirm with Nextendo administrators that this Client ID is provisioned for an emulator client and obtain the NEX-specific application identity/header and attestation requirements. Do not reuse keys, attestations or headers from Ryujinx, Citron, Den2 or another developer.
+
+Any NEX private attestation material provided by Nextendo must be stored as protected GitHub Actions secrets or a protected release environment, never committed to this repository or printed in build logs. The build must remain offline-only until the NEX application is accepted by the current gateway.
+
 ## Android callback manifest contract
 
 The overlay registers an exported callback activity with an intent filter for:
