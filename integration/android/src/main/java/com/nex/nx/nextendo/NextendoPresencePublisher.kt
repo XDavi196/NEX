@@ -87,6 +87,12 @@ object NextendoPresencePublisher {
      */
     fun stop(context: Context) {
         val appContext = context.applicationContext
+        // Capture the token before the caller clears the local session. Otherwise
+        // the queued offline request could run after logout and lose its credential.
+        val accessToken = runCatching {
+            NextendoSessionStore.load(appContext)?.accessToken
+        }.getOrNull()
+
         synchronized(lock) {
             heartbeat?.cancel(false)
             heartbeat = null
@@ -96,12 +102,12 @@ object NextendoPresencePublisher {
         gameTitleId = ""
         gameDetail = ""
         appFieldBase64 = ""
+        if (accessToken.isNullOrBlank()) return
+
         executor.execute {
-            val session = runCatching { NextendoSessionStore.load(appContext) }.getOrNull()
-                ?: return@execute
             runCatching {
                 NextendoAuthClient.postPresence(
-                    accessToken = session.accessToken,
+                    accessToken = accessToken,
                     status = 0,
                     appField = "",
                     appId = "",
