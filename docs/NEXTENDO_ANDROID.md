@@ -42,9 +42,22 @@ using `Authorization: Bearer <access_token>`. The current NEX account panel disp
 
 ## Friends and presence
 
-The NEX application requests the `friends` and `presence` scopes. The developer reference documents that presence must be published by the app with `POST /api/presence` at least every 90 seconds; otherwise the player returns to offline.
+The public developer guide documents `GET /api/oauth/userinfo` for OAuth Bearer tokens. With the `identity` scope it returns PID, username and Friend Code; with `friends` it also returns the basic friend list. The public account API source additionally exposes `GET /api/friends` with friend profile fields and presence, plus `POST /api/friends` and routes for accepting, declining, removing, blocking and favoriting friends. The NEX social client should use typed models, bounded caching and background I/O; it must never make network requests from the emulation/PRUDP thread.
 
-The exact friends-list endpoint/response contract and presence request body are not included in the currently published API specification. Do not guess these paths or payloads. Add typed clients and tests after Nextendo publishes or supplies the exact API contract. The NEX UI must not claim friends or rich presence are active until those calls are implemented and verified.
+The public developer guide documents `POST /api/presence` and a heartbeat at least every 90 seconds. The public account-service implementation documents this JSON shape:
+
+```json
+{
+  "status": 2,
+  "app_field": "",
+  "app_id": "0100000000000000",
+  "app_detail": ""
+}
+```
+
+Status values in the service are 0 (offline), 1 (online) and 2 (online/in-game). `app_field` is a game/HLE-specific binary field encoded as Base64 when a title needs it; NEX must not fabricate it. The app should publish online/game state from the emulation lifecycle, refresh it in the background, and let the server TTL expire the status after a crash. On a normal shutdown it should send offline status.
+
+**Authentication contract must be confirmed before wiring these calls:** the public developer guide says OAuth access tokens are used for account APIs, but the public account-service source currently shows `/api/friends`, `/api/presence` and `/api/nex-token` using `accountFromBearer`, which accepts a web session token or an `nx2` game token rather than an OAuth access token. Only `/api/oauth/userinfo` explicitly validates the OAuth access token in that source snapshot. Do not silently substitute a bot token or another user's game token. The NEX account/presence client will remain behind an API adapter until Nextendo confirms the live production bearer-token contract.
 
 ## Account token vs game token
 
@@ -60,9 +73,11 @@ The access token lasts one hour; the refresh token lasts 30 days. Each refresh r
 
 A successful OAuth login proves only that the user authorized NEX. It does not prove that a game can log in.
 
-The emulator's ACC/BAAS path must construct the game's identity token with the NEX account PID and fresh Nextendo `nex_token` in the `nnex` claim, following the current Nextendo/Ryujinx reference implementation. The gateway may also enforce application identity and signing/attestation rules. Any signing key, application token or attestation required by the gateway must be provisioned specifically for NEX by the Nextendo application owner/operator; never copy another developer's private material.
+The developer guide says the NEX game token (`nx2.`) belongs in the `nnex` claim of the BAAS `id_token`. The HLE ACC/BAAS layer must build the JWT with the correct NEX account PID and sign it with the **NEX-specific BAAS signing key** using the exact JWT parameters and public key/JWKS registration approved by Nextendo. A bare PID, OAuth access token or empty `nnex` claim is not valid.
 
-A valid `nex_token` alone is not enough: online play also depends on correct ACC/BAAS serialization/signing, DNS redirection, TLS/SNI behavior, game NEX services, matchmaking and NAT/P2P networking. NEX must not claim in-game multiplayer support until a real supported-title session passes testing.
+The public guide documents `GET /api/nex-token` with OAuth Bearer and the `game.matchmaking` scope. However, the public account-service source snapshot currently validates this route through `verifyToken` (web-session token), not `verifyOAuthToken`. The live gateway may have moved on; confirm the currently accepted bearer type and refresh flow with Nextendo before marking this implemented.
+
+A valid `nx2.` token alone is not enough: online play also depends on correct BAAS serialization/signing, approved client identity/attestation, DNS redirection, TLS/SNI behavior, game NEX services, matchmaking and NAT/P2P networking. NEX must not claim in-game multiplayer support until a real supported-title session passes testing.
 
 ## Nextendo application approval and client attestation
 
