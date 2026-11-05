@@ -149,7 +149,7 @@ def main() -> None:
         app_dir / "src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt"
     )
     activity_text = emulation_activity.read_text(encoding="utf-8")
-    activity_import = "import org.yuzu.yuzu_emu.NativeLibrary\\n"
+    activity_import = "import org.yuzu.yuzu_emu.NativeLibrary\n"
     if activity_text.count(activity_import) != 1:
         raise RuntimeError("Could not identify EmulationActivity NativeLibrary import")
     activity_text = activity_text.replace(
