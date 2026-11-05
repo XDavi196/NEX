@@ -8,7 +8,7 @@ This folder contains the NEX-owned Android integration source:
 - `NextendoCallbackActivity.kt` — Android deep-link callback handler.
 - `NextendoAccountApi.kt` — authenticated read-only player profile lookup.
 - `NextendoSocialApi.kt` — OAuth `/api/oauth/userinfo` and read-only friends list.
-- `NextendoPresencePublisher.kt` — online presence heartbeat every 60 seconds and offline publication on disconnect.
+- `NextendoPresencePublisher.kt` — online presence heartbeat every 60 seconds, offline publication on disconnect, and in-game Title ID publication from the Eden lifecycle hook.
 
 ## NEX configuration
 
@@ -29,7 +29,7 @@ GitHub Actions builds the Optimized release flavor from Eden tag `v0.2.0-rc1`.
 The Android integration currently has:
 - OAuth login/session scaffold and account profile panel.
 - Read-only friends list from `/api/oauth/userinfo`.
-- App-level online heartbeat and offline publication.
+- App-level online heartbeat, offline publication and real game Title ID status via the repeatable Eden overlay.
 - Separate `nx2.` game-token request.
 
 Still missing:
