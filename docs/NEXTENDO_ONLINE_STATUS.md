@@ -62,9 +62,14 @@ Há uma divergência entre o README da branch principal e a branch de integraç�
 
 Antes de testar login, confirme qual dos dois Client IDs é o que está realmente registrado para o NEX no Developer Portal. O build não deve tentar alternar silenciosamente entre identidades.
 
-## Build
+## Build e CI
 
-A compilação anterior chegou à etapa Kotlin e falhou em `NextendoAuthManager.kt` devido a smart-cast de uma variável mutável capturada por uma closure. Essa captura foi substituída por um snapshot imutável nesta branch. Os builds automáticos após as últimas alterações estão em validação; ainda não há APK confirmado como aprovado.
+- **Build #42:** falhou na etapa `Apply NEX identity and Nextendo Android integration`, antes do Gradle. A causa foi o padrão de importação `NativeLibrary` no script `scripts/apply-eden-overlay.py`: a string de busca continha uma quebra de linha escapada incorretamente.
+- **Correção enviada:** o anchor foi corrigido para corresponder à importação real de `EmulationActivity.kt` na revisão Eden fixada. A função `NativeLibrary.playTimeManagerGetCurrentTitleId()` também foi confirmada no código-fonte dessa revisão.
+- **Build #43:** iniciada com a correção do overlay; pode ser cancelada pela regra de concorrência quando a execução mais recente assumir.
+- **Build #44:** acionada com a automação de prerelease. Ainda precisa concluir o overlay, o build Android e o upload para confirmar um APK.
+
+Nenhum APK está confirmado como aprovado neste momento. A automação só cria uma GitHub prerelease se o build completo terminar com sucesso e o commit que disparou a execução tiver assunto iniciado por `[release]`. A release leva o APK e o arquivo SHA-256; uma falha antes ou durante a compilação não publica release.
 
 ## Critério para dizer “online funcional”
 
