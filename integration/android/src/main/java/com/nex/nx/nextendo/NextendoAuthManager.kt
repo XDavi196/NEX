@@ -89,6 +89,19 @@ object NextendoAuthManager {
                 NextendoSessionStore.saveOAuthTokens(context, tokens)
                 NextendoSessionStore.clearPendingAuthorization(context)
 
+                // Populate the account identity from the documented OAuth userinfo
+                // endpoint even if the separate game-token endpoint is temporarily down.
+                runCatching {
+                    NextendoSocialApi.fetchUserInfo(tokens.accessToken)
+                }.onSuccess { userInfo ->
+                    NextendoSessionStore.saveAccountIdentity(
+                        context,
+                        pid = userInfo.pid,
+                        username = userInfo.username,
+                        friendCode = userInfo.friendCode
+                    )
+                }
+
                 val gameToken = runCatching {
                     NextendoAuthClient.fetchNexGameToken(tokens.accessToken)
                 }.getOrNull()
