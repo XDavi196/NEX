@@ -19,7 +19,7 @@ The repository contains the Android Nextendo integration scaffold, social/presen
 
 The NEX public application requests these scopes:
 
-`identity friends presence game.matchmaking`
+`identity friends presence profil game.matchmaking mods.favorites`
 
 Native Android authentication uses OAuth 2.0 Authorization Code + PKCE (S256). No client secret is embedded in the APK.
 
