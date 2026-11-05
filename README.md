@@ -36,3 +36,8 @@ NEX is Android-only. This repository does not target Windows, Linux desktop, mac
 ## Legal
 
 NEX is an independent community project. Nintendo Switch is a trademark of Nintendo. NEX is not affiliated with or endorsed by Nintendo.
+
+## Legal documents
+
+- [Terms of Service](TERMS.md)
+- [Privacy Policy](PRIVACY.md)
