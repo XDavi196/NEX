@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+# Keep one full native build per branch. New commits cancel stale 30-minute builds.
+concurrency:
+  group: nex-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android-optimized:
     name: Eden v0.2.0-rc1 — Android Optimized / NEX
