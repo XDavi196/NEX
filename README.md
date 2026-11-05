@@ -1,38 +1,40 @@
 # NEX
 
-**NEX** is an Android-only Nintendo Switch emulator project based on the Eden source tree, with a first-party Nextendo Network integration registered for this project.
+**NEX** is an Android-only Nintendo Switch emulator project based on the Eden source tree, with a first-party integration for the NEX application registered on Nextendo Network.
 
 - **Platforms:** Android phones and tablets only.
-- **Emulator base:** Eden. NEX is not based on Den2.
-- **Network identity:** NEX uses the public Nextendo application ID registered for this project. It does not borrow another developer's Client ID, application credential, signing key, or attestation.
-- **Online goal:** account sign-in, friends, presence, and real in-game multiplayer for titles supported by Nextendo.
+- **Emulator source:** Eden tag `v0.2.0-rc1`.
+- **Requested Android build variant:** `Eden-Android-v0.2.0-rc1-optimized.apk`.
+- **Android application ID:** `com.nex.nx`.
+- **Nextendo Client ID:** `nxc_yAdR-14bOEq7`.
+- **OAuth redirect URI:** `com.nex.nx://oauth/callback`.
+
+NEX is based on Eden, not Den2. Its Nextendo registration and application identity belong to NEX; no other developer's Client ID, client secret, signing key or attestation material is reused.
 
 ## Project status
 
-The repository is being structured and the first Android OAuth/PKCE integration layer is being prepared. The Eden source tree has not yet been imported into this repository, and no NEX APK is available yet.
+The repository currently contains the first Android Nextendo integration scaffold and project documentation. The complete Eden source tree has **not yet been imported**, the Kotlin scaffold has **not yet been compiled against Eden**, and there is **no NEX APK yet**. Do not treat login or multiplayer as implemented until they are wired into the emulator and tested.
 
-## Nextendo application
+## Nextendo permissions
 
-The NEX public application Client ID supplied for this project is:
+The NEX public application requests these scopes:
 
-nxc_6BozwtiXy9n
+`identity friends presence profil game.matchmaking`
 
-Native Android authentication uses OAuth 2.0 Authorization Code + PKCE. No client secret is embedded in the APK. API requests identify this application with the X-Nextendo-Client-Id header.
+Native Android authentication uses OAuth 2.0 Authorization Code + PKCE (S256). No client secret is embedded in the APK.
 
-See [the Android integration plan](docs/NEXTENDO_ANDROID.md) for the auth flow, token separation, redirect URI, and remaining game-authentication work.
+See [the Android integration plan](docs/NEXTENDO_ANDROID.md), [the pinned Eden source baseline](docs/EDEN_BASE.md), and [the Nextendo online/multiplayer architecture and attestation plan](docs/NEXTENDO_ONLINE_ARCHITECTURE.md).
 
-## Source base
+## Source base and license
 
-NEX is intended to track the official Eden source repository:
+Upstream source: https://git.eden-emu.dev/eden-emu/eden
 
-https://git.eden-emu.dev/eden-emu/eden.git
+Pinned baseline: tag `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 
-Den2 is not the source base. It may be consulted only as a technical reference when needed; NEX must use its own application identity and implementation.
+Eden is licensed under GPLv3-or-later. NEX must preserve the applicable license notices and provide corresponding source under the same license when distributing modified builds. See the upstream [license](https://git.eden-emu.dev/eden-emu/eden/src/tag/v0.2.0-rc1/LICENSE.txt).
 
 ## Scope
 
 NEX is Android-only. This repository does not target Windows, Linux desktop, macOS, iOS, visionOS, or headset operating systems.
 
-## Legal
-
-NEX is an independent community project. Nintendo Switch is a trademark of Nintendo. NEX is not affiliated with or endorsed by Nintendo.
+NEX is an independent community project and is not affiliated with or endorsed by Nintendo.

@@ -1,4 +1,4 @@
-package com.xdavi196.nex.nextendo
+package com.nex.nx.nextendo
 
 import android.net.Uri
 import android.util.Base64
@@ -19,17 +19,15 @@ import java.security.SecureRandom
  * or another background executor.
  */
 object NextendoAuthClient {
-    const val CLIENT_ID = "nxc_6BozwtiXy9n"
-    const val REDIRECT_URI = "com.xdavi196.nex://oauth/callback"
-
-    const val APPLICATION_ID_HEADER = "X-Nextendo-Client-Id"
+    const val CLIENT_ID = "nxc_yAdR-14bOEq7"
+    const val REDIRECT_URI = "com.nex.nx://oauth/callback"
 
     private const val BASE_URL = "https://nextendo.network"
     private const val AUTHORIZE_URL = "$BASE_URL/api/oauth/authorize"
     private const val TOKEN_URL = "$BASE_URL/api/oauth/token"
     private const val NEX_TOKEN_URL = "$BASE_URL/api/nex-token"
 
-    const val SCOPES = "identity friends presence game.matchmaking"
+    const val SCOPES = "identity friends presence profil game.matchmaking"
 
     data class PendingAuthorization(
         val codeVerifier: String,
@@ -45,7 +43,10 @@ object NextendoAuthClient {
 
     data class NexGameToken(
         val token: String,
-        val expiresAtEpochSeconds: Long
+        val expiresAtEpochSeconds: Long,
+        val pid: Long,
+        val username: String,
+        val friendCode: String
     )
 
     class NextendoException(
@@ -89,12 +90,16 @@ object NextendoAuthClient {
         pending: PendingAuthorization
     ): OAuthTokens {
         require(code.isNotBlank()) { "Nextendo returned an empty authorization code." }
-        require(!returnedState.isNullOrBlank()) { "Nextendo callback did not contain state." }
-
-        val expected = pending.state.toByteArray(StandardCharsets.UTF_8)
-        val actual = returnedState.toByteArray(StandardCharsets.UTF_8)
-        require(MessageDigest.isEqual(expected, actual)) {
-            "Nextendo OAuth state validation failed."
+        // Nextendo's published Android callback example does not require a state
+        // parameter. If the server echoes it, validate it; PKCE remains mandatory
+        // and binds the one-time code to the locally stored verifier.
+        if (returnedState != null) {
+            require(returnedState.isNotBlank()) { "Nextendo callback returned an empty state." }
+            val expected = pending.state.toByteArray(StandardCharsets.UTF_8)
+            val actual = returnedState.toByteArray(StandardCharsets.UTF_8)
+            require(MessageDigest.isEqual(expected, actual)) {
+                "Nextendo OAuth state validation failed."
+            }
         }
 
         val response = postForm(
@@ -151,7 +156,13 @@ object NextendoAuthClient {
 
         val expiresIn = json.optLong("expires_in", 24L * 60L * 60L)
         val expiresAt = System.currentTimeMillis() / 1000L + expiresIn
-        return NexGameToken(token, expiresAt)
+        return NexGameToken(
+            token = token,
+            expiresAtEpochSeconds = expiresAt,
+            pid = json.optLong("pid", 0L),
+            username = json.optString("username"),
+            friendCode = json.optString("friend_code")
+        )
     }
 
     private fun parseOAuthTokens(response: String): OAuthTokens {
@@ -196,7 +207,6 @@ object NextendoAuthClient {
             connection.readTimeout = 20_000
             connection.useCaches = false
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty(APPLICATION_ID_HEADER, CLIENT_ID)
             headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
 
             if (body != null) {
