@@ -23,7 +23,7 @@ The NEX public application requests these scopes:
 
 Native Android authentication uses OAuth 2.0 Authorization Code + PKCE (S256). No client secret is embedded in the APK.
 
-See [the Android integration plan](docs/NEXTENDO_ANDROID.md) and [the pinned Eden source baseline](docs/EDEN_BASE.md).
+See [the Android integration plan](docs/NEXTENDO_ANDROID.md), [the pinned Eden source baseline](docs/EDEN_BASE.md), and [the Nextendo online/multiplayer architecture and attestation plan](docs/NEXTENDO_ONLINE_ARCHITECTURE.md).
 
 ## Source base and license
 
