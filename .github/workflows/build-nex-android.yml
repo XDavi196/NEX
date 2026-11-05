@@ -6,19 +6,19 @@ on:
     branches:
       - nex/eden-v0.2.0-rc1-nextendo
     paths:
-      - "README.md"
       - "integration/android/**"
       - "scripts/**"
       - ".github/workflows/build-nex-android.yml"
       - "docs/EDEN_BASE.md"
-      - "docs/NEXTENDO_ONLINE_STATUS.md"
 permissions:
   contents: write
 
 # Keep one full native build per branch. New commits cancel stale 30-minute builds.
+# Do not cancel a costly native build just because another commit was pushed.
+# Pending runs are queued instead of interrupting the active APK build.
 concurrency:
   group: nex-android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   android-optimized:
