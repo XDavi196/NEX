@@ -60,6 +60,18 @@ object NextendoSessionStore {
         )
     }
 
+    /** Starts a new account session without carrying over the previous player's game token. */
+    fun saveFreshOAuthTokens(context: Context, tokens: NextendoAuthClient.OAuthTokens) {
+        saveSession(
+            context,
+            Session(
+                accessToken = tokens.accessToken,
+                refreshToken = tokens.refreshToken,
+                accessTokenExpiresAtEpochSeconds = tokens.expiresAtEpochSeconds
+            )
+        )
+    }
+
     fun saveAccountIdentity(
         context: Context,
         pid: Long,
