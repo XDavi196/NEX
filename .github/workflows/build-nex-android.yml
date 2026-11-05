@@ -6,10 +6,12 @@ on:
     branches:
       - nex/eden-v0.2.0-rc1-nextendo
     paths:
+      - "README.md"
       - "integration/android/**"
       - "scripts/**"
       - ".github/workflows/build-nex-android.yml"
       - "docs/EDEN_BASE.md"
+      - "docs/NEXTENDO_ONLINE_STATUS.md"
 permissions:
   contents: write
 
