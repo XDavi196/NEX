@@ -15,7 +15,9 @@ This folder contains the NEX-owned Android integration source:
 - Application ID: `com.nex.nx`
 - Client ID used in this branch: `nxc_yAdR-14bOEq7`
 - Redirect URI: `com.nex.nx://oauth/callback`
-- Scopes: `identity friends presence game.matchmaking`
+- Scopes: `identity friends presence profil game.matchmaking mods.favorites`
+- Authorization URL: `https://nextendo.network/oauth/authorize`
+- Token URL: `https://nextendo.network/api/oauth/token`
 - Application identity header: `X-Nextendo-Client-Id`
 
 The README on `main` currently has a different Client ID (`nxc_6BozwtiXy9n`). Confirm the correct value in the Developer Portal before live sign-in.
