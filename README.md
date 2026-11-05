@@ -1,124 +1,96 @@
 # NEX
 
-**NEX is an independent Android Nintendo Switch emulator project derived from the Eden open-source codebase, with an in-progress integration for Nextendo Network.**
+**A community-made Android Nintendo Switch emulator project, built from Eden's open-source code and with Nextendo Network support in development.**
 
-<sub>Experimental project — not a stable release and not ready for online gameplay.</sub>
+NEX is being developed for Android phones and tablets. The goal is to build on Eden's work while giving the project its own identity and its own Nextendo integration. This is an ongoing community project, so things are still changing and not everything is ready yet.
 
-## Important status notice
+> **Please keep in mind:** NEX is experimental. The first APK will be an early preview, not a finished or stable release. In-game online multiplayer is not working yet.
 
-NEX is under active development. The Android integration and build pipeline are still being validated. A successful APK build does **not** mean that every emulator feature, account endpoint, or online game mode has been tested.
+## A little about the project
 
-**Online gameplay is not available yet.** The current Nextendo work is an integration scaffold for account authentication, profile/friends display, and presence reporting. The native emulator and game-network work required for matchmaking and peer-to-peer sessions is not complete. Do not expect the first successful APK to support playing games online.
+NEX is a **fork of the Eden project**. It uses Eden's open-source code as its starting point, with changes and additions being developed for NEX. Eden deserves credit for the work that made this project possible, but NEX is maintained separately and is not an official Eden release.
 
-The first public APK, when the build is verified, will be an **experimental preview**. Sign-in and account-related features will also need live testing against the Nextendo service before they can be considered reliable.
+The project currently targets Android only. The source base is Eden `v0.2.0-rc1`, pinned to commit `8e373eb714aa01117ec885680477501cdb572112`.
 
-## What is NEX?
+Some technical details:
 
-NEX is an Android-focused community fork of Eden. It aims to maintain an Android emulator build and develop a separate, first-party NEX integration with Nextendo Network.
+- Android application ID: `com.nex.nx`
+- OAuth callback: `com.nex.nx://oauth/callback`
+- Nextendo public Client ID: `nxc_yAdR-14bOEq7`
+- Build variant: Eden Android Optimized, customized for NEX
 
-- **Platform:** Android phones and tablets.
-- **Upstream codebase:** Eden `v0.2.0-rc1`.
-- **Pinned upstream commit:** `8e373eb714aa01117ec885680477501cdb572112`.
-- **Android application ID:** `com.nex.nx`.
-- **OAuth redirect URI:** `com.nex.nx://oauth/callback`.
-- **Nextendo public Client ID:** `nxc_yAdR-14bOEq7`.
-- **Build target:** Eden Android Optimized flavor, customized for NEX.
+## Where things stand
 
-NEX is based on Eden source code. It is not based on Den2, and it does not reuse another emulator's private credentials, client secrets, signing keys, or attestation material.
+The Android side of the Nextendo integration is being put together. The current code includes the OAuth sign-in flow, protected session storage, a basic account/profile view, a read-only friends list, and app presence updates. These features still need to be tested against the live service, so they should be considered experimental too.
 
-## Project status
+There is an important difference between showing that someone is online and actually connecting two players inside a game. **NEX does not support in-game online multiplayer yet.** The emulator-side work for game authentication, friend services, DNS/TLS routing, matchmaking, NAT traversal, and peer-to-peer networking is still ahead of us.
 
-| Component | Current status |
-|---|---|
-| Eden source pin and Android overlay | Implemented; CI validation in progress |
-| NEX package identity (`com.nex.nx`) | Implemented in the build overlay |
-| OAuth Authorization Code + PKCE (S256) | Android integration scaffold implemented; live sign-in not yet verified end to end |
-| Account profile | Read-only integration implemented; requires live service validation |
-| Friends list | Read-only integration implemented; friend-request actions are not wired |
-| App online/offline presence | Heartbeat and offline publication implemented; service behavior still needs live testing |
-| In-game presence | Current title-ID hook added; not a game-network connection |
-| BAAS `id_token` and signed `nnex` claim | Not implemented |
-| Game-side `nn::friends` integration | Not implemented |
-| Nextendo DNS and TLS/SNI routing | Not implemented |
-| NEX/PRUDP, matchmaking, NAT traversal and P2P | Not implemented |
-| Verified online gameplay | Not available |
+We would rather be clear about what is unfinished than promise features that players cannot use. The [online development notes](docs/NEXTENDO_ONLINE_STATUS.md) explain the current work and what remains.
 
-See [the online implementation status](docs/NEXTENDO_ONLINE_STATUS.md) for the detailed list of missing emulator-side work and source files.
+## Nextendo Network
 
-## Nextendo Network integration
-
-NEX uses its own public application registration. The Android client uses OAuth 2.0 Authorization Code with PKCE S256 and requests these scopes:
+NEX is being connected to Nextendo Network using its own public application registration. The Android sign-in flow uses OAuth 2.0 Authorization Code with PKCE (S256), with these requested permissions:
 
 `identity friends presence profil game.matchmaking mods.favorites`
 
-The configured callback is:
+The sign-in callback is `com.nex.nx://oauth/callback`. The authorization page is `/oauth/authorize`, and the token exchange uses `/api/oauth/token`. PKCE values are generated for each sign-in; placeholder challenge values are never meant to be used as real credentials.
 
-`com.nex.nx://oauth/callback`
+OAuth login and game authentication are separate parts of the integration. In particular, the Nextendo game token (`nx2.`) has a different purpose from the normal OAuth access token. NEX must handle it according to the service's game-authentication requirements; one token cannot simply replace the other.
 
-The authorization request uses the Nextendo Developer Portal route `/oauth/authorize`. The OAuth token exchange uses the documented `/api/oauth/token` endpoint. PKCE verifier and challenge values are generated dynamically for each authorization flow; placeholder values must never be hard-coded.
+If you are interested in the technical side, these notes go into more detail:
 
-The OAuth access token and the separate Nextendo game token (the `nx2.` token) serve different purposes. The game token must be handled according to the Nextendo game-authentication contract; an OAuth access token must not be substituted for it. No client secret is embedded in the APK.
+- [Android sign-in and account integration](docs/NEXTENDO_ANDROID.md)
+- [Online networking architecture](docs/NEXTENDO_ONLINE_ARCHITECTURE.md)
+- [Current implementation status](docs/NEXTENDO_ONLINE_STATUS.md)
 
-For implementation details, see:
+## Builds and downloads
 
-- [Android authentication and account integration](docs/NEXTENDO_ANDROID.md)
-- [Online architecture](docs/NEXTENDO_ONLINE_ARCHITECTURE.md)
-- [Online implementation status](docs/NEXTENDO_ONLINE_STATUS.md)
+When a build is ready, experimental APKs will be published on the [Releases page](https://github.com/XDavi196/NEX/releases). You can also follow the [GitHub Actions page](https://github.com/XDavi196/NEX/actions) to see whether a build has passed.
 
-## Building
+The automated workflow is set up to publish a prerelease only after the full Android build succeeds. A failed or incomplete build will not be presented as a release. The expected APK name is `NEX-Android-v0.2.0-rc1-optimized.apk`.
 
-The GitHub Actions workflow checks out the pinned Eden source, applies the NEX Android overlay, builds the Android Optimized variant, renames the output, and generates SHA-256 checksums.
+Please treat early builds as test versions. Compatibility, performance, supported Android versions, and device requirements must be confirmed from each release's notes rather than assumed from Eden.
 
-Build artifacts are published only after the complete build succeeds. The first experimental prerelease is created automatically only when a push build is triggered by a commit whose subject starts with `[release]`; failed builds never create a release. The initial public preview is a prerelease, not a stable release. Check the [GitHub Actions runs](https://github.com/XDavi196/NEX/actions) and [Releases](https://github.com/XDavi196/NEX/releases) pages for verified outputs.
+## A note about accounts and security
 
-The expected APK filename is:
+Please do not post access tokens, refresh tokens, game tokens, private keys, or other account credentials in issues or public chats. NEX should never need a client secret inside its APK. The Android integration is designed to keep session information protected with Android Keystore-backed encryption, but it is still under testing.
 
-`NEX-Android-v0.2.0-rc1-optimized.apk`
+When signing in, use the Nextendo sign-in page and take a moment to review the permissions being requested.
 
-The exact supported Android versions, ABI, signing details, and device compatibility must be confirmed from the actual build and release metadata. Do not assume that every device supported by upstream Eden is automatically supported by NEX.
+## Games and system files
 
-## Security and account safety
+NEX does not come with commercial games, game dumps, firmware, console keys, or other copyrighted game data. You are responsible for obtaining and using any files you need in a lawful way. The project does not host or distribute copyrighted game files.
 
-- Never share OAuth access tokens, refresh tokens, game tokens, private keys, or other account credentials in issues, screenshots, chat messages, or public logs.
-- NEX must not embed a client secret in the Android application.
-- Session data is intended to be stored using Android Keystore-backed encryption.
-- Use the official Nextendo sign-in page and review the permissions requested during authorization.
-- Report suspected credential exposure immediately and revoke affected sessions through the service where possible.
+## A few important things to make clear
 
-## Games, firmware, keys and other files
+### About Eden
 
-NEX does not include commercial games, game dumps, firmware, console keys, or copyrighted game data. Users are responsible for obtaining and using any required files lawfully and in accordance with the laws that apply to them. The project does not provide instructions or downloads for obtaining copyrighted material without authorization.
+NEX is a **fork of Eden**, not an official Eden build. It is developed independently and is not affiliated with, sponsored by, maintained by, or endorsed by the Eden project or its developers. The original Eden project remains separate, and its contributors deserve credit for their work.
 
-## Independence and trademark notices
+### About Nextendo Network
 
-### Eden
+NEX is an independent third-party integration. It is not an official Nextendo Network app and is not affiliated with, operated by, sponsored by, or endorsed by Nextendo Network or its operators. Access to the service and its APIs is controlled by the service provider and may change at any time.
 
-NEX is a **community fork derived from Eden's open-source codebase**. It is not an official Eden build or an official Eden project. NEX is not sponsored by, affiliated with, maintained by, or endorsed by the Eden project or its developers. Upstream Eden remains a separate project.
+### About Nintendo
 
-### Nextendo Network
+NEX is not affiliated with, sponsored by, authorized by, or endorsed by Nintendo. Nintendo, Nintendo Switch, and related names and marks belong to their respective owner. NEX is a community project, not an official Nintendo product.
 
-NEX is an independent third-party client integration. It is not an official Nextendo Network application, and it is not sponsored by, affiliated with, operated by, or endorsed by Nextendo Network or its operators. Network access, API availability, account approval, and service behavior are controlled by the service provider and may change independently of NEX.
+All third-party names and trademarks belong to their respective owners. Their use here is only to describe the software and services that the project works with; it does not suggest an official partnership.
 
-### Nintendo
+## Source code and license
 
-NEX is not affiliated with, sponsored by, authorized by, or endorsed by Nintendo. Nintendo, Nintendo Switch, and related names and marks are trademarks of their respective owner. NEX is an independent community project and is not an official Nintendo product.
+NEX includes and modifies code from Eden `v0.2.0-rc1`. Eden's source code is licensed under **GPL-3.0-or-later**. When sharing builds or modified source, the project and anyone redistributing it must follow the licenses that apply to the included components, including the required copyright notices and corresponding source code.
 
-All third-party names, logos, and trademarks remain the property of their respective owners. These notices are intended to make the project's independent status clear; they do not imply a partnership or authorization.
-
-## Source code and licensing
-
-NEX derives from Eden `v0.2.0-rc1` and includes or modifies upstream components. Eden's source is licensed under **GPL-3.0-or-later**; the repository retains applicable upstream copyright and SPDX notices. Any redistribution of NEX binaries or modified source must comply with the licenses that apply to the included components, including providing corresponding source and preserving required notices where the license requires it.
-
-- [Pinned Eden upstream release](https://git.eden-emu.dev/eden-emu/eden/releases/tag/v0.2.0-rc1)
-- [Eden upstream source](https://git.eden-emu.dev/eden-emu/eden)
+- [Eden source code](https://git.eden-emu.dev/eden-emu/eden)
+- [Eden `v0.2.0-rc1` release](https://git.eden-emu.dev/eden-emu/eden/releases/tag/v0.2.0-rc1)
 - [Eden license](https://git.eden-emu.dev/eden-emu/eden/src/tag/v0.2.0-rc1/LICENSE.txt)
 
-This project is provided without warranty. Features may be incomplete, unstable, or removed during development.
+NEX is provided as-is, without warranty. Features may be incomplete, unstable, or changed as development continues.
 
-## Links
+## Find your way around
 
-- [NEX source repository](https://github.com/XDavi196/NEX)
-- [Open pull request and implementation branch](https://github.com/XDavi196/NEX/pull/1)
-- [Build history](https://github.com/XDavi196/NEX/actions)
-- [Releases](https://github.com/XDavi196/NEX/releases)
+- [Source code](https://github.com/XDavi196/NEX)
+- [Development pull request](https://github.com/XDavi196/NEX/pull/1)
+- [Builds and checks](https://github.com/XDavi196/NEX/actions)
+- [Downloads and prereleases](https://github.com/XDavi196/NEX/releases)
 - [Nextendo Developer Portal](https://nextendo.network/developers)
