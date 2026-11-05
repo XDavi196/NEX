@@ -154,7 +154,7 @@ def main() -> None:
         raise RuntimeError("Could not identify EmulationActivity NativeLibrary import")
     activity_text = activity_text.replace(
         activity_import,
-        activity_import + "import com.nex.nx.nextendo.NextendoPresencePublisher\\n",
+        activity_import + "import com.nex.nx.nextendo.NextendoPresencePublisher\n",
         1,
     )
 
