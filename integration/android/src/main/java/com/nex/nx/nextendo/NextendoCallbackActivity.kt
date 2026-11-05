@@ -32,7 +32,7 @@ class NextendoCallbackActivity : Activity() {
             val message = result.fold(
                 onSuccess = { outcome ->
                     if (outcome.gameTokenReady) {
-                        "Conta Nextendo conectada ao NEX. Autenticação de jogo recebida."
+                        "Conta Nextendo conectada. Token de jogo recebido; multiplayer ainda está em integração."
                     } else {
                         "Conta Nextendo conectada. Não foi possível obter o token de jogo; tente atualizar a sessão."
                     }
