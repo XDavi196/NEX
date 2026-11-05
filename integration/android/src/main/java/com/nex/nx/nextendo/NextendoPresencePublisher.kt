@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit
  *
  * Nextendo expires presence unless the app sends a heartbeat at least every
  * 90 seconds. NEX sends one every 60 seconds. The current Android wiring
- * reports account-online status; a native emulation callback must call
- * setGameActivity() to publish a real title ID and game detail.
+ * reports account-online status. The Eden overlay calls setGameActivity()
+ * from EmulationActivity using Eden's current title-ID/playtime bridge.
  */
 object NextendoPresencePublisher {
     private const val HEARTBEAT_SECONDS = 60L
