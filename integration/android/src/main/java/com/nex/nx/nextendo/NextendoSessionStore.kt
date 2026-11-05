@@ -13,32 +13,49 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Stores Nextendo session material encrypted with an AES-GCM key held by Android Keystore.
- *
- * There is intentionally no plaintext fallback. If Keystore encryption is unavailable,
- * saving fails rather than writing account tokens to ordinary preferences or files.
+ * Stores Nextendo session and pending PKCE transaction data encrypted with an
+ * AES-GCM key held by Android Keystore. There is intentionally no plaintext fallback.
  */
 object NextendoSessionStore {
     private const val PREFERENCES = "nex_nextendo_secure_session"
     private const val KEY_ALIAS = "com.nex.nx.nextendo.session.v1"
-    private const val VALUE_IV = "iv"
-    private const val VALUE_CIPHERTEXT = "ciphertext"
+
+    private const val SESSION_IV = "session_iv"
+    private const val SESSION_CIPHERTEXT = "session_ciphertext"
+    private const val PENDING_IV = "pending_iv"
+    private const val PENDING_CIPHERTEXT = "pending_ciphertext"
+    private const val PENDING_MAX_AGE_SECONDS = 10L * 60L
 
     data class Session(
         val accessToken: String,
         val refreshToken: String,
         val accessTokenExpiresAtEpochSeconds: Long,
         val nexGameToken: String = "",
-        val nexGameTokenExpiresAtEpochSeconds: Long = 0L
+        val nexGameTokenExpiresAtEpochSeconds: Long = 0L,
+        val pid: Long = 0L,
+        val username: String = "",
+        val friendCode: String = ""
+    )
+
+    data class PendingAuthorization(
+        val codeVerifier: String,
+        val state: String,
+        val createdAtEpochSeconds: Long
     )
 
     fun saveOAuthTokens(context: Context, tokens: NextendoAuthClient.OAuthTokens) {
-        save(
+        val previous = runCatching { load(context) }.getOrNull()
+        saveSession(
             context,
             Session(
                 accessToken = tokens.accessToken,
                 refreshToken = tokens.refreshToken,
-                accessTokenExpiresAtEpochSeconds = tokens.expiresAtEpochSeconds
+                accessTokenExpiresAtEpochSeconds = tokens.expiresAtEpochSeconds,
+                nexGameToken = previous?.nexGameToken.orEmpty(),
+                nexGameTokenExpiresAtEpochSeconds = previous?.nexGameTokenExpiresAtEpochSeconds ?: 0L,
+                pid = previous?.pid ?: 0L,
+                username = previous?.username.orEmpty(),
+                friendCode = previous?.friendCode.orEmpty()
             )
         )
     }
@@ -47,34 +64,87 @@ object NextendoSessionStore {
         val current = load(context)
             ?: throw IllegalStateException("Cannot save a game token without a linked Nextendo session.")
 
-        save(
+        saveSession(
             context,
             current.copy(
                 nexGameToken = token.token,
-                nexGameTokenExpiresAtEpochSeconds = token.expiresAtEpochSeconds
+                nexGameTokenExpiresAtEpochSeconds = token.expiresAtEpochSeconds,
+                pid = token.pid,
+                username = token.username,
+                friendCode = token.friendCode
             )
         )
     }
 
     fun load(context: Context): Session? {
         val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-        val ivText = preferences.getString(VALUE_IV, null) ?: return null
-        val ciphertextText = preferences.getString(VALUE_CIPHERTEXT, null) ?: return null
+        val ivText = preferences.getString(SESSION_IV, null) ?: return null
+        val ciphertextText = preferences.getString(SESSION_CIPHERTEXT, null) ?: return null
+        val json = JSONObject(decrypt(ivText, ciphertextText))
 
-        val iv = Base64.decode(ivText, Base64.NO_WRAP)
-        val ciphertext = Base64.decode(ciphertextText, Base64.NO_WRAP)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
-        val cleartext = cipher.doFinal(ciphertext).toString(StandardCharsets.UTF_8)
-        val json = JSONObject(cleartext)
+        val accessToken = json.optString("access_token")
+        val refreshToken = json.optString("refresh_token")
+        if (accessToken.isBlank() || refreshToken.isBlank()) return null
 
         return Session(
-            accessToken = json.getString("access_token"),
-            refreshToken = json.getString("refresh_token"),
-            accessTokenExpiresAtEpochSeconds = json.getLong("access_expires_at"),
+            accessToken = accessToken,
+            refreshToken = refreshToken,
+            accessTokenExpiresAtEpochSeconds = json.optLong("access_expires_at", 0L),
             nexGameToken = json.optString("nex_token"),
-            nexGameTokenExpiresAtEpochSeconds = json.optLong("nex_expires_at", 0L)
+            nexGameTokenExpiresAtEpochSeconds = json.optLong("nex_expires_at", 0L),
+            pid = json.optLong("pid", 0L),
+            username = json.optString("username"),
+            friendCode = json.optString("friend_code")
         )
+    }
+
+    fun savePendingAuthorization(context: Context, pending: NextendoAuthClient.PendingAuthorization) {
+        val json = JSONObject()
+            .put("code_verifier", pending.codeVerifier)
+            .put("state", pending.state)
+            .put("created_at", System.currentTimeMillis() / 1000L)
+
+        val (iv, ciphertext) = encrypt(json.toString())
+        val saved = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .putString(PENDING_IV, iv)
+            .putString(PENDING_CIPHERTEXT, ciphertext)
+            .commit()
+        check(saved) { "Could not persist the pending Nextendo authorization." }
+    }
+
+    fun loadPendingAuthorization(context: Context): PendingAuthorization? {
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        val iv = preferences.getString(PENDING_IV, null) ?: return null
+        val ciphertext = preferences.getString(PENDING_CIPHERTEXT, null) ?: return null
+
+        val pending = try {
+            val json = JSONObject(decrypt(iv, ciphertext))
+            PendingAuthorization(
+                codeVerifier = json.getString("code_verifier"),
+                state = json.getString("state"),
+                createdAtEpochSeconds = json.getLong("created_at")
+            )
+        } catch (_: Exception) {
+            clearPendingAuthorization(context)
+            return null
+        }
+
+        val age = (System.currentTimeMillis() / 1000L) - pending.createdAtEpochSeconds
+        if (age !in 0..PENDING_MAX_AGE_SECONDS) {
+            clearPendingAuthorization(context)
+            return null
+        }
+        return pending
+    }
+
+    fun clearPendingAuthorization(context: Context) {
+        val cleared = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .remove(PENDING_IV)
+            .remove(PENDING_CIPHERTEXT)
+            .commit()
+        check(cleared) { "Could not clear the pending Nextendo authorization." }
     }
 
     fun clear(context: Context) {
@@ -89,34 +159,46 @@ object NextendoSessionStore {
         }
     }
 
-    private fun save(context: Context, session: Session) {
+    private fun saveSession(context: Context, session: Session) {
         val json = JSONObject()
             .put("access_token", session.accessToken)
             .put("refresh_token", session.refreshToken)
             .put("access_expires_at", session.accessTokenExpiresAtEpochSeconds)
             .put("nex_token", session.nexGameToken)
             .put("nex_expires_at", session.nexGameTokenExpiresAtEpochSeconds)
+            .put("pid", session.pid)
+            .put("username", session.username)
+            .put("friend_code", session.friendCode)
 
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
-        val ciphertext = cipher.doFinal(json.toString().toByteArray(StandardCharsets.UTF_8))
-        val iv = cipher.iv
-
+        val (iv, ciphertext) = encrypt(json.toString())
         val saved = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit()
-            .putString(VALUE_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
-            .putString(VALUE_CIPHERTEXT, Base64.encodeToString(ciphertext, Base64.NO_WRAP))
+            .putString(SESSION_IV, iv)
+            .putString(SESSION_CIPHERTEXT, ciphertext)
             .commit()
-
         check(saved) { "Could not persist the encrypted Nextendo session." }
+    }
+
+    private fun encrypt(cleartext: String): Pair<String, String> {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        val ciphertext = cipher.doFinal(cleartext.toByteArray(StandardCharsets.UTF_8))
+        return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) to
+            Base64.encodeToString(ciphertext, Base64.NO_WRAP)
+    }
+
+    private fun decrypt(ivText: String, ciphertextText: String): String {
+        val iv = Base64.decode(ivText, Base64.NO_WRAP)
+        val ciphertext = Base64.decode(ciphertextText, Base64.NO_WRAP)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
+        return cipher.doFinal(ciphertext).toString(StandardCharsets.UTF_8)
     }
 
     private fun getOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         val existing = keyStore.getKey(KEY_ALIAS, null) as? SecretKey
-        if (existing != null) {
-            return existing
-        }
+        if (existing != null) return existing
 
         val generator = KeyGenerator.getInstance(
             KeyProperties.KEY_ALGORITHM_AES,
