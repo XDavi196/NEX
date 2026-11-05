@@ -140,7 +140,7 @@ object NextendoAuthManager {
         NextendoPresencePublisher.start(activity)
 
         executor.execute {
-            val activeSession = refreshSessionIfNeeded(activity, stored)
+            val activeSession = refreshSessionIfNeeded(activity)
             val profile = if (activeSession.pid > 0L) {
                 runCatching {
                     NextendoAccountApi.fetchOwnProfile(activeSession.accessToken, activeSession.pid)
@@ -207,7 +207,7 @@ object NextendoAuthManager {
 
         executor.execute {
             val result = runCatching {
-                val session = refreshSessionIfNeeded(activity, stored)
+                val session = refreshSessionIfNeeded(activity)
                 NextendoSocialApi.fetchFriends(session.accessToken)
             }
 
@@ -260,8 +260,7 @@ object NextendoAuthManager {
      * The new refresh token is persisted immediately.
      */
     private fun refreshSessionIfNeeded(
-        context: Context,
-        stored: NextendoSessionStore.Session
+        context: Context
     ): NextendoSessionStore.Session {
         // Always re-read the current session in the synchronized refresher:
         // another worker may already have rotated the refresh token.
