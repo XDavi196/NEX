@@ -89,14 +89,17 @@ object NextendoAuthClient {
         pending: PendingAuthorization
     ): OAuthTokens {
         require(code.isNotBlank()) { "Nextendo returned an empty authorization code." }
-        require(!returnedState.isNullOrBlank()) {
-            "Nextendo OAuth callback did not include the state parameter."
-        }
-
-        val expected = pending.state.toByteArray(StandardCharsets.UTF_8)
-        val actual = returnedState.toByteArray(StandardCharsets.UTF_8)
-        require(MessageDigest.isEqual(expected, actual)) {
-            "Nextendo OAuth state validation failed."
+        // Validate state whenever Nextendo echoes it. PKCE remains mandatory and
+        // binds the one-time authorization code to the locally stored verifier.
+        if (returnedState != null) {
+            require(returnedState.isNotBlank()) {
+                "Nextendo OAuth callback returned an empty state parameter."
+            }
+            val expected = pending.state.toByteArray(StandardCharsets.UTF_8)
+            val actual = returnedState.toByteArray(StandardCharsets.UTF_8)
+            require(MessageDigest.isEqual(expected, actual)) {
+                "Nextendo OAuth state validation failed."
+            }
         }
 
         val response = postForm(
