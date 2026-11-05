@@ -50,7 +50,7 @@ The public developer guide documents `POST /api/presence` and a heartbeat at lea
 {
   "status": 2,
   "app_field": "",
-  "app_id": "0100000000000000",
+  "app_id": "TITLE_ID_DO_JOGO",
   "app_detail": ""
 }
 ```
