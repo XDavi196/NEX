@@ -263,17 +263,9 @@ object NextendoAuthManager {
         context: Context,
         stored: NextendoSessionStore.Session
     ): NextendoSessionStore.Session {
-        if (stored.accessTokenExpiresAtEpochSeconds >
-            (System.currentTimeMillis() / 1000L) + 60L
-        ) {
-            return stored
-        }
-
-        return runCatching {
-            val refreshed = NextendoAuthClient.refreshAccessToken(stored.refreshToken)
-            NextendoSessionStore.saveOAuthTokens(context, refreshed)
-            NextendoSessionStore.load(context)
-        }.getOrNull() ?: stored
+        // Always re-read the current session in the synchronized refresher:
+        // another worker may already have rotated the refresh token.
+        return NextendoSessionRefresher.getValidSession(context, 60L)
     }
 
     fun refreshSession(
@@ -282,21 +274,14 @@ object NextendoAuthManager {
     ) {
         executor.execute {
             val result = runCatching {
-                val current = NextendoSessionStore.load(context)
-                    ?: throw IllegalStateException("Nenhuma conta Nextendo está conectada.")
-
-                val refreshed = NextendoAuthClient.refreshAccessToken(current.refreshToken)
-                NextendoSessionStore.saveOAuthTokens(context, refreshed)
-
-                val latest = NextendoSessionStore.load(context)
-                    ?: throw IllegalStateException("Não foi possível recuperar a sessão Nextendo.")
+                val latest = NextendoSessionRefresher.getValidSession(context, 300L)
 
                 val gameToken = if (
                     latest.nexGameToken.isBlank() ||
                     latest.nexGameTokenExpiresAtEpochSeconds <=
                         (System.currentTimeMillis() / 1000L) + 300L
                 ) {
-                    NextendoAuthClient.fetchNexGameToken(refreshed.accessToken).also {
+                    NextendoAuthClient.fetchNexGameToken(latest.accessToken).also {
                         NextendoSessionStore.saveNexGameToken(context, it)
                     }
                 } else {
