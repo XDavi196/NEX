@@ -30,7 +30,12 @@ object NextendoAccountApi {
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000
             connection.useCaches = false
+            connection.instanceFollowRedirects = false
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty(
+                NextendoAuthClient.CLIENT_ID_HEADER,
+                NextendoAuthClient.CLIENT_ID
+            )
             connection.setRequestProperty("Authorization", "Bearer $accessToken")
 
             val status = connection.responseCode
@@ -47,7 +52,9 @@ object NextendoAccountApi {
 
             val json = JSONObject(payload)
             val returnedPid = json.optLong("pid", pid)
-            require(returnedPid == pid) { "O Nextendo devolveu um perfil diferente do jogador conectado." }
+            require(returnedPid == pid) {
+                "O Nextendo devolveu um perfil diferente do jogador conectado."
+            }
 
             return PlayerProfile(
                 pid = returnedPid,
