@@ -2,6 +2,10 @@
 
 **Atualizado em 5 de novembro de 2026**
 
+## OAuth URL mais recente do Developer Portal
+
+A URL gerada para o Client ID do NEX usa `https://nextendo.network/oauth/authorize`, o redirect `com.nex.nx://oauth/callback` e os escopos `identity friends presence profil game.matchmaking mods.favorites`. O valor `YOUR_CODE_CHALLENGE` é apenas um placeholder: o NEX calcula um `code_verifier` e um `code_challenge` S256 novos a cada login. A troca do código continua em `POST /api/oauth/token`, conforme a documentação técnica publicada.
+
 Este documento separa o que já existe no código do NEX do que ainda falta para uma sessão multiplayer real. Uma conta conectada ou um token `nx2.` recebido não significam que os jogos já estejam online.
 
 ## O que já foi adicionado à branch de integração
