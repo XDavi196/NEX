@@ -130,9 +130,9 @@ def main() -> None:
                 RunnableSetting(
                     titleString = "Nextendo Network",
                     descriptionString = if (nextendoUsername.isBlank()) {
-                        "Conectar conta, perfil, amigos e multiplayer"
+                        "Entrar na conta Nextendo (perfil em leitura)"
                     } else {
-                        "Conectado como $nextendoUsername — tocar para reconectar"
+                        "Conectado como $nextendoUsername — tocar para abrir perfil"
                     },
                     isRunnable = activity != null,
                     iconId = R.drawable.ic_network
