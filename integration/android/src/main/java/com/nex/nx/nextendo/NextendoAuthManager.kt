@@ -1,6 +1,8 @@
 package com.nex.nx.nextendo
 
 import android.app.Activity
+import androidx.appcompat.app.AlertDialog
+import android.widget.Toast
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -114,6 +116,66 @@ object NextendoAuthManager {
             }
 
             mainHandler.post { onComplete(result) }
+        }
+    }
+
+    /**
+     * Opens the NEX account panel. Profile data is requested using the user's
+     * OAuth token and PID; no bot token or client secret is used.
+     */
+    fun openAccount(activity: Activity) {
+        val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
+        if (stored == null) {
+            startLogin(activity)
+            return
+        }
+
+        executor.execute {
+            val profile = if (stored.pid > 0L) {
+                runCatching {
+                    NextendoAccountApi.fetchOwnProfile(stored.accessToken, stored.pid)
+                }.getOrNull()
+            } else {
+                null
+            }
+
+            mainHandler.post {
+                if (activity.isFinishing || activity.isDestroyed) return@post
+
+                val username = profile?.username?.ifBlank { stored.username }
+                    ?: stored.username.ifBlank { "Conta conectada" }
+                val friendCode = profile?.friendCode?.ifBlank { stored.friendCode }
+                    ?: stored.friendCode.ifBlank { "Ainda não disponível" }
+                val pid = profile?.pid?.takeIf { it > 0L } ?: stored.pid
+                val avatar = profile?.avatarUrl.orEmpty()
+
+                val details = buildString {
+                    append("Jogador: ")
+                    append(username)
+                    append("\nFriend Code: ")
+                    append(friendCode)
+                    append("\nPID: ")
+                    append(if (pid > 0L) pid.toString() else "Aguardando token de jogo")
+                    if (avatar.isNotBlank()) {
+                        append("\n\nAvatar: ")
+                        append(avatar)
+                    }
+                    if (profile == null && pid > 0L) {
+                        append("\n\nO perfil não pôde ser atualizado agora. Os dados salvos são exibidos.")
+                    }
+                }
+
+                AlertDialog.Builder(activity)
+                    .setTitle("Perfil Nextendo")
+                    .setMessage(details)
+                    .setPositiveButton("Reconectar") { _, _ -> startLogin(activity) }
+                    .setNeutralButton("Desconectar") { _, _ ->
+                        runCatching { NextendoSessionStore.clear(activity) }
+                        Toast.makeText(activity, "Conta Nextendo desconectada.", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("Fechar", null)
+                    .show()
+            }
         }
     }
 
