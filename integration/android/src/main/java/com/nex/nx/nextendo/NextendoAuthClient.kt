@@ -43,7 +43,10 @@ object NextendoAuthClient {
 
     data class NexGameToken(
         val token: String,
-        val expiresAtEpochSeconds: Long
+        val expiresAtEpochSeconds: Long,
+        val pid: Long,
+        val username: String,
+        val friendCode: String
     )
 
     class NextendoException(
@@ -149,7 +152,13 @@ object NextendoAuthClient {
 
         val expiresIn = json.optLong("expires_in", 24L * 60L * 60L)
         val expiresAt = System.currentTimeMillis() / 1000L + expiresIn
-        return NexGameToken(token, expiresAt)
+        return NexGameToken(
+            token = token,
+            expiresAtEpochSeconds = expiresAt,
+            pid = json.optLong("pid", 0L),
+            username = json.optString("username"),
+            friendCode = json.optString("friend_code")
+        )
     }
 
     private fun parseOAuthTokens(response: String): OAuthTokens {
