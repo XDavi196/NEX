@@ -36,10 +36,14 @@ object NextendoPresencePublisher {
     private var applicationContext: Context? = null
     private var heartbeat: ScheduledFuture<*>? = null
 
+    @Volatile
+    private var enabled = false
+
     /** Start online presence after a valid OAuth session has been saved. */
     fun start(context: Context) {
         synchronized(lock) {
             applicationContext = context.applicationContext
+            enabled = true
             if (heartbeat?.isCancelled == false && heartbeat?.isDone == false) return
 
             heartbeat = executor.scheduleAtFixedRate(
@@ -94,6 +98,7 @@ object NextendoPresencePublisher {
         }.getOrNull()
 
         synchronized(lock) {
+            enabled = false
             heartbeat?.cancel(false)
             heartbeat = null
             applicationContext = appContext
@@ -118,6 +123,7 @@ object NextendoPresencePublisher {
     }
 
     private fun publishCurrentPresence() {
+        if (!enabled) return
         val context = synchronized(lock) { applicationContext } ?: return
         val session = runCatching {
             NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
