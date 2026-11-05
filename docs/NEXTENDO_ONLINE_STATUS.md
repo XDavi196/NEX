@@ -13,11 +13,11 @@ Este documento separa o que já existe no código do NEX do que ainda falta para
 | Identidade do cliente | Envia `X-Nextendo-Client-Id` com o Client ID do NEX nas chamadas REST | `NextendoAuthClient.kt`, `NextendoAccountApi.kt` |
 | Perfil | Consulta de perfil do próprio jogador | `NextendoAccountApi.kt` |
 | Lista de amigos no app | Consulta somente de leitura via `GET /api/oauth/userinfo`, com UI simples | `NextendoSocialApi.kt`, `NextendoAuthManager.kt` |
-| Presença de aplicativo | Publica online e envia heartbeat a cada 60 segundos; envia offline ao desconectar | `NextendoPresencePublisher.kt`, `NextendoAuthClient.kt` |
+| Presença de aplicativo/jogo | Publica online, heartbeat a cada 60 segundos, offline no logout e status in-game com o Title ID obtido pelo playtime bridge do Eden | `NextendoPresencePublisher.kt`, `EmulationActivity.kt` via overlay |
 | Token de jogo | Solicita o token separado `nx2.` em `/api/nex-token` e guarda-o separado do OAuth | `NextendoAuthClient.kt`, `NextendoSessionStore.kt` |
 | Overlay Android | Copia fontes Kotlin, registra callback e adiciona a entrada Nextendo às configurações do Eden | `scripts/apply-eden-overlay.py` |
 
-**Limites atuais do código Android:** a lista de amigos é somente leitura; envio/aceite/recusa de pedidos ainda não foi ligado. O heartbeat atual publica o estado da conta como online. O método `setGameActivity()` existe, mas ainda não recebe o Title ID real do emulador; portanto o NEX ainda não publica presença real de jogo.
+**Limites atuais do código Android:** a lista de amigos é somente leitura; envio/aceite/recusa de pedidos ainda não foi ligado. O overlay agora conecta `EmulationActivity.onEmulationStarted()` e `onEmulationStopped()` ao publisher, usando `NativeLibrary.playTimeManagerGetCurrentTitleId()` para status in-game. O Title ID é enviado como `app_id`; `app_field` continua vazio até a integração HLE produzir o payload binário real exigido por um jogo.
 
 ## Arquivos do Eden que ainda precisam ser integrados
 
