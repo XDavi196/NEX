@@ -25,13 +25,14 @@ object NextendoAuthClient {
     const val REDIRECT_URI = "com.nex.nx://oauth/callback"
 
     private const val BASE_URL = "https://nextendo.network"
-    private const val AUTHORIZE_URL = "$BASE_URL/api/oauth/authorize"
+    // The Developer Portal's current generated authorization link uses /oauth/authorize.
+    private const val AUTHORIZE_URL = "$BASE_URL/oauth/authorize"
     private const val TOKEN_URL = "$BASE_URL/api/oauth/token"
     private const val NEX_TOKEN_URL = "$BASE_URL/api/nex-token"
     private const val USERINFO_URL = "$BASE_URL/api/oauth/userinfo"
 
-    // NEX only requests scopes used by the current feature set.
-    const val SCOPES = "identity friends presence game.matchmaking"
+    // Exact scopes shown by the current NEX URL generated in the Nextendo portal.
+    const val SCOPES = "identity friends presence profil game.matchmaking mods.favorites"
 
     data class PendingAuthorization(
         val codeVerifier: String,
