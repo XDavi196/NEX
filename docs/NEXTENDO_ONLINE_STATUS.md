@@ -64,13 +64,16 @@ Antes de testar login, confirme qual dos dois Client IDs é o que está realment
 
 ## Build e CI
 
-- **Build #42:** falhou na etapa `Apply NEX identity and Nextendo Android integration`, antes do Gradle. A causa foi o padrão de importação `NativeLibrary` no script `scripts/apply-eden-overlay.py`: a string de busca continha uma quebra de linha escapada incorretamente.
-- **Correção enviada:** o anchor foi corrigido para corresponder à importação real de `EmulationActivity.kt` na revisão Eden fixada. A função `NativeLibrary.playTimeManagerGetCurrentTitleId()` também foi confirmada no código-fonte dessa revisão.
-- **Build #43:** iniciada com a correção do overlay; pode ser cancelada pela regra de concorrência quando a execução mais recente assumir.
-- **Build #44:** acionada com a automação de prerelease. Ainda precisa concluir o overlay, o build Android e o upload para confirmar um APK.
+- **Build #42:** falhou antes do Gradle porque o overlay não identificava a importação `NativeLibrary` no arquivo `EmulationActivity.kt`. Esse anchor foi corrigido.
+- **Builds #43, #44 e #45:** canceladas pela configuração antiga `cancel-in-progress: true`, que interrompia uma build ativa sempre que outro commit era enviado.
+- **Build #46:** passou pelo checkout, instalação da toolchain e aplicação do overlay. Falhou na compilação Kotlin, em `EmulationActivity.kt:44`. O overlay havia inserido a importação `NextendoPresencePublisher` com os caracteres literais `\\n` em vez de uma quebra de linha real. Isso causou erros de sintaxe e os erros subsequentes de referência a `R`.
+- **Correção enviada:** `scripts/apply-eden-overlay.py` agora monta essa linha de importação com uma quebra de linha real, igual ao padrão já usado nas outras inserções. A alteração está no commit `a29dadb5b75edea6be04946fdaf5a674ffbc2e67`.
+- **Build #47:** foi iniciada antes dessa última correção; passou pelo overlay e está na compilação Kotlin/Gradle com a versão antiga do script. Portanto, ainda pode repetir o erro da #46.
+- **Build #48:** está na fila e usa a correção do import. É a execução que deve validar a correção.
 
-Nenhum APK está confirmado como aprovado neste momento. A automação só cria uma GitHub prerelease se o build completo terminar com sucesso e o commit que disparou a execução tiver assunto iniciado por `[release]`. A release leva o APK e o arquivo SHA-256; uma falha antes ou durante a compilação não publica release.
+A concorrência do workflow foi alterada para `cancel-in-progress: false`, e README/alterações somente documentais foram removidas do filtro de gatilhos de build. Assim, uma nova alteração não deve interromper a compilação ativa, e modificações apenas no README não devem consumir outra build nativa.
 
+Ainda não há APK aprovado nem GitHub Release. A pré-release só será publicada quando uma execução com assunto iniciado por `[release]` concluir o Gradle, empacotar o APK e enviar o artefato com o checksum com sucesso.
 ## Critério para dizer “online funcional”
 
 Só considerar concluído depois que duas contas NEX entrarem na mesma sessão de um jogo suportado, com BAAS/claim `nnex`, autenticação NEX, matchmaking, NAT-check e tráfego P2P funcionando. Login OAuth, lista social e obtenção de `nx2.` são etapas necessárias, mas não substituem esse teste.
