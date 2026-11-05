@@ -10,13 +10,6 @@ on:
       - "scripts/**"
       - ".github/workflows/build-nex-android.yml"
       - "docs/EDEN_BASE.md"
-  pull_request:
-    paths:
-      - "integration/android/**"
-      - "scripts/**"
-      - ".github/workflows/build-nex-android.yml"
-      - "docs/EDEN_BASE.md"
-
 permissions:
   contents: read
 
@@ -78,7 +71,7 @@ jobs:
       - name: Install native build utilities
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ccache p7zip-full xz-utils
+          sudo apt-get install -y ninja-build ccache p7zip-full xz-utils glslang-tools
 
       - name: Apply NEX identity and Nextendo Android integration
         run: |
