@@ -25,7 +25,7 @@ The Android authorization sample and endpoint specification use the `/api/oauth/
 2. Persist verifier and state encrypted with AES-GCM using Android Keystore. The pending transaction expires after 10 minutes.
 3. Open the authorization URI in a Chrome Custom Tab. NEX never collects the player's Nextendo password.
 4. Receive the callback through `com.nex.nx://oauth/callback`.
-5. Validate the callback scheme, host, path, one-time code and exact `state`.
+5. Validate the callback scheme, host, path and one-time code. Validate `state` with a constant-time comparison when the server echoes it; the published Android example does not explicitly guarantee a state parameter, so the required PKCE verifier remains the code-binding protection.
 6. Exchange the code at `/api/oauth/token` with `grant_type=authorization_code`, the same `client_id`, the exact `redirect_uri`, and original `code_verifier`.
 7. Persist access and refresh tokens encrypted with Android Keystore.
 8. Request the separate game token from `/api/nex-token`; save it separately from OAuth credentials.
