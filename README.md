@@ -13,17 +13,17 @@ NEX is based on Eden, not Den2. Its Nextendo registration and application identi
 
 ## Project status
 
-The repository currently contains the first Android Nextendo integration scaffold and project documentation. The complete Eden source tree has **not yet been imported**, the Kotlin scaffold has **not yet been compiled against Eden**, and there is **no NEX APK yet**. Do not treat login or multiplayer as implemented until they are wired into the emulator and tested.
+The repository contains the Android Nextendo integration scaffold, social/presence client code, repeatable Eden overlay and project documentation. The complete Eden source tree is downloaded by CI and patched during the build; it is not vendored in this repository. The Kotlin integration is being validated against the pinned Eden revision. There is **no APK confirmed as successful yet**. The HLE/BAAS and game-network changes for in-game multiplayer are still missing.
 
 ## Nextendo permissions
 
 The NEX public application requests these scopes:
 
-`identity friends presence profil game.matchmaking`
+`identity friends presence game.matchmaking`
 
 Native Android authentication uses OAuth 2.0 Authorization Code + PKCE (S256). No client secret is embedded in the APK.
 
-See [the Android integration plan](docs/NEXTENDO_ANDROID.md), [the pinned Eden source baseline](docs/EDEN_BASE.md), and [the Nextendo online/multiplayer architecture and attestation plan](docs/NEXTENDO_ONLINE_ARCHITECTURE.md).
+See [the Android integration plan](docs/NEXTENDO_ANDROID.md), [the pinned Eden source baseline](docs/EDEN_BASE.md), [the multiplayer architecture](docs/NEXTENDO_ONLINE_ARCHITECTURE.md), and [the current online implementation status and missing Eden files](docs/NEXTENDO_ONLINE_STATUS.md).
 
 ## Source base and license
 
