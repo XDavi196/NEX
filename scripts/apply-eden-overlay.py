@@ -137,7 +137,7 @@ def main() -> None:
                     isRunnable = activity != null,
                     iconId = R.drawable.ic_network
                 ) {
-                    activity?.let { NextendoAuthManager.startLogin(it) }
+                    activity?.let { NextendoAuthManager.openAccount(it) }
                 }
             )
 """
