@@ -69,7 +69,7 @@ For implementation details, see:
 
 The GitHub Actions workflow checks out the pinned Eden source, applies the NEX Android overlay, builds the Android Optimized variant, renames the output, and generates SHA-256 checksums.
 
-Build artifacts are published only after the complete build succeeds. The initial public preview is intended to be a prerelease, not a stable release. Check the [GitHub Actions runs](https://github.com/XDavi196/NEX/actions) and [Releases](https://github.com/XDavi196/NEX/releases) pages for verified outputs.
+Build artifacts are published only after the complete build succeeds. The first experimental prerelease is created automatically only when a push build is triggered by a commit whose subject starts with `[release]`; failed builds never create a release. The initial public preview is a prerelease, not a stable release. Check the [GitHub Actions runs](https://github.com/XDavi196/NEX/actions) and [Releases](https://github.com/XDavi196/NEX/releases) pages for verified outputs.
 
 The expected APK filename is:
 
