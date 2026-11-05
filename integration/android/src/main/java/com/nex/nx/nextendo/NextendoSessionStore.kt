@@ -60,6 +60,24 @@ object NextendoSessionStore {
         )
     }
 
+    fun saveAccountIdentity(
+        context: Context,
+        pid: Long,
+        username: String,
+        friendCode: String
+    ) {
+        val current = load(context)
+            ?: throw IllegalStateException("Cannot save account identity without a linked Nextendo session.")
+        saveSession(
+            context,
+            current.copy(
+                pid = if (pid > 0L) pid else current.pid,
+                username = username.ifBlank { current.username },
+                friendCode = friendCode.ifBlank { current.friendCode }
+            )
+        )
+    }
+
     fun saveNexGameToken(context: Context, token: NextendoAuthClient.NexGameToken) {
         val current = load(context)
             ?: throw IllegalStateException("Cannot save a game token without a linked Nextendo session.")
