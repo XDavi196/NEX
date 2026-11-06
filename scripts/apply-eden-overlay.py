@@ -274,7 +274,7 @@ def main() -> None:
     games_text = games_text.replace(
         view_click_anchor,
         view_click_anchor
-        + """        binding.nextendoButton.setOnClickListener {
+        + """        binding.nextendoButton?.setOnClickListener {
             NextendoAuthManager.openAccount(requireActivity())
         }
 """,
