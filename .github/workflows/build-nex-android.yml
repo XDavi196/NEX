@@ -168,7 +168,7 @@ jobs:
           test -s release-artifacts/NEX-Android-v0.2.0-rc1-optimized.apk
           test -s release-artifacts/SHA256SUMS.txt
           cd release-artifacts
-          sed 's#^nex-artifacts/##' SHA256SUMS.txt | sha256sum --check -
+          sed 's#nex-artifacts/##g' SHA256SUMS.txt | sha256sum --check -
 
       - name: Publish NEX alpha.58 prerelease
         env:
