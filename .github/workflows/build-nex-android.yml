@@ -1,0 +1,222 @@
+name: Build NEX Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_build58:
+        description: "Publish the already-verified Build 58 artifact without rebuilding"
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - nex/eden-v0.2.0-rc1-nextendo
+    paths:
+      - "integration/android/**"
+      - "scripts/**"
+      - ".github/workflows/build-nex-android.yml"
+      - "docs/EDEN_BASE.md"
+permissions:
+  actions: read
+  contents: write
+
+# Keep one full native build per branch. New commits cancel stale 30-minute builds.
+# Do not cancel a costly native build just because another commit was pushed.
+# Pending runs are queued instead of interrupting the active APK build.
+concurrency:
+  group: nex-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android-optimized:
+    name: Eden v0.2.0-rc1 — Android Optimized / NEX
+    if: |
+      !(
+        (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[publish-existing]')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish_build58)
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout NEX overlay
+        uses: actions/checkout@v4
+        with:
+          path: nex
+          persist-credentials: false
+
+      - name: Checkout pinned Eden source
+        uses: actions/checkout@v4
+        with:
+          repository: eden-emulator/mirror
+          ref: v0.2.0-rc1
+          path: eden
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Verify Eden release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git -C eden rev-parse HEAD)"
+          expected="8e373eb714aa01117ec885680477501cdb572112"
+          test "$actual" = "$expected" || {
+            echo "Expected Eden $expected, received $actual"
+            exit 1
+          }
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install pinned Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1"
+
+      - name: Install native build utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache p7zip-full xz-utils glslang-tools
+
+      - name: Apply NEX identity and Nextendo Android integration
+        run: |
+          python3 nex/scripts/apply-eden-overlay.py eden
+
+      - name: Run NEX Nextendo unit tests
+        working-directory: eden/src/android
+        run: ./gradlew :app:testGenshinSpoofReleaseUnitTest
+
+      - name: Build NEX Android Optimized APK
+        working-directory: eden
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          CCACHE: "true"
+        run: |
+          chmod +x .ci/android/build.sh
+          .ci/android/build.sh -r -t optimized -b Release
+
+      - name: Rename NEX artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p nex-artifacts
+          find eden/artifacts -maxdepth 1 -type f -name "*.apk" -print -quit | grep -q .
+          apk="$(find eden/artifacts -maxdepth 1 -type f -name "*.apk" -print -quit)"
+          cp "$apk" "nex-artifacts/NEX-Android-v0.2.0-rc1-optimized.apk"
+          aab="$(find eden/artifacts -maxdepth 1 -type f -name "*.aab" -print -quit || true)"
+          if [ -n "$aab" ]; then
+            cp "$aab" "nex-artifacts/NEX-Android-v0.2.0-rc1-optimized.aab"
+          fi
+          sha256sum nex-artifacts/* > nex-artifacts/SHA256SUMS.txt
+
+      - name: Upload NEX Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NEX-Android-v0.2.0-rc1-optimized
+          path: nex-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+      # Mint a short-lived token for the NEX Release Bot.
+      - name: Create NEX Release Bot token
+        id: nex-app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.NEX_RELEASE_APP_ID }}
+          private-key: ${{ secrets.NEX_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: NEX
+          permission-contents: write
+          permission-workflows: write
+
+      # Publish every successful push build as an experimental prerelease.
+      # Failed builds never publish.
+      - name: Publish experimental GitHub prerelease
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ steps.nex-app-token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v0.1.0-alpha.${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" \
+            nex-artifacts/NEX-Android-v0.2.0-rc1-optimized.apk \
+            nex-artifacts/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "NEX $tag" \
+            --prerelease \
+            --notes "Experimental Android preview based on Eden v0.2.0-rc1. NEX uses its own Nextendo application identity. Account sign-in and presence require live service validation. In-game online multiplayer is NOT implemented or verified: BAAS/nnex authentication, game-side friends IPC, DNS/TLS routing, PRUDP, matchmaking, NAT traversal and P2P remain unfinished. Read the repository README for project status, license and independence notices.\n\nBuild source: ${GITHUB_SHA}."
+
+  # One-time publication of the already-built and tested Build 58 artifact.
+# Retry after repository Actions workflow write permissions and GH_RELEASE_TOKEN were configured.
+  # Triggered by a commit whose subject starts with [publish-existing].
+  publish-existing:
+    name: Publish verified NEX Build 58
+    if: |
+      (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[publish-existing]')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_build58)
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download successful Build 58 artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 42286312361
+          name: NEX-Android-v0.2.0-rc1-optimized
+          path: release-artifacts
+
+      - name: Verify APK and SHA-256 checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release-artifacts/NEX-Android-v0.2.0-rc1-optimized.apk
+          test -s release-artifacts/SHA256SUMS.txt
+          cd release-artifacts
+          sed 's#nex-artifacts/##g' SHA256SUMS.txt | sha256sum --check -
+
+      - name: Create NEX Release Bot token
+        id: nex-app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.NEX_RELEASE_APP_ID }}
+          private-key: ${{ secrets.NEX_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: NEX
+          permission-contents: write
+          permission-workflows: write
+
+      - name: Publish NEX alpha.58 prerelease
+        env:
+          GH_TOKEN: ${{ steps.nex-app-token.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "v0.1.0-alpha.58" \
+            "release-artifacts/NEX-Android-v0.2.0-rc1-optimized.apk" \
+            "release-artifacts/SHA256SUMS.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "c99ef05679c1a91760e2405186d4cc7865d82744" \
+            --title "NEX v0.1.0-alpha.58" \
+            --prerelease \
+            --notes "NEX Android experimental preview, built by successful GitHub Actions run #58. Source commit: c99ef05679c1a91760e2405186d4cc7865d82744. The build and Nextendo unit tests passed. In-game online multiplayer is not yet verified or complete; BAAS/nnex game authentication, game-side HLE friends, DNS/TLS routing, PRUDP, matchmaking, NAT traversal and P2P still require implementation and validation. This release uses the NEX-owned client identity."
