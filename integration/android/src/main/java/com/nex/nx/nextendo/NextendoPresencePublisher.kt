@@ -119,7 +119,7 @@ object NextendoPresencePublisher {
         executor.execute {
             runCatching {
                 NextendoAuthClient.postPresence(
-                    accessToken = gameToken,
+                    gameToken = gameToken,
                     status = 0,
                     appField = "",
                     appId = "",
@@ -151,7 +151,7 @@ object NextendoPresencePublisher {
         val inGame = titleId.isNotBlank()
         runCatching {
             NextendoAuthClient.postPresence(
-                accessToken = gameToken,
+                gameToken = gameToken,
                 status = if (inGame) 2 else 1,
                 appField = if (inGame) appFieldBase64 else "",
                 appId = if (inGame) titleId else "",

@@ -56,8 +56,16 @@ internal object NextendoGameFriendParser {
             ?: item.longField("nsa")
             ?: 0L
 
-        val encodedAppField = presence.stringField("app_field")
-        val appField = decodeBase64(encodedAppField) ?: byteArrayOf()
+        val appFieldValue = presence["app_field"]
+        val encodedAppField = when (appFieldValue) {
+            null -> ""
+            is JsonPrimitive -> {
+                if (!appFieldValue.isString) return null
+                appFieldValue.contentOrNull.orEmpty()
+            }
+            else -> return null
+        }
+        val appField = decodeBase64(encodedAppField) ?: return null
         if (appField.size > MAX_APP_FIELD_BYTES) return null
 
         return NextendoGameFriend(
@@ -73,8 +81,10 @@ internal object NextendoGameFriendParser {
 
     /** Strict RFC 4648 decoder with bounded output; no Android-only API is required. */
     private fun decodeBase64(value: String): ByteArray? {
-        if (value.isBlank()) return byteArrayOf()
-        val encoded = value.filterNot(Char::isWhitespace)
+        if (value.isEmpty()) return byteArrayOf()
+        if (value.any(Char::isWhitespace)) return null
+        val encoded = value
+        if (encoded.length > ((MAX_APP_FIELD_BYTES + 2) / 3) * 4) return null
         if (encoded.length % 4 != 0) return null
 
         val padding = when {
@@ -101,6 +111,8 @@ internal object NextendoGameFriendParser {
             if ((!finalBlock && (c2Char == '=' || c3Char == '=')) ||
                 (c2Char == '=' && c3Char != '=')
             ) return null
+            if (c2Char == '=' && (c1 and 0x0F) != 0) return null
+            if (c3Char == '=' && c2Char != '=' && (c2 and 0x03) != 0) return null
 
             val bits = (c0 shl 18) or (c1 shl 12) or (c2 shl 6) or c3
             if (outputIndex < output.size) output[outputIndex++] = (bits shr 16).toByte()
@@ -109,6 +121,7 @@ internal object NextendoGameFriendParser {
             index += 4
         }
 
+        if (outputIndex != output.size) return null
         return output
     }
 

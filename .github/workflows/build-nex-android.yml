@@ -96,6 +96,16 @@ jobs:
         run: |
           python3 nex/scripts/apply-eden-overlay.py eden
 
+      - name: Run NEX native friend-cache tests
+        working-directory: nex
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+            integration/android/src/test/cpp/nextendo_friend_cache_test.cpp \
+            -o "$RUNNER_TEMP/nextendo_friend_cache_test"
+          "$RUNNER_TEMP/nextendo_friend_cache_test"
+
       - name: Run NEX Nextendo unit tests
         working-directory: eden/src/android
         run: ./gradlew :app:testGenshinSpoofReleaseUnitTest

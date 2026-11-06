@@ -113,11 +113,11 @@ Until Nextendo confirms which contract is live and aligns the docs/server implem
 
 ## Test and release gate
 
-The new parser tests cover only the documented game-token response envelope. They do not validate the `nnex` JWT claim, cryptographic signatures, BAAS, PRUDP, HLE IPC, NAT state transitions, UDP cleanup or P2P.
+Kotlin tests cover the documented `nx2.` game-token response and strict game-friend payload parsing, including the bounded 0xC0-byte presence field. A host C++ test covers the native friend cache's PID/status validation, de-duplication, 300-entry bound, app-field bound and clearing. These tests do not validate the `nnex` JWT claim, cryptographic signatures, BAAS, PRUDP, HLE IPC serialization, NAT state transitions, UDP cleanup or P2P.
 
 Before calling online support functional, add and pass:
 1. BAAS token construction/claim/signature validation tests using NEX-issued key material.
-2. HLE `nn::friends` IPC serialization and cache tests.
+2. HLE `nn::friends` IPC serialization and guest-visible behavior tests (the native cache itself now has a host-side CI test).
 3. PRUDP framing, parsing, sequencing and matchmaking tests against a reproducible public contract.
 4. NAT state-transition, UDP mapping retention, timeout and resource-cleanup tests.
 5. End-to-end tests with two NEX accounts, two Android devices and a Nextendo-supported game.

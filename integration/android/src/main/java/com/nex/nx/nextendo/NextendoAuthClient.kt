@@ -192,13 +192,15 @@ object NextendoAuthClient {
     internal fun getFriends(accessToken: String): JSONObject = getUserInfo(accessToken)
 
     internal fun postPresence(
-        accessToken: String,
+        gameToken: String,
         status: Int,
         appField: String,
         appId: String,
         appDetail: String
     ) {
-        require(accessToken.isNotBlank()) { "No Nextendo access token is available." }
+        require(gameToken.startsWith("nx2.") && gameToken.length > 4) {
+            "A valid Nextendo nx2. game token is required for presence publishing."
+        }
         require(status in 0..2) { "Presence status must be 0, 1 or 2." }
 
         val body = JSONObject()
@@ -213,7 +215,7 @@ object NextendoAuthClient {
             url = "$BASE_URL/api/presence",
             method = "POST",
             headers = mapOf(
-                "Authorization" to "Bearer $accessToken",
+                "Authorization" to "Bearer $gameToken",
                 "Content-Type" to "application/json; charset=utf-8"
             ),
             body = body
