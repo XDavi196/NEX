@@ -25,7 +25,8 @@ object NextendoAuthManager {
         val pid: Long,
         val username: String,
         val friendCode: String,
-        val gameTokenReady: Boolean
+        val gameTokenReady: Boolean,
+        val gameTokenDiagnostic: String = "not checked"
     )
 
     fun startLogin(activity: Activity) {
@@ -103,9 +104,25 @@ object NextendoAuthManager {
                         friendCode = userInfo.friendCode
                     )
                 }
-                val gameToken = runCatching {
-                    NextendoAuthClient.fetchNexGameToken(tokens.accessToken)
-                }.getOrNull()
+                val gameTokenAttempt = if ("game.matchmaking" !in tokens.grantedScopes) {
+                    Result.failure(IllegalStateException("scope_missing"))
+                } else {
+                    runCatching {
+                        NextendoAuthClient.fetchNexGameToken(tokens.accessToken)
+                    }
+                }
+                val gameToken = gameTokenAttempt.getOrNull()
+                val gameTokenDiagnostic = gameTokenAttempt.fold(
+                    onSuccess = { "HTTP 200: nx2 accepted" },
+                    onFailure = { error ->
+                        when (error) {
+                            is NextendoAuthClient.NextendoException -> "HTTP " + error.httpStatus
+                            is java.io.IOException -> "network_error"
+                            is IllegalStateException -> "scope_missing"
+                            else -> "response_contract_error"
+                        }
+                    }
+                )
 
                 if (gameToken != null) {
                     NextendoSessionStore.saveNexGameToken(context, gameToken)
@@ -127,7 +144,8 @@ object NextendoAuthManager {
                     pid = gameToken?.pid ?: savedSession?.pid ?: 0L,
                     username = gameToken?.username ?: savedSession?.username.orEmpty(),
                     friendCode = gameToken?.friendCode ?: savedSession?.friendCode.orEmpty(),
-                    gameTokenReady = savedSession?.let(::hasValidGameToken) == true
+                    gameTokenReady = savedSession?.let(::hasValidGameToken) == true,
+                    gameTokenDiagnostic = gameTokenDiagnostic
                 )
             }
 

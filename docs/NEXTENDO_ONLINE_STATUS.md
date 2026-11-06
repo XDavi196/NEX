@@ -32,7 +32,7 @@ Additional contract-alignment work:
 - An Android-to-native bridge transfers at most 300 accepted friend PID/name records into a mutex-protected NEX-owned cache and clears it on account replacement/logout.
 - The Eden overlay registers `nn::friends` list-ID, list, friend-detail, profile-list and count handlers against that cache. Native build/ABI verification is pending.
 - HLE presence fields remain neutral/offline because OAuth userinfo does not return live presence. NEX does not fabricate online status, timestamps or AppKeyValueStorage data. Incoming requests, mutations and joinable-room metadata remain unavailable.
-- Presence publishing follows the NexWiki Developer Documentation: it uses the OAuth access token only when the granted `presence` scope is present. The `nx2.` game token is reserved for game authentication and game-only routes; it is never substituted for OAuth consent. The public account-server source snapshot still rejects OAuth on `/api/presence`, so successful production publishing remains unverified until the deployed gateway matches the documented contract.
+- Presence publishing currently uses the NEX-issued `nx2.` token because the inspected public account-server implementation accepts web-session/`nx2.` credentials on `/api/presence`; the NexWiki specifies OAuth `presence` scope instead. This behavior is provisional and must be changed to the documented OAuth flow if Nextendo confirms the production gateway follows the wiki.
 
 These changes are partial account/HLE integration, not a claim that a game can authenticate, join matchmaking or play online.
 
@@ -42,8 +42,8 @@ References reviewed:
 
 - [Official NexWiki Developer Documentation](https://wiki.nextendo.network/developers) — OAuth scopes, public-client PKCE, `/api/nex-token`, 24-hour game-token lifetime, BAAS `nnex` flow and refresh-token rotation.
 - [NexWiki changelog](https://wiki.nextendo.network/changelog) — v1.8.6 application identity/closed API and v1.8.7 client-attestation update.
-- [NexWiki Developer Documentation](https://wiki.nextendo.network/developers)
-- [NexWiki changelog](https://wiki.nextendo.network/changelog)
+- [Ryujinx-Nextendo README](https://github.com/NextendoNetwork/Ryujinx-Nextendo#readme) — public explanation of official-client API request signing.
+- [Ryujinx-Nextendo release bake script](https://github.com/NextendoNetwork/Ryujinx-Nextendo/blob/main/distribution/nextendo/bake_release.py) — public source says the registered Client ID is baked as the application identity.
 - [Nextendo Developer Portal](https://nextendo.network/developers)
 - [Nextendo architecture guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md)
 - [Nextendo deployment guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md)
@@ -62,7 +62,7 @@ The Developer Portal describes a broader OAuth contract than the public account-
 | Game-token response | Documents `nex_token`, PID, friend code, username and `expires_in`; states the token lasts 24 hours and is game-only | The public `nexToken` handler returns token, PID, friend code and username, but does not include `expires_in` |
 | Presence | OAuth app scope `presence`; publish at least once every 90 seconds via `POST /api/presence` | The checked source uses `accountFromBearer` (web session or `nx2.`), not OAuth |
 
-The NexWiki is the intended developer contract and NEX follows its credential separation: OAuth + scopes for account APIs, `nx2.` only for game authentication. The older public account-server source may lag production, but until Nextendo confirms the deployed contract, NEX cannot treat game-token issuance, refresh rotation, full social/presence data or multiplayer authentication as verified. Do not switch to the special `nextendo-emulator` built-in client identity: NEX must use its own registered Client ID.
+The NexWiki is the intended developer contract. NEX keeps OAuth and `nx2.` credentials separate, but the current publisher has been temporarily aligned with the inspected public server code while the mismatch is confirmed. The older public account-server source may lag production; until Nextendo confirms the deployed contract and a live NEX OAuth session is tested, NEX cannot treat game-token issuance, refresh rotation, presence publishing or multiplayer authentication as verified. Do not switch to the special `nextendo-emulator` built-in client identity: NEX must use its own registered Client ID.
 
 ## Blocking requirements for real in-game online play
 
