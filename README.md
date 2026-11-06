@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.jpg" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.48">Get the first experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.54">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
-> **Please read before installing:** NEX is an experimental preview. The first APK builds successfully, but that does not mean every feature has been tested on real devices or against the live Nextendo service. In-game online multiplayer is not ready.
+ > **Please read before installing:** NEX is an experimental preview. Build #54 produced a verified APK, but this does not prove that account endpoints or in-game online play work against the live Nextendo service. In-game online multiplayer is not ready.
 
 ## What NEX is
 
@@ -39,11 +39,11 @@ The current requested scopes are:
 
 ### Where to find it
 
-The first `v0.1.0-alpha.48` APK placed the initial Nextendo entry inside the app's Settings list. It was too easy to miss, so the development branch is adding a clearly labeled **Nextendo Network** card directly to the main Games screen. That card will open the NEX account connection flow and, after sign-in, the account panel.
+The verified `v0.1.0-alpha.54` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
 
 ### Connecting your account
 
-1. Open NEX and tap **Nextendo Network** on the main Games screen in a build that includes the new home-screen card. In `alpha.48`, open the app's Settings list and choose **Nextendo Network**.
+1. Open NEX and tap **Nextendo Network** on the main Games screen.
 2. NEX opens the Nextendo authorization page in your browser.
 3. Sign in on Nextendo and approve the permissions shown there.
 4. The browser returns to NEX through `com.nex.nx://oauth/callback`.
@@ -53,7 +53,7 @@ The account panel can show the username, Friend Code, and PID when those details
 
 ### Friends and presence
 
-The current friend-list screen follows the compact player-list layout familiar to Den2 users. It reads the authenticated account's friends and incoming requests from Nextendo's friends endpoint using the **NEX OAuth access token** and NEX Client ID. Friend rows can show a player's avatar, display name, Friend Code, and reported state: offline, online, or in a game.
+The NEX-owned friend-list screen can display profile, Friend Code and presence fields when the service returns them. However, the published Nextendo Developer Portal and public account-server source currently describe different OAuth contracts: the public source does not accept the OAuth access token on `/api/friends` or `/api/presence`. Therefore, the friends/presence flow is not yet verified against the deployed service; see [the contract audit](docs/NEXTENDO_ONLINE_STATUS.md).
 
 The screen is currently read-only. Incoming requests are displayed, but adding, accepting, declining, removing, blocking, and other account mutations are not enabled yet. Presence is informational; it is not proof that a game session or peer-to-peer connection is active.
 
@@ -72,13 +72,13 @@ Until those pieces work together and have been tested, please do not expect onli
 
 ## Downloads
 
-The first successful Android build is available as an experimental GitHub prerelease:
+The latest verified Android baseline is available as an experimental GitHub prerelease:
 
-**[NEX v0.1.0-alpha.48 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.48)**
+**[NEX v0.1.0-alpha.54 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.54)**
 
 The APK asset is named `NEX-Android-v0.2.0-rc1-optimized.apk`. The release also includes `SHA256SUMS.txt`, which can be used to verify the file's SHA-256 checksum.
 
-This is an early preview, not a stable release. The newer home-screen Nextendo card and the updated NEX app branding are being built into a subsequent version; they are not part of the original `alpha.48` package.
+This is an early preview, not a stable release. It includes the NEX app identity and the Nextendo Network card. It does not include verified in-game multiplayer.
 
 You can follow the [GitHub Actions runs](https://github.com/XDavi196/NEX/actions) to see build progress and the [Releases page](https://github.com/XDavi196/NEX/releases) for published APKs. A release is created only after the complete build and artifact upload succeed.
 
