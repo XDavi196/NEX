@@ -85,7 +85,7 @@ jobs:
           python3 nex/scripts/apply-eden-overlay.py eden
 
       - name: Run NEX Nextendo unit tests
-        working-directory: eden
+        working-directory: eden/src/android
         run: ./gradlew :app:testGenshinSpoofReleaseUnitTest
 
       - name: Build NEX Android Optimized APK
