@@ -8,6 +8,18 @@ A URL gerada para o Client ID do NEX usa `https://nextendo.network/oauth/authori
 
 Este documento separa o que já existe no código do NEX do que ainda falta para uma sessão multiplayer real. Uma conta conectada ou um token `nx2.` recebido não significam que os jogos já estejam online.
 
+## Onde encontrar o Nextendo dentro do aplicativo
+
+O APK `v0.1.0-alpha.48` tinha a entrada inicial **Nextendo Network** somente na lista raiz de Configurações. Por isso, ela era fácil de não perceber.
+
+A branch de desenvolvimento agora adiciona um cartão identificado **Nextendo Network** diretamente na tela principal de jogos, logo abaixo do cabeçalho. Esse cartão abre `NextendoAuthManager.openAccount()`: sem sessão, inicia o OAuth do NEX; com sessão, abre o perfil com a ação **Amigos**. A lista de amigos consulta o `/api/oauth/userinfo` usando o access token OAuth da sessão NEX e permanece somente de leitura.
+
+O cartão principal foi ampliado para mostrar o nome do serviço e a descrição, em vez de depender de um pequeno ícone genérico. A autenticação continua usando o Client ID público do NEX (`nxc_yAdR-14bOEq7`), o redirect `com.nex.nx://oauth/callback` e PKCE S256.
+
+A nova logo oficial também foi adicionada a `assets/nex-logo.jpg`; o overlay a copia para `drawable-nodpi/nex_logo.jpg` e aponta os ícones `android:icon` e `android:roundIcon` para esse recurso. A mesma imagem aparece no topo do README.
+
+**Status de distribuição:** a Release `v0.1.0-alpha.48` é anterior ao cartão da tela principal e à troca da logo no ícone Android. Essas duas mudanças estão na branch e aguardam validação na Build #51 antes de aparecerem em um APK publicado.
+
 ## O que já foi adicionado à branch de integração
 
 | Área | Estado | Arquivos do NEX |
@@ -64,16 +76,12 @@ Antes de testar login, confirme qual dos dois Client IDs é o que está realment
 
 ## Build e CI
 
-- **Build #42:** falhou antes do Gradle porque o overlay não identificava a importação `NativeLibrary` no arquivo `EmulationActivity.kt`. Esse anchor foi corrigido.
-- **Builds #43, #44 e #45:** canceladas pela configuração antiga `cancel-in-progress: true`, que interrompia uma build ativa sempre que outro commit era enviado.
-- **Build #46:** passou pelo checkout, instalação da toolchain e aplicação do overlay. Falhou na compilação Kotlin, em `EmulationActivity.kt:44`. O overlay havia inserido a importação `NextendoPresencePublisher` com os caracteres literais `\\n` em vez de uma quebra de linha real. Isso causou erros de sintaxe e os erros subsequentes de referência a `R`.
-- **Correção enviada:** `scripts/apply-eden-overlay.py` agora monta essa linha de importação com uma quebra de linha real, igual ao padrão já usado nas outras inserções. A alteração está no commit `a29dadb5b75edea6be04946fdaf5a674ffbc2e67`.
-- **Build #47:** falhou na mesma tarefa Kotlin que a #46 (`EmulationActivity.kt:44`). Ela usou o commit anterior à correção, com o `\\n` literal, portanto repetiu o mesmo erro; não revelou um novo problema.
-- **Build #48:** está usando o commit corrigido, passou pelo overlay e está em `Build NEX Android Optimized` (Gradle). A compilação Kotlin ainda não foi confirmada como concluída.
+- **Build #48:** primeira compilação completa aprovada; gerou `NEX-Android-v0.2.0-rc1-optimized.apk` e a Release experimental `v0.1.0-alpha.48`. Esse APK tem a entrada inicial do Nextendo no root das Configurações, não o cartão da tela principal nem o novo ícone.
+- **Build #49:** falhou durante a aplicação do overlay porque o script não encontrou o anchor de import do `GamesFragment`.
+- **Build #50:** corrigiu esse anchor, passou pela etapa `Apply NEX identity and Nextendo Android integration` e está na compilação Gradle do APK.
+- **Build #51:** está na fila. Inclui o cartão grande Nextendo na tela principal, o logo em `assets/nex-logo.jpg`, a cópia para os recursos Android e a troca dos ícones do app para a nova marca.
 
-A concorrência do workflow foi alterada para `cancel-in-progress: false`, e README/alterações somente documentais foram removidas do filtro de gatilhos de build. Assim, uma nova alteração não deve interromper a compilação ativa, e modificações apenas no README não devem consumir outra build nativa.
-
-Ainda não há APK aprovado nem GitHub Release. A pré-release só será publicada quando uma execução com assunto iniciado por `[release]` concluir o Gradle, empacotar o APK e enviar o artefato com o checksum com sucesso.
+A fila de CI mantém `cancel-in-progress: false`, então novos commits não devem interromper uma compilação nativa ativa. Nenhum APK com o cartão principal e com o novo ícone está confirmado até o build correspondente concluir o Gradle, o empacotamento e o upload.
 ## Critério para dizer “online funcional”
 
 Só considerar concluído depois que duas contas NEX entrarem na mesma sessão de um jogo suportado, com BAAS/claim `nnex`, autenticação NEX, matchmaking, NAT-check e tráfego P2P funcionando. Login OAuth, lista social e obtenção de `nx2.` são etapas necessárias, mas não substituem esse teste.
