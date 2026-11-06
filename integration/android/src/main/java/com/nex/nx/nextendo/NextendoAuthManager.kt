@@ -88,9 +88,10 @@ object NextendoAuthManager {
 
                 NextendoSessionStore.saveFreshOAuthTokens(context, tokens)
                 NextendoSessionStore.clearPendingAuthorization(context)
+                NextendoNativeBridge.clearFriendCache()
 
-                // Populate the account identity from the documented OAuth userinfo
-                // endpoint even if the separate game-token endpoint is temporarily down.
+                // Populate the account identity and accepted-friend cache from the
+                // OAuth-scoped userinfo contract. No presence is invented when absent.
                 runCatching {
                     NextendoSocialApi.fetchUserInfo(tokens.accessToken)
                 }.onSuccess { userInfo ->
@@ -100,6 +101,11 @@ object NextendoAuthManager {
                         username = userInfo.username,
                         friendCode = userInfo.friendCode
                     )
+                }
+                runCatching {
+                    NextendoSocialApi.fetchFriendList(tokens.accessToken)
+                }.onSuccess { friends ->
+                    NextendoNativeBridge.replaceFriendCache(friends.friends)
                 }
 
                 val gameToken = runCatching {
@@ -191,6 +197,7 @@ object NextendoAuthManager {
                     .setPositiveButton("Amigos") { _, _ -> openFriends(activity) }
                     .setNeutralButton("Desconectar") { _, _ ->
                         NextendoPresencePublisher.stop(activity)
+                        NextendoNativeBridge.clearFriendCache()
                         runCatching { NextendoSessionStore.clear(activity) }
                         Toast.makeText(
                             activity,
@@ -222,7 +229,9 @@ object NextendoAuthManager {
                 return@execute
             }
             val result = runCatching {
-                NextendoSocialApi.fetchFriendList(session.accessToken)
+                NextendoSocialApi.fetchFriendList(session.accessToken).also { friends ->
+                    NextendoNativeBridge.replaceFriendCache(friends.friends)
+                }
             }
 
             mainHandler.post {

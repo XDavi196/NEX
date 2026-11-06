@@ -38,11 +38,12 @@ object NextendoFriendsDialog {
             setPadding(dp(18), dp(8), dp(18), dp(8))
         }
 
-        val onlineCount = result.friends.count { it.presenceStatus > 0 }
+        val onlineCount = result.friends.count { it.presenceStatus == 1 || it.presenceStatus == 2 }
         val playingCount = result.friends.count { it.presenceStatus == 2 }
+        val unknownCount = result.friends.count { it.presenceStatus < 0 }
         content.addView(
             TextView(activity).apply {
-                text = "$onlineCount online · $playingCount jogando · ${result.friends.size} amigos"
+                text = "$onlineCount online · $playingCount jogando · $unknownCount sem presença · ${result.friends.size} amigos"
                 textSize = 13f
                 setTextColor(0xFF9CA3AF.toInt())
                 setPadding(0, dp(4), 0, dp(14))
@@ -136,7 +137,8 @@ object NextendoFriendsDialog {
                 isRequest -> "Pedido de amizade recebido"
                 friend.presenceStatus == 2 -> friend.presenceLabel()
                 friend.presenceStatus == 1 -> "Online"
-                else -> "Offline"
+                friend.presenceStatus == 0 -> "Offline"
+                else -> friend.presenceLabel()
             }
             texts.addView(
                 TextView(activity).apply {
