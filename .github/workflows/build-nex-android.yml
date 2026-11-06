@@ -128,7 +128,7 @@ jobs:
       - name: Publish experimental GitHub prerelease
         if: github.event_name == 'push'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -171,9 +171,19 @@ jobs:
           cd release-artifacts
           sed 's#nex-artifacts/##g' SHA256SUMS.txt | sha256sum --check -
 
+      - name: Check release publishing token
+        env:
+          GH_RELEASE_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_RELEASE_TOKEN:-}" ]; then
+            echo "::error::Missing GH_RELEASE_TOKEN. Add a repository secret backed by a fine-grained PAT with Contents: write and Workflows: write."
+            exit 1
+          fi
       - name: Publish NEX alpha.58 prerelease
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
