@@ -183,6 +183,19 @@ object NextendoAuthClient {
         return NextendoGameFriendParser.parse(response)
     }
 
+    /** Reads the account's own NSA from Nextendo /api/me using its game token. */
+    internal fun fetchAccountNsa(gameToken: String): Long {
+        require(gameToken.startsWith("nx2.")) {
+            "A valid Nextendo nx2. game token is required for account NSA."
+        }
+        val response = request(
+            url = "$BASE_URL/api/me",
+            method = "GET",
+            headers = mapOf("Authorization" to "Bearer $gameToken")
+        )
+        return NextendoAccountNsaParser.parse(response)
+    }
+
     /**
      * Retrieves the OAuth-scoped identity/friends document.
      *

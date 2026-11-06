@@ -14,6 +14,7 @@ internal data class NextendoGameFriend(
     val username: String,
     val presenceStatus: Int,
     val appId: String,
+    val appIdValue: Long,
     val appDetail: String,
     val appField: ByteArray
 )
@@ -51,10 +52,8 @@ internal object NextendoGameFriendParser {
         val status = presence.intField("status") ?: return null
         if (status !in 0..2) return null
 
-        val nsaText = item.stringField("nsa").removePrefix("0x").removePrefix("0X")
-        val nsa = nsaText.toULongOrNull(16)?.toLong()
-            ?: item.longField("nsa")
-            ?: 0L
+        val nsa = item.hex64Field("nsa") ?: 0L
+        val appIdValue = presence.hex64Field("app_id") ?: 0L
 
         val appFieldValue = presence["app_field"]
         val encodedAppField = when (appFieldValue) {
@@ -74,6 +73,7 @@ internal object NextendoGameFriendParser {
             username = username,
             presenceStatus = status,
             appId = presence.stringField("app_id"),
+            appIdValue = appIdValue,
             appDetail = presence.stringField("app_detail"),
             appField = appField
         )
@@ -130,6 +130,14 @@ internal object NextendoGameFriendParser {
 
     private fun JsonObject.longField(name: String): Long? =
         (this[name] as? JsonPrimitive)?.longOrNull
+
+    private fun JsonObject.hex64Field(name: String): Long? {
+        val primitive = this[name] as? JsonPrimitive ?: return null
+        if (!primitive.isString) return null
+        val value = primitive.contentOrNull ?: return null
+        if (value.length != 16 || value.any { it.digitToIntOrNull(16) == null }) return null
+        return value.toULongOrNull(16)?.takeIf { it != 0uL }?.toLong()
+    }
 
     private fun JsonObject.intField(name: String): Int? =
         (this[name] as? JsonPrimitive)?.intOrNull

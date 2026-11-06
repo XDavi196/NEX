@@ -20,8 +20,27 @@ class NextendoGameFriendParserTest {
         assertEquals("Friend", friend.username)
         assertEquals(2, friend.presenceStatus)
         assertEquals("0100F8F0000A2000", friend.appId)
+        assertEquals(0x0100F8F0000A2000L, friend.appIdValue)
         assertEquals("Private Battle", friend.appDetail)
         assertArrayEquals(byteArrayOf(0, 1, 0xFF.toByte()), friend.appField)
+    }
+
+    @Test
+    fun acceptsOnlyStringNsaAndAppIdsWithExactlySixteenHexDigits() {
+        val friends = NextendoGameFriendParser.parse(
+            """{"friends":[
+                {"pid":5,"nsa":161,"name":"Numeric NSA","presence":{"status":1,"app_id":"0000000000000001","app_field":""}},
+                {"pid":6,"nsa":"A1","name":"Short NSA","presence":{"status":1,"app_id":"ABCD","app_field":""}},
+                {"pid":7,"nsa":"00000000000000A1","name":"Valid IDs","presence":{"status":1,"app_id":"0100F8F0000A2000","app_field":""}}
+            ]}"""
+        )
+        assertEquals(3, friends.size)
+        assertEquals(0L, friends.first { it.pid == 5L }.networkServiceAccountId)
+        assertEquals(1L, friends.first { it.pid == 5L }.appIdValue)
+        assertEquals(0L, friends.first { it.pid == 6L }.networkServiceAccountId)
+        assertEquals(0L, friends.first { it.pid == 6L }.appIdValue)
+        assertEquals(161L, friends.first { it.pid == 7L }.networkServiceAccountId)
+        assertEquals(0x0100F8F0000A2000L, friends.first { it.pid == 7L }.appIdValue)
     }
 
     @Test

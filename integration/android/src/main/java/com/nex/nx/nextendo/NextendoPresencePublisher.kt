@@ -96,9 +96,9 @@ object NextendoPresencePublisher {
         // the queued offline request could run after logout and lose its credential.
         val accessToken = runCatching {
             NextendoSessionStore.load(appContext)?.let { session ->
-                session.accessToken.takeIf {
-                    "presence" in session.grantedScopes &&
-                        session.accessTokenExpiresAtEpochSeconds >
+                session.nexGameToken.takeIf {
+                    it.startsWith("nx2.") &&
+                        session.nexGameTokenExpiresAtEpochSeconds >
                         System.currentTimeMillis() / 1000L
                 }
             }
@@ -136,18 +136,19 @@ object NextendoPresencePublisher {
             NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
         }.getOrNull() ?: return
 
-        // The Developer Documentation assigns presence publishing to the OAuth
-        // application scope. The nx2. token is game-only and is never a substitute
-        // for the player's explicit OAuth presence consent.
-        if ("presence" !in session.grantedScopes) return
+        // The published account service validates web-session or nx2. game tokens
+        // in /api/presence. Public OAuth access tokens are a separate token class.
+        val accessToken = session.nexGameToken
         val nowEpochSeconds = System.currentTimeMillis() / 1000L
-        if (session.accessTokenExpiresAtEpochSeconds <= nowEpochSeconds) return
+        if (!accessToken.startsWith("nx2.") ||
+            session.nexGameTokenExpiresAtEpochSeconds <= nowEpochSeconds
+        ) return
 
         val titleId = gameTitleId
         val inGame = titleId.isNotBlank()
         runCatching {
             NextendoAuthClient.postPresence(
-                accessToken = session.accessToken,
+                accessToken = accessToken,
                 status = if (inGame) 2 else 1,
                 appField = if (inGame) appFieldBase64 else "",
                 appId = if (inGame) titleId else "",
