@@ -146,24 +146,9 @@ object NextendoAuthClient {
             method = "GET",
             headers = mapOf("Authorization" to "Bearer $accessToken")
         )
-        val json = JSONObject(response)
-        val token = json.optString("nex_token").ifBlank {
-            json.optString("nx2").ifBlank { json.optString("token") }
-        }
-
-        require(token.startsWith("nx2.")) {
-            "Nextendo did not return a valid nx2 game token."
-        }
-
-        val expiresIn = json.optLong("expires_in", 24L * 60L * 60L)
-        require(expiresIn > 0L) { "Nextendo returned an invalid game-token lifetime." }
-
-        return NexGameToken(
-            token = token,
-            expiresAtEpochSeconds = System.currentTimeMillis() / 1000L + expiresIn,
-            pid = json.optLong("pid", 0L),
-            username = json.optString("username"),
-            friendCode = json.optString("friend_code")
+        return NextendoGameTokenParser.parse(
+            response = response,
+            nowEpochSeconds = System.currentTimeMillis() / 1000L
         )
     }
 

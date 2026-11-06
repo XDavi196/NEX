@@ -47,6 +47,14 @@ def main() -> None:
     for source in sorted(kotlin_source.glob("*.kt")):
         shutil.copy2(source, kotlin_destination / source.name)
 
+    test_source = NEX_SOURCE / "integration/android/src/test/java/com/nex/nx/nextendo"
+    test_destination = app_dir / "src/test/java/com/nex/nx/nextendo"
+    if not test_source.is_dir():
+        raise RuntimeError(f"Missing NEX Android unit tests: {test_source}")
+    test_destination.mkdir(parents=True, exist_ok=True)
+    for source in sorted(test_source.glob("*Test.kt")):
+        shutil.copy2(source, test_destination / source.name)
+
     gradle = app_dir / "build.gradle.kts"
     replace_once(
         gradle,
@@ -73,6 +81,7 @@ def main() -> None:
         'implementation("androidx.core:core-splashscreen:1.0.1")',
         'implementation("androidx.core:core-splashscreen:1.0.1")\n'
         '    implementation("androidx.browser:browser:1.8.0")',
+        '    testImplementation("junit:junit:4.13.2")',
     )
 
     logo_source = NEX_SOURCE / "assets/nex-logo.jpg"
