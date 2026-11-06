@@ -2,6 +2,12 @@ name: Build NEX Android
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_build58:
+        description: "Publish the already-verified Build 58 artifact without rebuilding"
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - nex/eden-v0.2.0-rc1-nextendo
@@ -24,7 +30,11 @@ concurrency:
 jobs:
   android-optimized:
     name: Eden v0.2.0-rc1 — Android Optimized / NEX
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, '[publish-existing]')
+    if: |
+      !(
+        (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[publish-existing]')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish_build58)
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -159,7 +169,9 @@ jobs:
   # Triggered by a commit whose subject starts with [publish-existing].
   publish-existing:
     name: Publish verified NEX Build 58
-    if: github.event_name == 'push' && startsWith(github.event.head_commit.message, '[publish-existing]')
+    if: |
+      (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[publish-existing]')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_build58)
     runs-on: ubuntu-24.04
     permissions:
       actions: read
