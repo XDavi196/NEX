@@ -152,16 +152,19 @@ object NextendoAuthClient {
         )
     }
 
-    internal fun getUserInfo(accessToken: String): JSONObject {
+    /** Retrieves OAuth userinfo as raw JSON, without Android's mocked org.json layer. */
+    internal fun getUserInfoRaw(accessToken: String): String {
         require(accessToken.isNotBlank()) { "No Nextendo access token is available." }
-        return JSONObject(
-            request(
-                url = USERINFO_URL,
-                method = "GET",
-                headers = mapOf("Authorization" to "Bearer $accessToken")
-            )
+        return request(
+            url = USERINFO_URL,
+            method = "GET",
+            headers = mapOf("Authorization" to "Bearer $accessToken")
         )
     }
+
+    /** Retrieves OAuth userinfo fields granted by the player. */
+    internal fun getUserInfo(accessToken: String): JSONObject =
+        JSONObject(getUserInfoRaw(accessToken))
 
     /**
      * Retrieves the OAuth-scoped identity/friends document.
