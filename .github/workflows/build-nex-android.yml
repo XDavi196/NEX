@@ -138,7 +138,7 @@ jobs:
         id: nex-app-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.NEX_RELEASE_APP_ID }}
+          client-id: ${{ secrets.NEX_RELEASE_APP_ID }}
           private-key: ${{ secrets.NEX_RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: NEX
@@ -164,7 +164,7 @@ jobs:
             --prerelease \
             --notes "Experimental Android preview based on Eden v0.2.0-rc1. NEX uses its own Nextendo application identity. Account sign-in and presence require live service validation. In-game online multiplayer is NOT implemented or verified: BAAS/nnex authentication, game-side friends IPC, DNS/TLS routing, PRUDP, matchmaking, NAT traversal and P2P remain unfinished. Read the repository README for project status, license and independence notices.\n\nBuild source: ${GITHUB_SHA}."
 
-  # One-time publication of the already-built and tested Build 58 artifact.
+  # One-time publication of the already-built and tested Build 58 artifact. Uses the NEX Release Bot installation token.
 # Publish-only retry using the installed NEX Release Bot; Build 58 is reused without recompilation.
   # Triggered by a commit whose subject starts with [publish-existing].
   publish-existing:
@@ -199,7 +199,7 @@ jobs:
         id: nex-app-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.NEX_RELEASE_APP_ID }}
+          client-id: ${{ secrets.NEX_RELEASE_APP_ID }}
           private-key: ${{ secrets.NEX_RELEASE_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: NEX
