@@ -102,7 +102,6 @@ object NextendoAuthManager {
                         username = userInfo.username,
                         friendCode = userInfo.friendCode
                     )
-                    NextendoNativeBridge.updateIdentity(userInfo.pid)
                 }
                 runCatching {
                     NextendoSocialApi.fetchFriendList(tokens.accessToken)
@@ -122,6 +121,7 @@ object NextendoAuthManager {
                 NextendoPresencePublisher.start(context)
 
                 val savedSession = NextendoSessionStore.load(context)
+                savedSession?.let(::syncNativeIdentity)
                 LoginOutcome(
                     pid = gameToken?.pid ?: savedSession?.pid ?: 0L,
                     username = gameToken?.username ?: savedSession?.username.orEmpty(),
@@ -273,14 +273,27 @@ object NextendoAuthManager {
      * Refreshes the rotating OAuth session when a refresh token is available.
      * The new refresh token is persisted immediately.
      */
+    private fun hasValidGameToken(session: NextendoSessionStore.Session): Boolean {
+        val now = System.currentTimeMillis() / 1000L
+        return session.nexGameToken.startsWith("nx2.") &&
+            session.nexGameTokenExpiresAtEpochSeconds > now &&
+            session.pid > 0L
+    }
+
+    private fun syncNativeIdentity(session: NextendoSessionStore.Session) {
+        if (hasValidGameToken(session)) {
+            NextendoNativeBridge.updateIdentity(session.pid)
+        } else {
+            NextendoNativeBridge.clearIdentity()
+        }
+    }
+
     private fun refreshSessionIfNeeded(
         context: Context
     ): NextendoSessionStore.Session {
         // Always re-read the current session in the synchronized refresher:
         // another worker may already have rotated the refresh token.
-        return NextendoSessionRefresher.getValidSession(context, 60L).also { session ->
-            NextendoNativeBridge.updateIdentity(session.pid)
-        }
+        return NextendoSessionRefresher.getValidSession(context, 60L).also(::syncNativeIdentity)
     }
 
     fun refreshSession(
@@ -290,27 +303,29 @@ object NextendoAuthManager {
         executor.execute {
             val result = runCatching {
                 val latest = NextendoSessionRefresher.getValidSession(context, 300L)
-                NextendoNativeBridge.updateIdentity(latest.pid)
-
-                val gameToken = if (
+                if (
                     latest.nexGameToken.isBlank() ||
                     latest.nexGameTokenExpiresAtEpochSeconds <=
                         (System.currentTimeMillis() / 1000L) + 300L
                 ) {
-                    NextendoAuthClient.fetchNexGameToken(latest.accessToken).also {
-                        NextendoSessionStore.saveNexGameToken(context, it)
+                    // OAuth session remains usable even if the public game-token
+                    // endpoint is not provisioned for this client yet.
+                    runCatching {
+                        NextendoAuthClient.fetchNexGameToken(latest.accessToken)
+                    }.onSuccess { token ->
+                        NextendoSessionStore.saveNexGameToken(context, token)
                     }
-                } else {
-                    null
                 }
 
                 NextendoPresencePublisher.start(context)
                 val session = NextendoSessionStore.load(context)
+                session?.let(::syncNativeIdentity)
+                val gameTokenReady = session?.let(::hasValidGameToken) == true
                 LoginOutcome(
-                    pid = gameToken?.pid ?: session?.pid ?: 0L,
-                    username = gameToken?.username ?: session?.username.orEmpty(),
-                    friendCode = gameToken?.friendCode ?: session?.friendCode.orEmpty(),
-                    gameTokenReady = session?.nexGameToken?.startsWith("nx2.") == true
+                    pid = session?.pid ?: 0L,
+                    username = session?.username.orEmpty(),
+                    friendCode = session?.friendCode.orEmpty(),
+                    gameTokenReady = gameTokenReady
                 )
             }
 
