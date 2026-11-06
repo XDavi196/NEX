@@ -68,8 +68,8 @@ Antes de testar login, confirme qual dos dois Client IDs é o que está realment
 - **Builds #43, #44 e #45:** canceladas pela configuração antiga `cancel-in-progress: true`, que interrompia uma build ativa sempre que outro commit era enviado.
 - **Build #46:** passou pelo checkout, instalação da toolchain e aplicação do overlay. Falhou na compilação Kotlin, em `EmulationActivity.kt:44`. O overlay havia inserido a importação `NextendoPresencePublisher` com os caracteres literais `\\n` em vez de uma quebra de linha real. Isso causou erros de sintaxe e os erros subsequentes de referência a `R`.
 - **Correção enviada:** `scripts/apply-eden-overlay.py` agora monta essa linha de importação com uma quebra de linha real, igual ao padrão já usado nas outras inserções. A alteração está no commit `a29dadb5b75edea6be04946fdaf5a674ffbc2e67`.
-- **Build #47:** foi iniciada antes dessa última correção; passou pelo overlay e está na compilação Kotlin/Gradle com a versão antiga do script. Portanto, ainda pode repetir o erro da #46.
-- **Build #48:** está na fila e usa a correção do import. É a execução que deve validar a correção.
+- **Build #47:** falhou na mesma tarefa Kotlin que a #46 (`EmulationActivity.kt:44`). Ela usou o commit anterior à correção, com o `\\n` literal, portanto repetiu o mesmo erro; não revelou um novo problema.
+- **Build #48:** está usando o commit corrigido, passou pelo overlay e está em `Build NEX Android Optimized` (Gradle). A compilação Kotlin ainda não foi confirmada como concluída.
 
 A concorrência do workflow foi alterada para `cancel-in-progress: false`, e README/alterações somente documentais foram removidas do filtro de gatilhos de build. Assim, uma nova alteração não deve interromper a compilação ativa, e modificações apenas no README não devem consumir outra build nativa.
 
