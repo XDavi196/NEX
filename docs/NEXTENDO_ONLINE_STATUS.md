@@ -29,8 +29,12 @@ Additional contract-alignment work:
 - OAuth session parsing accepts an access token even when a third-party response omits `refresh_token`; when that access token expires without a refresh credential, the app requests interactive sign-in.
 - Profile and accepted-friend reads use the OAuth-protected `/api/oauth/userinfo` route. Friend records without an explicit presence field are displayed as presence unavailable, not incorrectly labelled offline.
 - Incoming friend requests, presence mutations and game-token issuance are not inferred from routes that the published server source does not authorize for OAuth access tokens.
+- An Android-to-native bridge transfers at most 300 accepted friend PID/name records into a mutex-protected NEX-owned cache and clears it on account replacement/logout.
+- The Eden overlay registers `nn::friends` list-ID, list, friend-detail, profile-list and count handlers against that cache. Native build/ABI verification is pending.
+- HLE presence fields remain neutral/offline because OAuth userinfo does not return live presence. NEX does not fabricate online status, timestamps or AppKeyValueStorage data. Incoming requests, mutations and joinable-room metadata remain unavailable.
+- Presence publishing now requires a valid, unexpired NEX-issued `nx2.` game token. The OAuth access token is no longer sent to `/api/presence`, because the published server source does not accept that token type there.
 
-These items are implementation work, not a claim that OAuth, account endpoints, game authentication or multiplayer have been verified against two real NEX accounts.
+These changes are partial account/HLE integration, not a claim that a game can authenticate, join matchmaking or play online.
 
 ## Contract audit: documentation versus public account-server source
 
@@ -77,11 +81,11 @@ Until Nextendo confirms which contract is live and aligns the docs/server implem
 
 ### 3. Game-facing `nn::friends` HLE
 
-- In the pinned Eden revision, `src/core/hle/service/friend/friend.cpp` registers several list/profile/presence IPC commands as null handlers or stubs. The implemented handlers do not provide a complete NEX-backed friend cache.
-- NEX's Android friends UI is not the same thing as the Switch game's `nn::friends` IPC surface.
-- The game-facing cache needs stable PID/account identity, friend-list serialization, profile records, presence data and title-specific AppKeyValueStorage where the game uses joinable-session presence.
+- NEX now has a bounded native cache and Android/JNI bridge for OAuth-authorized accepted-friend PID/name records.
+- The overlay registers handlers for `GetFriendListIds`, `GetFriendList`, `UpdateFriendInfo`, `GetFriendCount`, `GetFriendListForViewer`, `GetFriendDetailedInfo`, `GetProfileList` and `GetProfileListV2`, using the 0x200 friend and 0x40 profile layouts verified in the public Den2 implementation and checked against the pinned Eden base. The overlay still requires successful native compilation and IPC tests.
+- Presence IPC remains deliberately incomplete: OAuth userinfo does not return live presence, and NEX does not populate app fields, playing status or timestamps from guesses. Incoming friend requests and mutation commands are also not wired.
 
-**Blocker:** complete IPC buffer/structure contracts and the NEX-to-HLE cache bridge must be implemented and tested against the pinned Eden ABI. Unknown fields must not be guessed.
+**Remaining blocker:** native compilation/ABI verification plus a documented OAuth-authorized presence/friend-request contract. The current HLE cache can expose basic accepted-friend identities to game IPC; it does not make game matchmaking or multiplayer work.
 
 ### 4. Title-scoped DNS and TLS/SNI
 
