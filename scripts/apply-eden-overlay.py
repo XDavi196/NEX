@@ -80,7 +80,7 @@ def main() -> None:
         gradle,
         'implementation("androidx.core:core-splashscreen:1.0.1")',
         'implementation("androidx.core:core-splashscreen:1.0.1")\n'
-        '    implementation("androidx.browser:browser:1.8.0")\\n'
+        '    implementation("androidx.browser:browser:1.8.0")\n'
         '    testImplementation("junit:junit:4.13.2")',
     )
 
