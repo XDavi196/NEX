@@ -1,0 +1,123 @@
+package com.nex.nx.nextendo
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
+
+internal data class NextendoGameFriend(
+    val pid: Long,
+    val networkServiceAccountId: Long,
+    val username: String,
+    val presenceStatus: Int,
+    val appId: String,
+    val appDetail: String,
+    val appField: ByteArray
+)
+
+/**
+ * Parses the richer /api/friends payload returned for an nx2. game token.
+ * This is deliberately separate from OAuth userinfo: no fabricated presence
+ * or empty app-field is passed to the game-facing HLE.
+ */
+internal object NextendoGameFriendParser {
+    private const val MAX_APP_FIELD_BYTES = 0xC0
+    private const val BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+    fun parse(response: String): List<NextendoGameFriend> {
+        val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }
+            .getOrNull() ?: return emptyList()
+
+        return (root["friends"] as? JsonArray)
+            .orEmpty()
+            .mapNotNull { it as? JsonObject }
+            .mapNotNull(::parseFriend)
+            .distinctBy { it.pid }
+            .take(300)
+    }
+
+    private fun parseFriend(item: JsonObject): NextendoGameFriend? {
+        val pid = item.longField("pid") ?: return null
+        if (pid <= 0L) return null
+        val username = item.stringField("name")
+            .ifBlank { item.stringField("username") }
+            .ifBlank { item.stringField("display_name") }
+        if (username.isBlank()) return null
+
+        val presence = item["presence"] as? JsonObject ?: return null
+        val status = presence.intField("status") ?: return null
+        if (status !in 0..2) return null
+
+        val nsaText = item.stringField("nsa").removePrefix("0x").removePrefix("0X")
+        val nsa = nsaText.toULongOrNull(16)?.toLong()
+            ?: item.longField("nsa")
+            ?: 0L
+
+        val encodedAppField = presence.stringField("app_field")
+        val appField = decodeBase64(encodedAppField) ?: byteArrayOf()
+        if (appField.size > MAX_APP_FIELD_BYTES) return null
+
+        return NextendoGameFriend(
+            pid = pid,
+            networkServiceAccountId = nsa,
+            username = username,
+            presenceStatus = status,
+            appId = presence.stringField("app_id"),
+            appDetail = presence.stringField("app_detail"),
+            appField = appField
+        )
+    }
+
+    /** Strict RFC 4648 decoder with bounded output; no Android-only API is required. */
+    private fun decodeBase64(value: String): ByteArray? {
+        if (value.isBlank()) return byteArrayOf()
+        val encoded = value.filterNot(Char::isWhitespace)
+        if (encoded.length % 4 != 0) return null
+
+        val padding = when {
+            encoded.endsWith("==") -> 2
+            encoded.endsWith("=") -> 1
+            else -> 0
+        }
+        val outputSize = encoded.length / 4 * 3 - padding
+        if (outputSize !in 0..MAX_APP_FIELD_BYTES) return null
+
+        val output = ByteArray(outputSize)
+        var outputIndex = 0
+        var index = 0
+        while (index < encoded.length) {
+            val finalBlock = index + 4 == encoded.length
+            val c0 = BASE64.indexOf(encoded[index])
+            val c1 = BASE64.indexOf(encoded[index + 1])
+            val c2Char = encoded[index + 2]
+            val c3Char = encoded[index + 3]
+            val c2 = if (c2Char == '=') 0 else BASE64.indexOf(c2Char)
+            val c3 = if (c3Char == '=') 0 else BASE64.indexOf(c3Char)
+
+            if (c0 < 0 || c1 < 0 || c2 < 0 || c3 < 0) return null
+            if ((!finalBlock && (c2Char == '=' || c3Char == '=')) ||
+                (c2Char == '=' && c3Char != '=')
+            ) return null
+
+            val bits = (c0 shl 18) or (c1 shl 12) or (c2 shl 6) or c3
+            if (outputIndex < output.size) output[outputIndex++] = (bits shr 16).toByte()
+            if (c2Char != '=' && outputIndex < output.size) output[outputIndex++] = (bits shr 8).toByte()
+            if (c3Char != '=' && outputIndex < output.size) output[outputIndex++] = bits.toByte()
+            index += 4
+        }
+
+        return output
+    }
+
+    private fun JsonObject.stringField(name: String): String =
+        (this[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+    private fun JsonObject.longField(name: String): Long? =
+        (this[name] as? JsonPrimitive)?.longOrNull
+
+    private fun JsonObject.intField(name: String): Int? =
+        (this[name] as? JsonPrimitive)?.intOrNull
+}

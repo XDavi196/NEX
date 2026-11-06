@@ -3,20 +3,23 @@ package com.nex.nx.nextendo
 import org.yuzu.yuzu_emu.NativeLibrary
 
 /**
- * Transfers only player-consented identity/friend data to Eden's in-process HLE cache.
- * This is not a NEX/PRUDP session, game token, attestation or presence source.
+ * Transfers the Nextendo game-token friend snapshot to Eden's in-process HLE.
+ * OAuth-only records are intentionally not accepted by this bridge.
  */
 internal object NextendoNativeBridge {
-    fun replaceFriendCache(friends: List<NextendoSocialApi.Friend>) {
+    fun replaceFriendCache(friends: List<NextendoGameFriend>) {
         val normalized = friends.asSequence()
-            .filter { it.pid > 0L && it.username.isNotBlank() }
+            .filter { it.pid > 0L && it.username.isNotBlank() && it.presenceStatus in 0..2 }
             .distinctBy { it.pid }
             .take(300)
             .toList()
 
         NativeLibrary.updateNextendoFriendCache(
             normalized.map { it.pid }.toLongArray(),
-            normalized.map { it.username }.toTypedArray()
+            normalized.map { it.networkServiceAccountId }.toLongArray(),
+            normalized.map { it.username }.toTypedArray(),
+            normalized.map { it.presenceStatus }.toIntArray(),
+            normalized.map { it.appField }.toTypedArray()
         )
     }
 

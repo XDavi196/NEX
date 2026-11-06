@@ -61,7 +61,7 @@ def main() -> None:
     replace_once(
         native_library,
         "    external fun getAllUsers(): Array<String>?\n",
-        "    external fun updateNextendoFriendCache(pids: LongArray, usernames: Array<String>)\n"
+        "    external fun updateNextendoFriendCache(pids: LongArray, nsas: LongArray, usernames: Array<String>, statuses: IntArray, appFields: Array<ByteArray>)\n"
         "    external fun clearNextendoFriendCache()\n"
         "    external fun updateNextendoIdentity(pid: Long)\n"
         "    external fun clearNextendoIdentity()\n"
@@ -90,21 +90,32 @@ def main() -> None:
         [[maybe_unused]] jobject obj) {
 """
     native_jni_bridge = r'''JNIEXPORT void JNICALL
+JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoFriendCache(
-    JNIEnv* env, [[maybe_unused]] jobject obj, jlongArray pids, jobjectArray usernames) {
-    if (pids == nullptr || usernames == nullptr) {
+    JNIEnv* env, [[maybe_unused]] jobject obj, jlongArray pids, jlongArray nsas,
+    jobjectArray usernames, jintArray statuses, jobjectArray app_fields) {
+    if (pids == nullptr || nsas == nullptr || usernames == nullptr ||
+        statuses == nullptr || app_fields == nullptr) {
         Common::NextendoFriendCache::Clear();
         return;
     }
 
     const jsize pid_count = env->GetArrayLength(pids);
+    const jsize nsa_count = env->GetArrayLength(nsas);
     const jsize name_count = env->GetArrayLength(usernames);
+    const jsize status_count = env->GetArrayLength(statuses);
+    const jsize field_count = env->GetArrayLength(app_fields);
     const jsize count = std::min<jsize>(
-        std::min(pid_count, name_count),
-        static_cast<jsize>(Common::NextendoFriendCache::MaxFriends));
+        std::min(std::min(pid_count, nsa_count), std::min(name_count, status_count)),
+        std::min(field_count, static_cast<jsize>(Common::NextendoFriendCache::MaxFriends)));
+
     std::vector<jlong> pid_values(static_cast<std::size_t>(count));
+    std::vector<jlong> nsa_values(static_cast<std::size_t>(count));
+    std::vector<jint> status_values(static_cast<std::size_t>(count));
     if (count > 0) {
         env->GetLongArrayRegion(pids, 0, count, pid_values.data());
+        env->GetLongArrayRegion(nsas, 0, count, nsa_values.data());
+        env->GetIntArrayRegion(statuses, 0, count, status_values.data());
         if (env->ExceptionCheck()) {
             env->ExceptionClear();
             Common::NextendoFriendCache::Clear();
@@ -116,18 +127,47 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoFriendCache(
     entries.reserve(static_cast<std::size_t>(count));
     for (jsize i = 0; i < count; ++i) {
         auto name_object = static_cast<jstring>(env->GetObjectArrayElement(usernames, i));
+        auto field_object = static_cast<jbyteArray>(env->GetObjectArrayElement(app_fields, i));
         if (name_object == nullptr) {
+            if (field_object != nullptr) env->DeleteLocalRef(field_object);
             continue;
         }
+
         const char* name_chars = env->GetStringUTFChars(name_object, nullptr);
-        if (name_chars != nullptr) {
+        if (name_chars != nullptr && status_values[static_cast<std::size_t>(i)] >= 0 &&
+            status_values[static_cast<std::size_t>(i)] <= 2) {
             Common::NextendoFriendCache::Entry entry{
                 .pid = static_cast<std::uint64_t>(pid_values[static_cast<std::size_t>(i)]),
+                .network_service_account_id =
+                    static_cast<std::uint64_t>(nsa_values[static_cast<std::size_t>(i)]),
                 .username = name_chars,
+                .presence_status = static_cast<std::uint32_t>(status_values[static_cast<std::size_t>(i)]),
             };
-            entries.push_back(std::move(entry));
+
+            if (field_object != nullptr) {
+                const jsize field_length = env->GetArrayLength(field_object);
+                if (field_length >= 0 &&
+                    field_length <= static_cast<jsize>(Common::NextendoFriendCache::MaxAppFieldBytes)) {
+                    entry.app_field_size = static_cast<std::size_t>(field_length);
+                    if (field_length > 0) {
+                        env->GetByteArrayRegion(
+                            field_object, 0, field_length,
+                            reinterpret_cast<jbyte*>(entry.app_field.data()));
+                    }
+                }
+            }
+
+            if (!env->ExceptionCheck()) {
+                entries.push_back(std::move(entry));
+            } else {
+                env->ExceptionClear();
+            }
             env->ReleaseStringUTFChars(name_object, name_chars);
+        } else if (env->ExceptionCheck()) {
+            env->ExceptionClear();
         }
+
+        if (field_object != nullptr) env->DeleteLocalRef(field_object);
         env->DeleteLocalRef(name_object);
     }
 
@@ -151,7 +191,7 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoIdentity(
 }
 
 JNIEXPORT void JNICALL
-Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
+Java_org_yuzu_yuzu_emu_NativeLibrary_clearNextendoIdentity(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Common::NextendoFriendCache::ClearPlayerPid();
 }
@@ -273,11 +313,16 @@ NextendoFriendInfo MakeNextendoFriendInfo(
     const auto length = std::min(entry.username.size(), out.nickname.size() - 1);
     std::memcpy(out.nickname.data(), entry.username.data(), length);
     out.presence.user_id = out.user_id;
-    // OAuth userinfo does not currently expose live presence.
-    // Do not synthesize Online/OnlinePlay or game-specific AppKeyValue data.
-    out.presence.status = 0;
-    out.presence.last_time_online_timestamp = 0;
-    out.presence.same_presence_group_application = 0;
+    out.presence.status = entry.presence_status;
+    out.presence.last_time_online_timestamp = 0x7FFFFFFFFFFFFFFFLL;
+    // This marks the friend as sharing the same title presence group, matching
+    // the observed Nextendo HLE behavior. app_field is copied byte-for-byte.
+    out.presence.same_presence_group_application = 1;
+    const auto app_field_size = std::min(
+        entry.app_field_size, out.presence.app_key_value.size());
+    std::copy_n(
+        entry.app_field.begin(), app_field_size,
+        out.presence.app_key_value.begin());
     out.is_valid = 1;
     return out;
 }
@@ -391,6 +436,46 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         friend_cpp,
         '{20102, nullptr, "GetFriendDetailedInfo"}',
         '{20102, &IFriendService::GetFriendDetailedInfo, "GetFriendDetailedInfo"}',
+    )
+    replace_once(
+        friend_cpp,
+        """    void GetUserPresenceView(HLERequestContext& ctx) {
+        IPC::RequestParser rp{ctx};
+        const auto uuid = rp.PopRaw<Common::UUID>();
+        LOG_DEBUG(Service_Friend, "(STUBBED) called, uuid={}.", uuid.RawString());
+
+        u8 buf[0xe0]{};
+        ctx.WriteBuffer(buf);
+
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+    }""",
+        """    void GetUserPresenceView(HLERequestContext& ctx) {
+        IPC::RequestParser rp{ctx};
+        const auto uuid = rp.PopRaw<Common::UUID>();
+        const auto friends = Common::NextendoFriendCache::Get();
+        NextendoUserPresence presence{};
+        const auto found = std::find_if(friends.begin(), friends.end(),
+            [&uuid](const auto& entry) {
+                return NextendoUidForPid(entry.pid).RawString() == uuid.RawString();
+            });
+        if (found != friends.end()) {
+            presence.user_id = NextendoUidForPid(found->pid);
+            presence.status = found->presence_status;
+            presence.last_time_online_timestamp = 0x7FFFFFFFFFFFFFFFLL;
+            presence.same_presence_group_application = 1;
+            const auto app_field_size = std::min(
+                found->app_field_size, presence.app_key_value.size());
+            std::copy_n(
+                found->app_field.begin(), app_field_size,
+                presence.app_key_value.begin());
+        }
+        ctx.WriteBuffer(presence);
+        LOG_INFO(Service_Friend, "[NEX Nextendo] GetUserPresenceView uuid=0x{} found={}",
+                 uuid.RawString(), found != friends.end());
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+    }""",
     )
 
     get_friend_list_stub = """    void GetFriendList(HLERequestContext& ctx) {

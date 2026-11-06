@@ -167,6 +167,22 @@ object NextendoAuthClient {
         JSONObject(getUserInfoRaw(accessToken))
 
     /**
+     * Retrieves the richer game-facing friend snapshot. This route is protected
+     * by a Nextendo-issued nx2. game token, not by an OAuth access token.
+     */
+    internal fun fetchGameFriends(gameToken: String): List<NextendoGameFriend> {
+        require(gameToken.startsWith("nx2.")) {
+            "A valid Nextendo nx2. game token is required for game friend data."
+        }
+        val response = request(
+            url = "$BASE_URL/api/friends",
+            method = "GET",
+            headers = mapOf("Authorization" to "Bearer $gameToken")
+        )
+        return NextendoGameFriendParser.parse(response)
+    }
+
+    /**
      * Retrieves the OAuth-scoped identity/friends document.
      *
      * The published account-server implementation validates OAuth access tokens

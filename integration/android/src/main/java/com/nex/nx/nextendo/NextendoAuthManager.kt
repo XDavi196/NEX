@@ -103,12 +103,6 @@ object NextendoAuthManager {
                         friendCode = userInfo.friendCode
                     )
                 }
-                runCatching {
-                    NextendoSocialApi.fetchFriendList(tokens.accessToken)
-                }.onSuccess { friends ->
-                    NextendoNativeBridge.replaceFriendCache(friends.friends)
-                }
-
                 val gameToken = runCatching {
                     NextendoAuthClient.fetchNexGameToken(tokens.accessToken)
                 }.getOrNull()
@@ -122,6 +116,13 @@ object NextendoAuthManager {
 
                 val savedSession = NextendoSessionStore.load(context)
                 savedSession?.let(::syncNativeIdentity)
+                if (savedSession?.let(::hasValidGameToken) == true) {
+                    runCatching {
+                        NextendoAuthClient.fetchGameFriends(savedSession.nexGameToken)
+                    }.onSuccess(NextendoNativeBridge::replaceFriendCache)
+                } else {
+                    NextendoNativeBridge.clearFriendCache()
+                }
                 LoginOutcome(
                     pid = gameToken?.pid ?: savedSession?.pid ?: 0L,
                     username = gameToken?.username ?: savedSession?.username.orEmpty(),
@@ -232,9 +233,15 @@ object NextendoAuthManager {
                 return@execute
             }
             val result = runCatching {
-                NextendoSocialApi.fetchFriendList(session.accessToken).also { friends ->
-                    NextendoNativeBridge.replaceFriendCache(friends.friends)
+                val oauthFriendList = NextendoSocialApi.fetchFriendList(session.accessToken)
+                if (hasValidGameToken(session)) {
+                    runCatching {
+                        NextendoAuthClient.fetchGameFriends(session.nexGameToken)
+                    }.onSuccess(NextendoNativeBridge::replaceFriendCache)
+                } else {
+                    NextendoNativeBridge.clearFriendCache()
                 }
+                oauthFriendList
             }
 
             mainHandler.post {
@@ -321,6 +328,13 @@ object NextendoAuthManager {
                 val session = NextendoSessionStore.load(context)
                 session?.let(::syncNativeIdentity)
                 val gameTokenReady = session?.let(::hasValidGameToken) == true
+                if (session != null && gameTokenReady) {
+                    runCatching {
+                        NextendoAuthClient.fetchGameFriends(session.nexGameToken)
+                    }.onSuccess(NextendoNativeBridge::replaceFriendCache)
+                } else {
+                    NextendoNativeBridge.clearFriendCache()
+                }
                 LoginOutcome(
                     pid = session?.pid ?: 0L,
                     username = session?.username.orEmpty(),
