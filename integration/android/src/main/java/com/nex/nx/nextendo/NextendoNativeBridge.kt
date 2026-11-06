@@ -21,6 +21,19 @@ internal object NextendoNativeBridge {
     }
 
     fun clearFriendCache() {
-        NativeLibrary.clearNextendoFriendCache()
+        runCatching { NativeLibrary.clearNextendoFriendCache() }
+    }
+
+    /** Binds games' ACC NetworkServiceAccountId to the authenticated NEX PID. */
+    fun updateIdentity(pid: Long) {
+        if (pid > 0L) {
+            runCatching { NativeLibrary.updateNextendoIdentity(pid) }
+        } else {
+            clearIdentity()
+        }
+    }
+
+    fun clearIdentity() {
+        runCatching { NativeLibrary.clearNextendoIdentity() }
     }
 }

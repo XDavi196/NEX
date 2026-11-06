@@ -63,6 +63,8 @@ def main() -> None:
         "    external fun getAllUsers(): Array<String>?\n",
         "    external fun updateNextendoFriendCache(pids: LongArray, usernames: Array<String>)\n"
         "    external fun clearNextendoFriendCache()\n"
+        "    external fun updateNextendoIdentity(pid: Long)\n"
+        "    external fun clearNextendoIdentity()\n"
         "    external fun getAllUsers(): Array<String>?\n",
     )
 
@@ -138,8 +140,68 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoFriendCache(
     Common::NextendoFriendCache::Clear();
 }
 
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoIdentity(
+    JNIEnv* /*env*/, [[maybe_unused]] jobject obj, jlong pid) {
+    if (pid > 0) {
+        Common::NextendoFriendCache::SetPlayerPid(static_cast<std::uint64_t>(pid));
+    } else {
+        Common::NextendoFriendCache::ClearPlayerPid();
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
+    JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
+    Common::NextendoFriendCache::ClearPlayerPid();
+}
+
 '''
     replace_once(native_cpp, native_jni_anchor, native_jni_bridge + native_jni_anchor)
+
+    # ACC exposes the linked NEX PID as NetworkServiceAccountId to games.
+    acc_cpp = eden / "src/core/hle/service/acc/acc.cpp"
+    replace_once(
+        acc_cpp,
+        '#include "core/hle/service/acc/acc.h"\n',
+        '#include "core/hle/service/acc/acc.h"\n'
+        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n',
+    )
+    replace_once(
+        acc_cpp,
+        """    Result GetAccountId(Out<u64> out_account_id) {
+        LOG_WARNING(Service_ACC, "(STUBBED) called");
+        *out_account_id = account_id.Hash();
+        R_SUCCEED();
+    }""",
+        """    Result GetAccountId(Out<u64> out_account_id) {
+        const auto nex_pid = Common::NextendoFriendCache::GetPlayerPid();
+        *out_account_id = nex_pid != 0 ? nex_pid : account_id.Hash();
+        LOG_INFO(Service_ACC, "[NEX Nextendo] GetAccountId -> {}",
+                 *out_account_id);
+        R_SUCCEED();
+    }""",
+    )
+    replace_once(
+        acc_cpp,
+        """    void GetAccountId(HLERequestContext& ctx) {
+        LOG_DEBUG(Service_ACC, "called");
+
+        IPC::ResponseBuilder rb{ctx, 4};
+        rb.Push(ResultSuccess);
+        rb.PushRaw<u64>(profile_manager->GetLastOpenedUser().Hash());
+    }""",
+        """    void GetAccountId(HLERequestContext& ctx) {
+        const auto nex_pid = Common::NextendoFriendCache::GetPlayerPid();
+        const auto account_id = nex_pid != 0
+            ? nex_pid
+            : profile_manager->GetLastOpenedUser().Hash();
+        LOG_INFO(Service_ACC, "[NEX Nextendo] GetAccountId -> {}", account_id);
+        IPC::ResponseBuilder rb{ctx, 4};
+        rb.Push(ResultSuccess);
+        rb.PushRaw<u64>(account_id);
+    }""",
+    )
 
     # Connect Eden's nn::friends HLE to the NEX-owned read-only cache.
     friend_cpp = eden / "src/core/hle/service/friend/friend.cpp"

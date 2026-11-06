@@ -89,6 +89,7 @@ object NextendoAuthManager {
                 NextendoSessionStore.saveFreshOAuthTokens(context, tokens)
                 NextendoSessionStore.clearPendingAuthorization(context)
                 NextendoNativeBridge.clearFriendCache()
+                NextendoNativeBridge.clearIdentity()
 
                 // Populate the account identity and accepted-friend cache from the
                 // OAuth-scoped userinfo contract. No presence is invented when absent.
@@ -101,6 +102,7 @@ object NextendoAuthManager {
                         username = userInfo.username,
                         friendCode = userInfo.friendCode
                     )
+                    NextendoNativeBridge.updateIdentity(userInfo.pid)
                 }
                 runCatching {
                     NextendoSocialApi.fetchFriendList(tokens.accessToken)
@@ -198,6 +200,7 @@ object NextendoAuthManager {
                     .setNeutralButton("Desconectar") { _, _ ->
                         NextendoPresencePublisher.stop(activity)
                         NextendoNativeBridge.clearFriendCache()
+                        NextendoNativeBridge.clearIdentity()
                         runCatching { NextendoSessionStore.clear(activity) }
                         Toast.makeText(
                             activity,
@@ -275,7 +278,9 @@ object NextendoAuthManager {
     ): NextendoSessionStore.Session {
         // Always re-read the current session in the synchronized refresher:
         // another worker may already have rotated the refresh token.
-        return NextendoSessionRefresher.getValidSession(context, 60L)
+        return NextendoSessionRefresher.getValidSession(context, 60L).also { session ->
+            NextendoNativeBridge.updateIdentity(session.pid)
+        }
     }
 
     fun refreshSession(
@@ -285,6 +290,7 @@ object NextendoAuthManager {
         executor.execute {
             val result = runCatching {
                 val latest = NextendoSessionRefresher.getValidSession(context, 300L)
+                NextendoNativeBridge.updateIdentity(latest.pid)
 
                 val gameToken = if (
                     latest.nexGameToken.isBlank() ||

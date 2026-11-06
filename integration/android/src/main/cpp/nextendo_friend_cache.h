@@ -3,6 +3,7 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -22,6 +23,20 @@ struct Entry {
 
 inline std::mutex cache_mutex;
 inline std::vector<Entry> cache_entries;
+inline std::atomic<std::uint64_t> current_player_pid{0};
+
+/** Publishes the signed-in NEX PID to ACC without coupling HLE calls to Android/HTTP. */
+inline void SetPlayerPid(std::uint64_t pid) {
+    current_player_pid.store(pid, std::memory_order_release);
+}
+
+inline std::uint64_t GetPlayerPid() {
+    return current_player_pid.load(std::memory_order_acquire);
+}
+
+inline void ClearPlayerPid() {
+    current_player_pid.store(0, std::memory_order_release);
+}
 
 /** Atomically replaces the in-memory list with bounded, de-duplicated identity data. */
 inline void Replace(std::vector<Entry> entries) {
