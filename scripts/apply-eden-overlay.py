@@ -90,7 +90,6 @@ def main() -> None:
         [[maybe_unused]] jobject obj) {
 """
     native_jni_bridge = r'''JNIEXPORT void JNICALL
-JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoFriendCache(
     JNIEnv* env, [[maybe_unused]] jobject obj, jlongArray pids, jlongArray nsas,
     jobjectArray usernames, jintArray statuses, jobjectArray app_fields) {
@@ -191,7 +190,7 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoIdentity(
 }
 
 JNIEXPORT void JNICALL
-Java_org_yuzu_yuzu_emu_NativeLibrary_clearNextendoIdentity(
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Common::NextendoFriendCache::ClearPlayerPid();
 }
@@ -306,18 +305,18 @@ Common::UUID NextendoUidForPid(u64 pid) {
 }
 
 NextendoFriendInfo MakeNextendoFriendInfo(
-    const Common::NextendoFriendCache::Entry& entry) {
+    const Common::NextendoFriendCache::Entry& entry, u64 requested_network_id = 0) {
     NextendoFriendInfo out{};
     out.user_id = NextendoUidForPid(entry.pid);
-    out.network_user_id = entry.pid;
+    out.network_user_id = requested_network_id != 0 ? requested_network_id : entry.pid;
     const auto length = std::min(entry.username.size(), out.nickname.size() - 1);
     std::memcpy(out.nickname.data(), entry.username.data(), length);
     out.presence.user_id = out.user_id;
     out.presence.status = entry.presence_status;
     out.presence.last_time_online_timestamp = 0x7FFFFFFFFFFFFFFFLL;
-    // This marks the friend as sharing the same title presence group, matching
-    // the observed Nextendo HLE behavior. app_field is copied byte-for-byte.
-    out.presence.same_presence_group_application = 1;
+    // The OAuth/game cache does not yet retain the current title ID, so do not
+    // claim that this friend is in the same application group.
+    out.presence.same_presence_group_application = 0;
     const auto app_field_size = std::min(
         entry.app_field_size, out.presence.app_key_value.size());
     std::copy_n(
@@ -356,14 +355,16 @@ void RespondNextendoProfileList(HLERequestContext& ctx, const char* label) {
             break;
         }
         const auto found = std::find_if(friends.begin(), friends.end(),
-            [pid](const auto& entry) { return entry.pid == pid; });
+            [pid](const auto& entry) {
+                return entry.pid == pid || entry.network_service_account_id == pid;
+            });
         if (found == friends.end()) {
             continue;
         }
 
         NextendoProfileInfo profile{};
         profile.user_uuid = NextendoUidForPid(found->pid);
-        profile.network_user_id = found->pid;
+        profile.network_user_id = pid;
         const auto length = std::min(found->username.size(), profile.nickname.size() - 1);
         std::memcpy(profile.nickname.data(), found->username.data(), length);
         profiles.push_back(profile);
@@ -390,11 +391,14 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     std::vector<NextendoFriendInfo> details;
     details.reserve(count);
     for (std::size_t i = 0; i < count; ++i) {
-        const auto pid = requested[i];
+        const auto requested_network_id = requested[i];
         const auto found = std::find_if(friends.begin(), friends.end(),
-            [pid](const auto& entry) { return entry.pid == pid; });
+            [requested_network_id](const auto& entry) {
+                return entry.pid == requested_network_id ||
+                    entry.network_service_account_id == requested_network_id;
+            });
         details.push_back(found == friends.end() ? NextendoFriendInfo{}
-                                                 : MakeNextendoFriendInfo(*found));
+                                                 : MakeNextendoFriendInfo(*found, requested_network_id));
     }
     if (!details.empty()) {
         ctx.WriteBuffer(details);
