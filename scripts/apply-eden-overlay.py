@@ -253,8 +253,6 @@ def main() -> None:
     layout_text = layout_text[:frame_start] + frame_open + layout_text[frame_end:]
     games_layout.write_text(layout_text, encoding="utf-8")
 
-        games_layout.write_text(layout_text, encoding="utf-8")
-
     # The home-screen shortcut opens the NEX account panel: sign in when there is
     # no session; otherwise show the profile and its Friends action.
     games_fragment = (
