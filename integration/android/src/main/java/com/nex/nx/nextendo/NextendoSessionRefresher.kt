@@ -28,6 +28,14 @@ object NextendoSessionRefresher {
             return current
         }
 
+        // Some published third-party OAuth responses contain no refresh_token.
+        // Never try to redeem an empty credential or silently invent a replacement.
+        if (current.refreshToken.isBlank()) {
+            throw IllegalStateException(
+                "A sessão Nextendo expirou e não há refresh_token disponível. Entre novamente na sua conta."
+            )
+        }
+
         // Keep the synchronized section through the network exchange and token
         // persistence: refresh tokens rotate, so the old value must not be reused.
         val refreshed = NextendoAuthClient.refreshAccessToken(current.refreshToken)

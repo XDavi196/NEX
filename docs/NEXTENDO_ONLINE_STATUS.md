@@ -25,6 +25,11 @@ The current development branch is `nex/eden-v0.2.0-rc1-nextendo`. Post-baseline 
 - Unit tests for valid game-token responses, wrong prefixes, undocumented aliases, missing identity/expiry fields, invalid PID/lifetime and expiry overflow.
 - A CI step runs the Android unit-test task before the APK build.
 
+Additional contract-alignment work:
+- OAuth session parsing accepts an access token even when a third-party response omits `refresh_token`; when that access token expires without a refresh credential, the app requests interactive sign-in.
+- Profile and accepted-friend reads use the OAuth-protected `/api/oauth/userinfo` route. Friend records without an explicit presence field are displayed as presence unavailable, not incorrectly labelled offline.
+- Incoming friend requests, presence mutations and game-token issuance are not inferred from routes that the published server source does not authorize for OAuth access tokens.
+
 These items are implementation work, not a claim that OAuth, account endpoints, game authentication or multiplayer have been verified against two real NEX accounts.
 
 ## Contract audit: documentation versus public account-server source

@@ -140,7 +140,14 @@ object NextendoAuthManager {
         NextendoPresencePublisher.start(activity)
 
         executor.execute {
-            val activeSession = refreshSessionIfNeeded(activity)
+            val activeSession = try {
+                refreshSessionIfNeeded(activity)
+            } catch (error: Exception) {
+                mainHandler.post {
+                    showSessionRecoveryDialog(activity, error.message.orEmpty())
+                }
+                return@execute
+            }
             val profile = if (activeSession.pid > 0L) {
                 runCatching {
                     NextendoAccountApi.fetchOwnProfile(activeSession.accessToken, activeSession.pid)
@@ -206,8 +213,15 @@ object NextendoAuthManager {
         }
 
         executor.execute {
+            val session = try {
+                refreshSessionIfNeeded(activity)
+            } catch (error: Exception) {
+                mainHandler.post {
+                    showSessionRecoveryDialog(activity, error.message.orEmpty())
+                }
+                return@execute
+            }
             val result = runCatching {
-                val session = refreshSessionIfNeeded(activity)
                 NextendoSocialApi.fetchFriendList(session.accessToken)
             }
 
@@ -233,8 +247,18 @@ object NextendoAuthManager {
         }
     }
 
+    private fun showSessionRecoveryDialog(activity: Activity, detail: String) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        AlertDialog.Builder(activity)
+            .setTitle("Não foi possível atualizar a sessão")
+            .setMessage(detail.ifBlank { "Entre novamente para continuar usando sua conta." })
+            .setPositiveButton("Conectar novamente") { _, _ -> startLogin(activity) }
+            .setNegativeButton("Fechar", null)
+            .show()
+    }
+
     /**
-     * Refreshes the rotating OAuth session when it is close to expiry.
+     * Refreshes the rotating OAuth session when a refresh token is available.
      * The new refresh token is persisted immediately.
      */
     private fun refreshSessionIfNeeded(

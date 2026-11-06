@@ -114,7 +114,7 @@ object NextendoSessionStore {
 
         val accessToken = json.optString("access_token")
         val refreshToken = json.optString("refresh_token")
-        if (accessToken.isBlank() || refreshToken.isBlank()) return null
+        if (accessToken.isBlank()) return null
 
         return Session(
             accessToken = accessToken,

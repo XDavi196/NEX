@@ -25,7 +25,8 @@ object NextendoSocialApi {
                 if (activity.isBlank()) "Jogando agora" else "Jogando · $activity"
             }
             1 -> "Online"
-            else -> "Offline"
+            0 -> "Offline"
+            else -> "Presença indisponível"
         }
     }
 
@@ -52,22 +53,22 @@ object NextendoSocialApi {
     }
 
     /**
-     * Retrieves friends and incoming requests through the account friends endpoint.
-     * This view is read-only; no mutation endpoint is guessed or enabled here.
+     * Reads accepted friends from the OAuth-scoped /api/oauth/userinfo response.
+     * The published response does not expose incoming requests or live presence.
      */
     fun fetchFriendList(accessToken: String): FriendList {
         require(accessToken.isNotBlank()) { "A conta Nextendo não está autenticada." }
         val json = NextendoAuthClient.getFriends(accessToken)
         return FriendList(
             friends = parseFriends(json.optJSONArray("friends")),
-            requests = parseFriends(json.optJSONArray("requests"))
+            requests = emptyList()
         )
     }
 
     fun fetchFriends(accessToken: String): List<Friend> =
         fetchFriendList(accessToken).friends
 
-    private fun parseFriends(array: JSONArray?): List<Friend> {
+    internal fun parseFriends(array: JSONArray?): List<Friend> {
         if (array == null) return emptyList()
         val result = ArrayList<Friend>(array.length())
 
@@ -75,9 +76,9 @@ object NextendoSocialApi {
             val item = array.optJSONObject(index) ?: continue
             val presence = item.optJSONObject("presence")
             val status = when {
-                presence?.has("status") == true -> presence.optInt("status", 0)
-                item.has("status") -> item.optInt("status", 0)
-                else -> 0
+                presence?.has("status") == true -> presence.optInt("status", -1)
+                item.has("status") -> item.optInt("status", -1)
+                else -> -1
             }
 
             val appId = presence?.optString("app_id").orEmpty()

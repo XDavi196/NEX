@@ -163,17 +163,14 @@ object NextendoAuthClient {
         )
     }
 
-    /** Retrieves friends and incoming requests with the player's NEX OAuth session. */
-    internal fun getFriends(accessToken: String): JSONObject {
-        require(accessToken.isNotBlank()) { "No Nextendo access token is available." }
-        return JSONObject(
-            request(
-                url = "$BASE_URL/api/friends",
-                method = "GET",
-                headers = mapOf("Authorization" to "Bearer $accessToken")
-            )
-        )
-    }
+    /**
+     * Retrieves the OAuth-scoped identity/friends document.
+     *
+     * The published account-server implementation validates OAuth access tokens
+     * on /api/oauth/userinfo. Its /api/friends route currently uses a different
+     * session-token validator, so an OAuth token must not be sent there.
+     */
+    internal fun getFriends(accessToken: String): JSONObject = getUserInfo(accessToken)
 
     internal fun postPresence(
         accessToken: String,
@@ -204,28 +201,11 @@ object NextendoAuthClient {
         )
     }
 
-    private fun parseOAuthTokens(response: String): OAuthTokens {
-        val json = JSONObject(response)
-        val access = json.optString("access_token")
-        val refresh = json.optString("refresh_token")
-        val expiresIn = json.optLong("expires_in", 3600L)
-
-        require(access.isNotBlank()) {
-            "Nextendo token response did not contain access_token."
-        }
-        require(refresh.isNotBlank()) {
-            "Nextendo token response did not contain refresh_token."
-        }
-        require(expiresIn > 0L) {
-            "Nextendo returned an invalid access-token lifetime."
-        }
-
-        return OAuthTokens(
-            accessToken = access,
-            refreshToken = refresh,
-            expiresAtEpochSeconds = System.currentTimeMillis() / 1000L + expiresIn
+    private fun parseOAuthTokens(response: String): OAuthTokens =
+        NextendoOAuthTokenParser.parse(
+            response = response,
+            nowEpochSeconds = System.currentTimeMillis() / 1000L
         )
-    }
 
     private fun postForm(url: String, values: Map<String, String>): String {
         val body = values.entries.joinToString("&") { (key, value) ->
