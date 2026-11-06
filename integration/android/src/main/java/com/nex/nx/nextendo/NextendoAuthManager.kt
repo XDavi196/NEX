@@ -126,7 +126,7 @@ object NextendoAuthManager {
                     pid = gameToken?.pid ?: savedSession?.pid ?: 0L,
                     username = gameToken?.username ?: savedSession?.username.orEmpty(),
                     friendCode = gameToken?.friendCode ?: savedSession?.friendCode.orEmpty(),
-                    gameTokenReady = savedSession?.nexGameToken?.startsWith("nx2.") == true
+                    gameTokenReady = savedSession?.let(::hasValidGameToken) == true
                 )
             }
 
