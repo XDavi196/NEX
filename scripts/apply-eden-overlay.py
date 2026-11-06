@@ -201,16 +201,16 @@ def main() -> None:
         app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/GamesFragment.kt"
     )
     games_text = games_fragment.read_text(encoding="utf-8")
-    games_import_anchor = "import org.yuzu.yuzu_emu.model.HomeViewModel\\n"
+    games_import_anchor = "import org.yuzu.yuzu_emu.model.HomeViewModel\n"
     if games_text.count(games_import_anchor) != 1:
         raise RuntimeError("Could not identify GamesFragment import block")
     games_text = games_text.replace(
         games_import_anchor,
         games_import_anchor
-        + "import com.nex.nx.nextendo.NextendoAuthManager\\n",
+        + "import com.nex.nx.nextendo.NextendoAuthManager\n",
         1,
     )
-    view_click_anchor = "        binding.viewButton.setOnClickListener { showViewMenu(it) }\\n"
+    view_click_anchor = "        binding.viewButton.setOnClickListener { showViewMenu(it) }\n"
     if games_text.count(view_click_anchor) != 1:
         raise RuntimeError("Could not identify GamesFragment top toolbar setup")
     games_text = games_text.replace(
