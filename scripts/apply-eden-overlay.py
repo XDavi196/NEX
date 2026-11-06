@@ -144,6 +144,86 @@ def main() -> None:
     text = text.replace(settings_anchor, session_row, 1)
     presenter.write_text(text, encoding="utf-8")
 
+    # Add a clearly visible Nextendo shortcut to the main games header, following
+    # the placement familiar to Den2 users while keeping all authentication NEX-owned.
+    games_layout = app_dir / "src/main/res/layout/fragment_games.xml"
+    layout_text = games_layout.read_text(encoding="utf-8")
+    settings_button_anchor = """        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/settings_button"
+"""
+    nextendo_button = """        <Space
+            android:layout_width="15dp"
+            android:layout_height="wrap_content"
+            />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/nextendo_button"
+            style="@style/EdenCard"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Nextendo Network"
+            android:tooltipText="Nextendo Network"
+            android:clickable="true"
+            android:focusable="true"
+            app:cardCornerRadius="21dp"
+            app:cardBackgroundColor="@android:color/transparent"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutline"
+            app:strokeWidth="1dp"
+            android:padding="8dp"
+            >
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_account_circle"
+                app:tint="#4CAF50"
+                />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <Space
+            android:layout_width="15dp"
+            android:layout_height="wrap_content"
+            />
+
+""" + settings_button_anchor
+    if layout_text.count(settings_button_anchor) != 1:
+        raise RuntimeError("Could not identify the games header settings button")
+    layout_text = layout_text.replace(settings_button_anchor, nextendo_button, 1)
+    games_layout.write_text(layout_text, encoding="utf-8")
+
+    # The home-screen shortcut opens the NEX account panel: sign in when there is
+    # no session; otherwise show the profile and its Friends action.
+    games_fragment = (
+        app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/GamesFragment.kt"
+    )
+    games_text = games_fragment.read_text(encoding="utf-8")
+    games_import_anchor = "import org.yuzu.yuzu_emu.model.HomeViewModel\\n"
+    if games_text.count(games_import_anchor) != 1:
+        raise RuntimeError("Could not identify GamesFragment import block")
+    games_text = games_text.replace(
+        games_import_anchor,
+        games_import_anchor
+        + "import com.nex.nx.nextendo.NextendoAuthManager\\n",
+        1,
+    )
+    view_click_anchor = "        binding.viewButton.setOnClickListener { showViewMenu(it) }\\n"
+    if games_text.count(view_click_anchor) != 1:
+        raise RuntimeError("Could not identify GamesFragment top toolbar setup")
+    games_text = games_text.replace(
+        view_click_anchor,
+        view_click_anchor
+        + """        binding.nextendoButton.setOnClickListener {
+            NextendoAuthManager.openAccount(requireActivity())
+        }
+""",
+        1,
+    )
+    games_fragment.write_text(games_text, encoding="utf-8")
+
     # Publish real in-game presence from Eden's existing title-ID/playtime callback.
     emulation_activity = (
         app_dir / "src/main/java/org/yuzu/yuzu_emu/activities/EmulationActivity.kt"
