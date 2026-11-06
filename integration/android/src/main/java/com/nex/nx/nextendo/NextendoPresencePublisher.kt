@@ -10,8 +10,9 @@ import java.util.concurrent.TimeUnit
  * Publishes the signed-in player's app/game presence.
  *
  * Nextendo expires presence unless the app sends a heartbeat at least every
- * 90 seconds. NEX sends one every 60 seconds. The current Android wiring
- * reports account-online status. The Eden overlay calls setGameActivity()
+ * 90 seconds. NEX sends one every 60 seconds, but only after a valid, unexpired
+ * NEX-issued nx2. game token is available. OAuth access tokens are never sent
+ * to the game-presence endpoint. The Eden overlay calls setGameActivity()
  * from EmulationActivity using Eden's current title-ID/playtime bridge.
  */
 object NextendoPresencePublisher {
@@ -39,7 +40,7 @@ object NextendoPresencePublisher {
     @Volatile
     private var enabled = false
 
-    /** Start online presence after a valid OAuth session has been saved. */
+    /** Start the heartbeat scheduler; publishing remains gated on a valid nx2. token. */
     fun start(context: Context) {
         synchronized(lock) {
             applicationContext = context.applicationContext
@@ -93,8 +94,14 @@ object NextendoPresencePublisher {
         val appContext = context.applicationContext
         // Capture the token before the caller clears the local session. Otherwise
         // the queued offline request could run after logout and lose its credential.
-        val accessToken = runCatching {
-            NextendoSessionStore.load(appContext)?.accessToken
+        val gameToken = runCatching {
+            NextendoSessionStore.load(appContext)?.let { session ->
+                session.nexGameToken.takeIf {
+                    it.startsWith("nx2.") &&
+                        session.nexGameTokenExpiresAtEpochSeconds >
+                        System.currentTimeMillis() / 1000L
+                }
+            }
         }.getOrNull()
 
         synchronized(lock) {
@@ -107,12 +114,12 @@ object NextendoPresencePublisher {
         gameTitleId = ""
         gameDetail = ""
         appFieldBase64 = ""
-        if (accessToken.isNullOrBlank()) return
+        if (gameToken.isNullOrBlank()) return
 
         executor.execute {
             runCatching {
                 NextendoAuthClient.postPresence(
-                    accessToken = accessToken,
+                    accessToken = gameToken,
                     status = 0,
                     appField = "",
                     appId = "",
@@ -129,11 +136,22 @@ object NextendoPresencePublisher {
             NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
         }.getOrNull() ?: return
 
+        // The published account server accepts a web-session or nx2 game token
+        // for /api/presence, not an OAuth access token. Do not mislabel OAuth as
+        // a game credential; wait for a valid NEX-issued token when unavailable.
+        val gameToken = session.nexGameToken
+        val nowEpochSeconds = System.currentTimeMillis() / 1000L
+        if (!gameToken.startsWith("nx2.") ||
+            session.nexGameTokenExpiresAtEpochSeconds <= nowEpochSeconds
+        ) {
+            return
+        }
+
         val titleId = gameTitleId
         val inGame = titleId.isNotBlank()
         runCatching {
             NextendoAuthClient.postPresence(
-                accessToken = session.accessToken,
+                accessToken = gameToken,
                 status = if (inGame) 2 else 1,
                 appField = if (inGame) appFieldBase64 else "",
                 appId = if (inGame) titleId else "",
