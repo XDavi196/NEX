@@ -30,6 +30,7 @@ object NextendoSessionStore {
         val accessToken: String,
         val refreshToken: String,
         val accessTokenExpiresAtEpochSeconds: Long,
+        val grantedScopes: Set<String> = emptySet(),
         val nexGameToken: String = "",
         val nexGameTokenExpiresAtEpochSeconds: Long = 0L,
         val pid: Long = 0L,
@@ -51,6 +52,7 @@ object NextendoSessionStore {
                 accessToken = tokens.accessToken,
                 refreshToken = tokens.refreshToken,
                 accessTokenExpiresAtEpochSeconds = tokens.expiresAtEpochSeconds,
+                grantedScopes = tokens.grantedScopes.ifEmpty { previous?.grantedScopes ?: emptySet() },
                 nexGameToken = previous?.nexGameToken.orEmpty(),
                 nexGameTokenExpiresAtEpochSeconds = previous?.nexGameTokenExpiresAtEpochSeconds ?: 0L,
                 pid = previous?.pid ?: 0L,
@@ -67,7 +69,8 @@ object NextendoSessionStore {
             Session(
                 accessToken = tokens.accessToken,
                 refreshToken = tokens.refreshToken,
-                accessTokenExpiresAtEpochSeconds = tokens.expiresAtEpochSeconds
+                accessTokenExpiresAtEpochSeconds = tokens.expiresAtEpochSeconds,
+                grantedScopes = tokens.grantedScopes
             )
         )
     }
@@ -120,6 +123,10 @@ object NextendoSessionStore {
             accessToken = accessToken,
             refreshToken = refreshToken,
             accessTokenExpiresAtEpochSeconds = json.optLong("access_expires_at", 0L),
+            grantedScopes = json.optString("granted_scopes")
+                .split(Regex("\\s+"))
+                .filter(String::isNotBlank)
+                .toSet(),
             nexGameToken = json.optString("nex_token"),
             nexGameTokenExpiresAtEpochSeconds = json.optLong("nex_expires_at", 0L),
             pid = json.optLong("pid", 0L),
@@ -194,6 +201,7 @@ object NextendoSessionStore {
             .put("access_token", session.accessToken)
             .put("refresh_token", session.refreshToken)
             .put("access_expires_at", session.accessTokenExpiresAtEpochSeconds)
+            .put("granted_scopes", session.grantedScopes.sorted().joinToString(" "))
             .put("nex_token", session.nexGameToken)
             .put("nex_expires_at", session.nexGameTokenExpiresAtEpochSeconds)
             .put("pid", session.pid)

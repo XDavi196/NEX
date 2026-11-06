@@ -94,11 +94,11 @@ object NextendoPresencePublisher {
         val appContext = context.applicationContext
         // Capture the token before the caller clears the local session. Otherwise
         // the queued offline request could run after logout and lose its credential.
-        val gameToken = runCatching {
+        val accessToken = runCatching {
             NextendoSessionStore.load(appContext)?.let { session ->
-                session.nexGameToken.takeIf {
-                    it.startsWith("nx2.") &&
-                        session.nexGameTokenExpiresAtEpochSeconds >
+                session.accessToken.takeIf {
+                    "presence" in session.grantedScopes &&
+                        session.accessTokenExpiresAtEpochSeconds >
                         System.currentTimeMillis() / 1000L
                 }
             }
@@ -114,12 +114,12 @@ object NextendoPresencePublisher {
         gameTitleId = ""
         gameDetail = ""
         appFieldBase64 = ""
-        if (gameToken.isNullOrBlank()) return
+        if (accessToken.isNullOrBlank()) return
 
         executor.execute {
             runCatching {
                 NextendoAuthClient.postPresence(
-                    gameToken = gameToken,
+                    accessToken = accessToken,
                     status = 0,
                     appField = "",
                     appId = "",
@@ -136,22 +136,18 @@ object NextendoPresencePublisher {
             NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
         }.getOrNull() ?: return
 
-        // The published account server accepts a web-session or nx2 game token
-        // for /api/presence, not an OAuth access token. Do not mislabel OAuth as
-        // a game credential; wait for a valid NEX-issued token when unavailable.
-        val gameToken = session.nexGameToken
+        // The Developer Documentation assigns presence publishing to the OAuth
+        // application scope. The nx2. token is game-only and is never a substitute
+        // for the player's explicit OAuth presence consent.
+        if ("presence" !in session.grantedScopes) return
         val nowEpochSeconds = System.currentTimeMillis() / 1000L
-        if (!gameToken.startsWith("nx2.") ||
-            session.nexGameTokenExpiresAtEpochSeconds <= nowEpochSeconds
-        ) {
-            return
-        }
+        if (session.accessTokenExpiresAtEpochSeconds <= nowEpochSeconds) return
 
         val titleId = gameTitleId
         val inGame = titleId.isNotBlank()
         runCatching {
             NextendoAuthClient.postPresence(
-                gameToken = gameToken,
+                accessToken = session.accessToken,
                 status = if (inGame) 2 else 1,
                 appField = if (inGame) appFieldBase64 else "",
                 appId = if (inGame) titleId else "",

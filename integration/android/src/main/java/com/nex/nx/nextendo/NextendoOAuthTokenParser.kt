@@ -42,10 +42,17 @@ internal object NextendoOAuthTokenParser {
             "Nextendo OAuth expiry is outside the supported time range."
         }
 
+        val grantedScopes = payload["scope"]?.jsonPrimitive?.contentOrNull
+            .orEmpty()
+            .split(Regex("\\s+"))
+            .filter(String::isNotBlank)
+            .toSet()
+
         return NextendoAuthClient.OAuthTokens(
             accessToken = accessToken,
             refreshToken = refreshToken,
-            expiresAtEpochSeconds = nowEpochSeconds + expiresIn
+            expiresAtEpochSeconds = nowEpochSeconds + expiresIn,
+            grantedScopes = grantedScopes
         )
     }
 }

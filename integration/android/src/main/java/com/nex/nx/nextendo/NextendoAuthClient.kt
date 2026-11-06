@@ -43,7 +43,8 @@ object NextendoAuthClient {
     data class OAuthTokens(
         val accessToken: String,
         val refreshToken: String,
-        val expiresAtEpochSeconds: Long
+        val expiresAtEpochSeconds: Long,
+        val grantedScopes: Set<String> = emptySet()
     )
 
     data class NexGameToken(
@@ -192,14 +193,14 @@ object NextendoAuthClient {
     internal fun getFriends(accessToken: String): JSONObject = getUserInfo(accessToken)
 
     internal fun postPresence(
-        gameToken: String,
+        accessToken: String,
         status: Int,
         appField: String,
         appId: String,
         appDetail: String
     ) {
-        require(gameToken.startsWith("nx2.") && gameToken.length > 4) {
-            "A valid Nextendo nx2. game token is required for presence publishing."
+        require(accessToken.isNotBlank() && !accessToken.startsWith("nx2.")) {
+            "Presence publishing requires the OAuth access token, not the nx2. game token."
         }
         require(status in 0..2) { "Presence status must be 0, 1 or 2." }
 
@@ -215,7 +216,7 @@ object NextendoAuthClient {
             url = "$BASE_URL/api/presence",
             method = "POST",
             headers = mapOf(
-                "Authorization" to "Bearer $gameToken",
+                "Authorization" to "Bearer $accessToken",
                 "Content-Type" to "application/json; charset=utf-8"
             ),
             body = body

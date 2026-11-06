@@ -18,6 +18,7 @@ class NextendoOAuthTokenParserTest {
         assertEquals("oauth.access.token", tokens.accessToken)
         assertTrue(tokens.refreshToken.isEmpty())
         assertEquals(now + 3600L, tokens.expiresAtEpochSeconds)
+        assertEquals(setOf("identity", "friends"), tokens.grantedScopes)
     }
 
     @Test
@@ -28,6 +29,7 @@ class NextendoOAuthTokenParserTest {
         )
 
         assertEquals("refresh", tokens.refreshToken)
+        assertEquals(emptySet<String>(), tokens.grantedScopes)
     }
 
     @Test

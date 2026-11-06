@@ -32,7 +32,7 @@ Additional contract-alignment work:
 - An Android-to-native bridge transfers at most 300 accepted friend PID/name records into a mutex-protected NEX-owned cache and clears it on account replacement/logout.
 - The Eden overlay registers `nn::friends` list-ID, list, friend-detail, profile-list and count handlers against that cache. Native build/ABI verification is pending.
 - HLE presence fields remain neutral/offline because OAuth userinfo does not return live presence. NEX does not fabricate online status, timestamps or AppKeyValueStorage data. Incoming requests, mutations and joinable-room metadata remain unavailable.
-- Presence publishing now requires a valid, unexpired NEX-issued `nx2.` game token. The OAuth access token is no longer sent to `/api/presence`, because the published server source does not accept that token type there.
+- Presence publishing follows the NexWiki Developer Documentation: it uses the OAuth access token only when the granted `presence` scope is present. The `nx2.` game token is reserved for game authentication and game-only routes; it is never substituted for OAuth consent. The public account-server source snapshot still rejects OAuth on `/api/presence`, so successful production publishing remains unverified until the deployed gateway matches the documented contract.
 
 These changes are partial account/HLE integration, not a claim that a game can authenticate, join matchmaking or play online.
 
@@ -40,6 +40,10 @@ These changes are partial account/HLE integration, not a claim that a game can a
 
 References reviewed:
 
+- [Official NexWiki Developer Documentation](https://wiki.nextendo.network/developers) — OAuth scopes, public-client PKCE, `/api/nex-token`, 24-hour game-token lifetime, BAAS `nnex` flow and refresh-token rotation.
+- [NexWiki changelog](https://wiki.nextendo.network/changelog) — v1.8.6 application identity/closed API and v1.8.7 client-attestation update.
+- [NexWiki Developer Documentation](https://wiki.nextendo.network/developers)
+- [NexWiki changelog](https://wiki.nextendo.network/changelog)
 - [Nextendo Developer Portal](https://nextendo.network/developers)
 - [Nextendo architecture guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md)
 - [Nextendo deployment guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md)
@@ -51,20 +55,21 @@ The Developer Portal describes a broader OAuth contract than the public account-
 
 | Area | Developer documentation | Public account-server source |
 |---|---|---|
-| OAuth scopes | Describes identity, friends, presence, profile and game matchmaking scopes | `oauthScopes` currently allows only `identity` and `friends` |
+| OAuth scopes | Documents `identity`, `friends`, `presence`, `game.matchmaking`, `mods.favorites` and `profil` | `oauthScopes` currently allows only `identity` and `friends` |
 | Token grant | Documents access/refresh-token handling | `oauthToken` accepts `authorization_code`; its third-party response contains `access_token`, `token_type`, `expires_in` and `scope`, but no `refresh_token` |
 | Game-token issuance | Describes `GET /api/nex-token` using an OAuth Bearer access token | `nexToken` calls `verifyToken`, which validates a web-session token; it does not validate the OAuth access token |
 | Friends and presence | Describes OAuth scopes for social and presence data | `/api/oauth/userinfo` returns identity and basic friends when those scopes are present; `/api/friends` and `/api/presence` use `accountFromBearer`, which accepts a web-session token or an `nx2.` game token, not an OAuth access token |
-| Game-token response | Documents `nex_token`, PID, friend code, username and expiry | The public `nexToken` handler returns token, PID, friend code and username, but does not include `expires_in` |
+| Game-token response | Documents `nex_token`, PID, friend code, username and `expires_in`; states the token lasts 24 hours and is game-only | The public `nexToken` handler returns token, PID, friend code and username, but does not include `expires_in` |
+| Presence | OAuth app scope `presence`; publish at least once every 90 seconds via `POST /api/presence` | The checked source uses `accountFromBearer` (web session or `nx2.`), not OAuth |
 
-Until Nextendo confirms which contract is live and aligns the docs/server implementation, NEX cannot safely assume that its third-party OAuth access token can obtain a game token, read the full friends/presence data, or refresh the session. Do not switch to the special `nextendo-emulator` built-in client identity: NEX must use its own registered Client ID.
+The NexWiki is the intended developer contract and NEX follows its credential separation: OAuth + scopes for account APIs, `nx2.` only for game authentication. The older public account-server source may lag production, but until Nextendo confirms the deployed contract, NEX cannot treat game-token issuance, refresh rotation, full social/presence data or multiplayer authentication as verified. Do not switch to the special `nextendo-emulator` built-in client identity: NEX must use its own registered Client ID.
 
 ## Blocking requirements for real in-game online play
 
 ### 1. BAAS/ACC game authentication
 
 - The account token is distinct from the OAuth access token. The documented game token has the `nx2.` prefix and belongs in the BAAS `id_token`'s `nnex` claim.
-- The exact BAAS JWT header, claim schema, issuer/audience, `kid`, expiry rules, signature verification rules and client-attestation contract must be confirmed for NEX.
+- The NexWiki confirms the game-token-to-`nnex` claim path, but the exact BAAS JWT header, claim schema, issuer/audience, `kid`, expiry rules, signature verification rules and NEX-specific client-attestation/provisioning material must still be confirmed.
 - The public `baas-jwks` service publishes a public JWK derived from a private RSA key supplied separately to the signer. NEX has not been issued or registered its own BAAS signing key/JWK/`kid`.
 - No signing key from Ryujinx-Nextendo, Den2 or another emulator may be reused. No placeholder signature or fabricated claim may be shipped.
 

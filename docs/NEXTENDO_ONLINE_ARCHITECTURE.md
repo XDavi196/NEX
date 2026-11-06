@@ -46,19 +46,18 @@ Há dois usos distintos de presença:
 - **Presença social do aplicativo:** informa que o jogador está conectado ao NEX.
 - **Presença do jogo:** informa o título atual, estado, lobby e, para certos títulos, o campo de aplicação/protocolo que permite entrar na sala de um amigo.
 
-A documentação Nextendo descreve `POST /api/presence` e exige uma atualização ao menos a cada 90 segundos; sem heartbeat a presença expira. O modelo público do servidor aceita status 0 (offline), 1 (online) e 2 (online em jogo), além de `app_field`, `app_id` e `app_detail`. No código publicado, porém, essa rota autentica token de sessão web ou `nx2.`, não OAuth access token.
+A NexWiki Developer Documentation define o escopo OAuth `presence` para ler/publicar atividade e exige heartbeat em `POST /api/presence` pelo menos a cada 90 segundos. O modelo documentado usa status 0 (offline), 1 (online) e 2 (em jogo), além de `app_field`, `app_id` e `app_detail`.
 
-Implementação Android parcial:
+Implementação Android alinhada à documentação:
 
-1. O app agenda heartbeat a cada 60 segundos, mas não envia nada sem token de jogo NEX `nx2.` válido e não expirado.
-2. Quando disponível, o publisher usa esse token de jogo — nunca OAuth access token — pois é o tipo de credencial aceito pelo código público de `/api/presence`.
-3. Ao desconectar, tenta status 0 somente se ainda houver token `nx2.` válido.
-4. O overlay liga `setGameActivity()` ao ciclo de vida da emulação e ao Title ID real do play-time manager.
-5. `app_field` permanece vazio até o HLE produzir AppKeyValueStorage binário real de um título; NEX não inventa esse valor.
-6. A presença continua bloqueada pelo desencontro entre docs e serviço publicado: `/api/nex-token` no código público exige token de sessão web e não devolve `expires_in`, então o NEX ainda não consegue obter um token `nx2.` pelo fluxo OAuth público.
+1. O app agenda heartbeat a cada 60 segundos.
+2. O publisher usa exclusivamente o OAuth access token quando a sessão registra o escopo concedido `presence`.
+3. O token `nx2.` nunca é enviado para essa API: ele é reservado ao login de jogo e às rotas game-only.
+4. Ao desconectar, NEX tenta status 0 apenas se ainda possuir um OAuth access token válido com o escopo `presence`.
+5. O overlay liga `setGameActivity()` ao ciclo de vida da emulação e ao Title ID real do play-time manager.
+6. `app_field` deve ser o AppKeyValueStorage binário real de 0xC0 bytes produzido pelo HLE; NEX não inventa esse valor.
 
-A documentação do Developer Portal diz OAuth Bearer em `/api/presence`. Um snapshot público antigo do backend mostrava validação diferente para essa rota. O código segue a documentação atual, mas o heartbeat precisa de teste real antes de ser considerado funcional.
-
+**Validação pendente:** a cópia pública do serviço de contas consultada usa `accountFromBearer` em `/api/presence`, aceitando sessão web ou `nx2.`, e não OAuth. A wiki é o contrato de desenvolvedor; a implementação pública pode estar defasada em relação à produção. Até a chamada OAuth com o escopo `presence` ser confirmada na implantação, a presença permanece best-effort e não é critério de multiplayer funcional.
 ## 3. BAAS e claim nnex
 
 O fluxo de login do jogo é independente do login OAuth:
@@ -127,15 +126,19 @@ Recursos que a documentação reserva a aplicações oficiais, como cloud saves 
 
 ## 7. Inconsistências de contrato a confirmar
 
-A documentação pública atual descreve OAuth access token para APIs de conta e `/api/nex-token`. O código público do serviço de contas que foi consultado mostra alguns handlers (`/api/profile`, `/api/friends`, `/api/presence`, `/api/nex-token`) usando `accountFromBearer`, que aceita token de sessão web ou `nx2` e não o tipo de OAuth token. O OAuth `userinfo` valida o access token explicitamente. A implementação publicada de `/api/oauth/token` também precisa ser verificada para o fluxo de `refresh_token`.
+A NexWiki Developer Documentation é a referência funcional para clientes públicos: PKCE sem Client Secret, escopos `identity`, `friends`, `presence`, `game.matchmaking`, `mods.favorites` e `profil`; `GET /api/nex-token` com OAuth Bearer e escopo `game.matchmaking`; token `nx2.` de 24 horas apenas para jogos, usado na claim BAAS `nnex`; access token de uma hora; refresh token de 30 dias com rotação.
+
+O código público do serviço de contas consultado ainda diverge da wiki: limita os escopos a `identity/friends`, não devolve refresh token no grant público, `/api/nex-token` valida token de sessão web e não devolve `expires_in`, e `/api/presence` usa um validador que não aceita OAuth. O código-fonte público pode estar desatualizado em relação ao gateway implantado; NEX deve seguir a wiki e confirmar em testes reais, sem contornar o OAuth com token de sessão web.
+
+O changelog público também registra identidade de aplicação/closed API na v1.8.6 e atualização obrigatória de client attestation na v1.8.7. A wiki explica o Client ID público, mas não publica o protocolo criptográfico de attestation nem confirma se o Client ID `nxc_` é toda a prova exigida para uma build independente. NEX usa apenas o seu próprio Client ID no cabeçalho `X-Nextendo-Client-Id`; não copia o token de aplicação, segredo, chave ou attestation de outro emulador.
 
 Antes do lançamento, solicitar à equipe Nextendo exemplos reais (sem dados de usuários) de:
 - perfil GET e update de perfil (escopo `profil`);
 - amigos GET, incoming requests e ações de aceitar/recusar;
 - payload de presença e comportamento de logout/offline;
-- `/api/nex-token` com OAuth access token;
-- refresh-token rotation;
-- headers/assinatura de client attestation;
+- `/api/nex-token` com OAuth access token e resposta com `expires_in`;
+- refresh-token rotation de 30 dias;
+- headers e protocolo/credencial de client attestation aplicável a um cliente público independente;
 - JWT BAAS, JWKS e parâmetros NEX.
 
 ## 8. Plano de testes e critérios de aceite
