@@ -148,12 +148,16 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoFriendCache(
         "#include <queue>\n",
         "#include <algorithm>\n"
         "#include <array>\n"
+        "#include <cstddef>\n"
         "#include <cstring>\n"
         "#include <queue>\n"
         "#include <vector>\n"
         '#include "core/hle/service/friend/nextendo_friend_cache.h"\n',
     )
-    friend_support = r'''namespace {
+    friend_support = r'''// FriendInfo/ProfileInfo ABI layout follows the pinned Eden HLE and the publicly
+// documented Nextendo/Den2 friend-service wire layout. No Den2 identity or secrets
+// are used; NEX supplies its own PID/name cache through the JNI bridge.
+namespace {
 #pragma pack(push, 1)
 struct NextendoUserPresence {
     Common::UUID user_id;
