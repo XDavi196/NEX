@@ -178,6 +178,18 @@ object NextendoAuthClient {
         )
     }
 
+    /** Retrieves friends and incoming requests with the player's NEX OAuth session. */
+    internal fun getFriends(accessToken: String): JSONObject {
+        require(accessToken.isNotBlank()) { "No Nextendo access token is available." }
+        return JSONObject(
+            request(
+                url = "$BASE_URL/api/friends",
+                method = "GET",
+                headers = mapOf("Authorization" to "Bearer $accessToken")
+            )
+        )
+    }
+
     internal fun postPresence(
         accessToken: String,
         status: Int,

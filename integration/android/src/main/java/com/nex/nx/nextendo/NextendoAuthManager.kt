@@ -208,39 +208,17 @@ object NextendoAuthManager {
         executor.execute {
             val result = runCatching {
                 val session = refreshSessionIfNeeded(activity)
-                NextendoSocialApi.fetchFriends(session.accessToken)
+                NextendoSocialApi.fetchFriendList(session.accessToken)
             }
 
             mainHandler.post {
                 if (activity.isFinishing || activity.isDestroyed) return@post
 
                 result.fold(
-                    onSuccess = { friends ->
-                        val rows = if (friends.isEmpty()) {
-                            arrayOf("Nenhum amigo retornado pela Nextendo.")
-                        } else {
-                            friends.map { item ->
-                                val name = item.username.ifBlank {
-                                    if (item.pid > 0L) "PID " + item.pid else "Jogador"
-                                }
-                                buildString {
-                                    append(name)
-                                    if (item.friendCode.isNotBlank()) {
-                                        append(" · ")
-                                        append(item.friendCode)
-                                    }
-                                    append("\n")
-                                    append(item.presenceLabel())
-                                }
-                            }.toTypedArray()
+                    onSuccess = { friendList ->
+                        NextendoFriendsDialog.show(activity, friendList) {
+                            openFriends(activity)
                         }
-
-                        AlertDialog.Builder(activity)
-                            .setTitle("Amigos Nextendo (" + friends.size + ")")
-                            .setItems(rows, null)
-                            .setPositiveButton("Atualizar") { _, _ -> openFriends(activity) }
-                            .setNegativeButton("Fechar", null)
-                            .show()
                     },
                     onFailure = { error ->
                         AlertDialog.Builder(activity)

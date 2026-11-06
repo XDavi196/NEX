@@ -53,9 +53,9 @@ The account panel can show the username, Friend Code, and PID when those details
 
 ### Friends and presence
 
-The current friend-list screen is **read-only**. It displays the friends returned by the authenticated Nextendo user-info endpoint and shows their reported presence when the service supplies it, such as online, offline, or in-game.
+The current friend-list screen follows the compact player-list layout familiar to Den2 users. It reads the authenticated account's friends and incoming requests from Nextendo's friends endpoint using the **NEX OAuth access token** and NEX Client ID. Friend rows can show a player's avatar, display name, Friend Code, and reported state: offline, online, or in a game.
 
-Adding friends, accepting or declining requests, removing friends, blocking, and other social actions are not wired yet. A presence label is not proof that a game session is connected.
+The screen is currently read-only. Incoming requests are displayed, but adding, accepting, declining, removing, blocking, and other account mutations are not enabled yet. Presence is informational; it is not proof that a game session or peer-to-peer connection is active.
 
 ### What online does not mean yet
 
@@ -76,7 +76,7 @@ The first successful Android build is available as an experimental GitHub prerel
 
 **[NEX v0.1.0-alpha.48 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.48)**
 
-The APK asset is named `NEX-Android-v0.2.0-rc1-optimized.apk`. The release also includes `SHA256SUMS.txt), which can be used to verify the file's SHA-256 checksum.
+The APK asset is named `NEX-Android-v0.2.0-rc1-optimized.apk`. The release also includes `SHA256SUMS.txt`, which can be used to verify the file's SHA-256 checksum.
 
 This is an early preview, not a stable release. The newer home-screen Nextendo card and the updated NEX app branding are being built into a subsequent version; they are not part of the original `alpha.48` package.
 
@@ -108,7 +108,7 @@ For sign-in problems, first check that the Nextendo Developer Portal registratio
 
 ## Development notes
 
-The repository contains the Android Nextendo client, encrypted session handling, OAuth callback activity, profile/friends views, app-presence publisher, and the repeatable overlay that applies NEX changes to the pinned Eden checkout.
+The repository contains the Android Nextendo client, encrypted session handling, OAuth callback activity, player profile and friends views, friend-presence presentation, the app-presence publisher, the official NEX logo asset, and the repeatable overlay that applies NEX changes to the pinned Eden checkout.
 
 Useful technical documents:
 
