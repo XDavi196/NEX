@@ -75,6 +75,13 @@ def main() -> None:
         '    implementation("androidx.browser:browser:1.8.0")',
     )
 
+    logo_source = NEX_SOURCE / "assets/nex-logo.jpg"
+    if not logo_source.is_file():
+        raise RuntimeError(f"Missing NEX logo asset: {logo_source}")
+    logo_destination = app_dir / "src/main/res/drawable-nodpi/nex_logo.jpg"
+    logo_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(logo_source, logo_destination)
+
     manifest = app_dir / "src/main/AndroidManifest.xml"
     callback_activity = """        <activity
             android:name="com.nex.nx.nextendo.NextendoCallbackActivity"
@@ -100,6 +107,17 @@ def main() -> None:
         '        <activity\n            android:name="org.yuzu.yuzu_emu.ui.main.MainActivity"',
         callback_activity
         + '        <activity\n            android:name="org.yuzu.yuzu_emu.ui.main.MainActivity"',
+    )
+
+    replace_once(
+        manifest,
+        'android:icon="@mipmap/ic_launcher"',
+        'android:icon="@drawable/nex_logo"',
+    )
+    replace_once(
+        manifest,
+        'android:roundIcon="@mipmap/ic_launcher_round"',
+        'android:roundIcon="@drawable/nex_logo"',
     )
 
     presenter = (
@@ -148,52 +166,94 @@ def main() -> None:
     # the placement familiar to Den2 users while keeping all authentication NEX-owned.
     games_layout = app_dir / "src/main/res/layout/fragment_games.xml"
     layout_text = games_layout.read_text(encoding="utf-8")
-    settings_button_anchor = """        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/settings_button"
-"""
-    nextendo_button = """        <Space
-            android:layout_width="15dp"
-            android:layout_height="wrap_content"
-            />
+    header_anchor = """    </LinearLayout>
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/nextendo_button"
-            style="@style/EdenCard"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="Nextendo Network"
-            android:tooltipText="Nextendo Network"
-            android:clickable="true"
-            android:focusable="true"
-            app:cardCornerRadius="21dp"
-            app:cardBackgroundColor="@android:color/transparent"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutline"
-            app:strokeWidth="1dp"
-            android:padding="8dp"
-            >
+    <FrameLayout
+        android:id="@+id/frame_search"
+"""
+    nextendo_entry = """    </LinearLayout>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/nextendo_button"
+        style="@style/EdenCard"
+        android:layout_width="0dp"
+        android:layout_height="64dp"
+        android:layout_marginHorizontal="15dp"
+        android:layout_marginTop="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="Nextendo Network. Connect your account and view your friends."
+        app:cardCornerRadius="16dp"
+        app:cardBackgroundColor="?attr/colorSurfaceVariant"
+        app:cardElevation="0dp"
+        app:strokeColor="#E30613"
+        app:strokeWidth="1dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/header">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp">
 
             <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:layout_gravity="center"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginEnd="14dp"
                 android:src="@drawable/ic_account_circle"
-                app:tint="#4CAF50"
-                />
+                app:tint="#E30613" />
 
-        </com.google.android.material.card.MaterialCardView>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-        <Space
-            android:layout_width="15dp"
-            android:layout_height="wrap_content"
-            />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Nextendo Network"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
-""" + settings_button_anchor
-    if layout_text.count(settings_button_anchor) != 1:
-        raise RuntimeError("Could not identify the games header settings button")
-    layout_text = layout_text.replace(settings_button_anchor, nextendo_button, 1)
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Connect your account and see your friends"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <FrameLayout
+        android:id="@+id/frame_search"
+"""
+    if layout_text.count(header_anchor) != 1:
+        raise RuntimeError("Could not identify the games header/search boundary")
+    layout_text = layout_text.replace(header_anchor, nextendo_entry, 1)
+
+    frame_start = layout_text.index('    <FrameLayout\n        android:id="@+id/frame_search"')
+    frame_end = layout_text.index("    >", frame_start) + len("    >")
+    frame_open = layout_text[frame_start:frame_end]
+    if frame_open.count('android:layout_marginTop="16dp"') != 1:
+        raise RuntimeError("Could not identify the search panel top margin")
+    if frame_open.count('app:layout_constraintTop_toBottomOf="@id/header"') != 1:
+        raise RuntimeError("Could not identify the search panel top constraint")
+    frame_open = frame_open.replace('android:layout_marginTop="16dp"', 'android:layout_marginTop="12dp"')
+    frame_open = frame_open.replace(
+        'app:layout_constraintTop_toBottomOf="@id/header"',
+        'app:layout_constraintTop_toBottomOf="@id/nextendo_button"'
+    )
+    layout_text = layout_text[:frame_start] + frame_open + layout_text[frame_end:]
     games_layout.write_text(layout_text, encoding="utf-8")
+
+        games_layout.write_text(layout_text, encoding="utf-8")
 
     # The home-screen shortcut opens the NEX account panel: sign in when there is
     # no session; otherwise show the profile and its Friends action.
