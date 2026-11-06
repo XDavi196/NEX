@@ -123,12 +123,24 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # Mint a short-lived token for the NEX Release Bot.
+      - name: Create NEX Release Bot token
+        id: nex-app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.NEX_RELEASE_APP_ID }}
+          private-key: ${{ secrets.NEX_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: NEX
+          permission-contents: write
+          permission-workflows: write
+
       # Publish every successful push build as an experimental prerelease.
       # Failed builds never publish.
       - name: Publish experimental GitHub prerelease
         if: github.event_name == 'push'
         env:
-          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.nex-app-token.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -171,19 +183,20 @@ jobs:
           cd release-artifacts
           sed 's#nex-artifacts/##g' SHA256SUMS.txt | sha256sum --check -
 
-      - name: Check release publishing token
-        env:
-          GH_RELEASE_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${GH_RELEASE_TOKEN:-}" ]; then
-            echo "::error::Missing GH_RELEASE_TOKEN. Add a repository secret backed by a fine-grained PAT with Contents: write and Workflows: write."
-            exit 1
-          fi
+      - name: Create NEX Release Bot token
+        id: nex-app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.NEX_RELEASE_APP_ID }}
+          private-key: ${{ secrets.NEX_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: NEX
+          permission-contents: write
+          permission-workflows: write
+
       - name: Publish NEX alpha.58 prerelease
         env:
-          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.nex-app-token.outputs.token }}
         shell: bash
         run: |
           set -euo pipefail
