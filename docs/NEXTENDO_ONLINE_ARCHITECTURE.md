@@ -31,13 +31,13 @@ Fluxo proposto:
 2. Consultar a lista de amigos com o escopo `friends`.
 3. Normalizar cada registro para um modelo NEX próprio: PID, nome exibido, Friend Code, avatar, estado de presença, title ID, detalhe do jogo e favorito, quando fornecidos pelo serviço.
 4. Cache de curta duração, renovação em segundo plano, cancelamento ao desconectar e limpeza dos dados pessoais no logout.
-5. A camada Android agora consulta `GET /api/oauth/userinfo` com OAuth Bearer e o escopo `friends`, normaliza a lista e mostra uma tela simples de amigos. A consulta é de leitura; enviar/aceitar/recusar/remover pedidos ainda não está ligado, pois os endpoints de mutação e a autenticação de cada rota precisam ser validados no gateway em produção.
+5. A camada Android consulta `GET /api/oauth/userinfo` com OAuth Bearer e o escopo `friends`, normaliza a lista e mostra uma tela simples de amigos. O cache aceito (máximo 300 entradas PID/nome) é atualizado via JNI na camada nativa e limpo ao trocar/desconectar a conta. A consulta é de leitura; enviar/aceitar/recusar/remover pedidos ainda não está ligado, pois os endpoints de mutação e a autenticação de cada rota precisam ser validados no gateway em produção.
 
 O backend público também lista rotas mais completas em `/api/friends`. NEX não as chama até confirmar o contrato OAuth atual.
 
 ### Camada HLE (serviços locais do jogo)
 
-Os jogos Switch não consultam a tela Android de amigos. Eles chamam serviços locais do Horizon, em especial `nn::friends`. O NEX precisa projetar os dados de conta para as estruturas/IPC esperadas pelo jogo, incluindo PID/NetworkServiceAccountId, FriendCode, perfil e presença. A camada REST só alimenta o cache; as respostas IPC precisam continuar rápidas e nunca fazer HTTP síncrono na thread PRUDP/online do jogo.
+Os jogos Switch não consultam a tela Android de amigos. Eles chamam serviços locais do Horizon, em especial `nn::friends`. O NEX mantém um cache nativo limitado a 300 entradas PID/nome protegido por mutex. A camada Android busca os amigos via OAuth userinfo e atualiza esse cache pela JNI; logout/troca de conta limpa o cache. O overlay liga handlers básicos de IDs, lista, detalhes, contagem e perfis ao cache. Ainda não preenche presença verdadeira, Friend Code/avatar na struct HLE, pedidos ou AppKeyValueStorage. As respostas IPC não fazem HTTP síncrono na thread PRUDP/online do jogo.
 
 ## 2. Presença online
 
@@ -46,16 +46,16 @@ Há dois usos distintos de presença:
 - **Presença social do aplicativo:** informa que o jogador está conectado ao NEX.
 - **Presença do jogo:** informa o título atual, estado, lobby e, para certos títulos, o campo de aplicação/protocolo que permite entrar na sala de um amigo.
 
-A documentação Nextendo descreve `POST /api/presence` e exige uma atualização ao menos a cada 90 segundos; sem heartbeat a presença expira. O modelo de servidor público documenta status 0 (offline), 1 (online) e 2 (online em jogo), além de `app_field`, `app_id` e `app_detail`.
+A documentação Nextendo descreve `POST /api/presence` e exige uma atualização ao menos a cada 90 segundos; sem heartbeat a presença expira. O modelo público do servidor aceita status 0 (offline), 1 (online) e 2 (online em jogo), além de `app_field`, `app_id` e `app_detail`. No código publicado, porém, essa rota autentica token de sessão web ou `nx2.`, não OAuth access token.
 
-Implementação Android parcial já adicionada:
+Implementação Android parcial:
 
-1. Após login OAuth, o NEX publica status 1 (online).
-2. `NextendoPresencePublisher.kt` envia heartbeat a cada 60 segundos, sem bloquear a thread de emulação.
-3. Ao desconectar a conta, tenta publicar status 0 (offline).
-4. `setGameActivity()` está disponível, mas ainda não recebe o Title ID real do núcleo nativo. Portanto o NEX ainda não publica status 2 (in-game) de forma integrada.
-5. `app_field` permanece vazio até o HLE produzir o campo binário real de um título; NEX não inventa esse valor.
-6. O servidor deve expirar a presença após crash/força-parada.
+1. O app agenda heartbeat a cada 60 segundos, mas não envia nada sem token de jogo NEX `nx2.` válido e não expirado.
+2. Quando disponível, o publisher usa esse token de jogo — nunca OAuth access token — pois é o tipo de credencial aceito pelo código público de `/api/presence`.
+3. Ao desconectar, tenta status 0 somente se ainda houver token `nx2.` válido.
+4. O overlay liga `setGameActivity()` ao ciclo de vida da emulação e ao Title ID real do play-time manager.
+5. `app_field` permanece vazio até o HLE produzir AppKeyValueStorage binário real de um título; NEX não inventa esse valor.
+6. A presença continua bloqueada pelo desencontro entre docs e serviço publicado: `/api/nex-token` no código público exige token de sessão web e não devolve `expires_in`, então o NEX ainda não consegue obter um token `nx2.` pelo fluxo OAuth público.
 
 A documentação do Developer Portal diz OAuth Bearer em `/api/presence`. Um snapshot público antigo do backend mostrava validação diferente para essa rota. O código segue a documentação atual, mas o heartbeat precisa de teste real antes de ser considerado funcional.
 
