@@ -53,3 +53,8 @@ Never print access tokens, refresh tokens, game tokens, callback codes or PKCE v
 The account panel distinguishes OAuth account connectivity and the \`nx2.\` game token from actual in-game readiness. It reports SMM2 as disconnected while BAAS signing, title endpoints and a PRUDP session are missing. qLaunch friend rows are only available when the public API supplies an explicit NSA; a PID is never substituted.
 
 The OAuth callback must include the matching state value. A missing or mismatched state is rejected before exchanging the authorization code.
+
+
+## BAAS boundary (not enabled)
+
+\`NextendoBaasIdTokenBuilder.kt\` inserts the server-issued \`nx2.\` token into the \`nnex\` claim and delegates RS256 to \`NextendoBaasSigner\`. The actual signer and claim set must be supplied by an NEX-specific Nextendo provisioning contract. No private key, test key, fallback signature or other emulator credential is shipped. The builder is not wired to Eden ACC yet.

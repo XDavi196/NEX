@@ -167,3 +167,35 @@ Until those checks pass, NEX in-game multiplayer remains **not implemented / not
 ## CI capacity blocker
 
 The supplied GitHub Budgets and Alerts screenshot shows all five configured budgets at 100% with \`Usage blocked\`. GitHub documents that an exhausted budget with \`Stop usage when budget limit is reached\` can block GitHub Actions hosted runners. A code push can update the branch, but a new build/release cannot be considered verified until the applicable Actions budget is raised or the stop-usage setting is changed by the account owner. This is a billing/runner-capacity blocker, not an NEX source compile result.
+
+
+## Portal checklist — values to verify in the NEX application
+
+Open the NEX application entry at https://nextendo.network/developers and verify the following visible configuration (a redacted screenshot is sufficient):
+
+1. Application type: **Public** (Android is a distributed native client and must use PKCE; do not configure or embed a client secret).
+2. Client ID: \`nxc_yAdR-14bOEq7\`.
+3. Registered redirect URI: \`com.nex.nx://oauth/callback\` (exact spelling, scheme and path).
+4. Requested and actually enabled scopes: \`identity\`, \`friends\`, \`presence\`, \`game.matchmaking\`. The first two are accepted by the current public account-server source; the last two are documented by NexWiki but are not present in the public OAuth scope allow-list inspected for this audit. Do not treat a requested scope as granted; verify the returned consent/granted-scope list.
+5. Application status and NEX team member role/approval: confirm the app can be used by the owner/test account in the current portal rollout.
+
+Do **not** generate or send a bot token for this Android login flow. Do not send access tokens, refresh tokens, authorization codes, the \`nx2.\` game token, passwords, client secrets, or private keys in chat or screenshots. A public app should not have a client secret.
+
+## Separate Nextendo provisioning request — not ordinary Portal fields
+
+The standard OAuth application page does not provide the missing BAAS signing and game-service configuration. Nextendo must provision/confirm separately for NEX:
+
+- NEX-specific BAAS RS256 signer or approved signing integration, plus the assigned \`kid\` and public JWK registration.
+- Exact NEX BAAS \`iss\`, \`aud\`, \`jku\`, \`sub\`/device-identity rules, time claims, \`hm\` semantics and expiry; confirmation of optional \`tv\`/title claims.
+- Client-attestation contract and NEX-issued attestation material or managed attestation method.
+- Confirmation that OAuth access tokens with \`game.matchmaking\` are accepted by \`GET /api/nex-token\` and that its response includes the documented \`nex_token\`, \`pid\`, \`username\`, \`friend_code\`, and \`expires_in\` fields.
+- Confirmation that OAuth access tokens with \`presence\` are accepted by \`POST /api/presence\`.
+- SMM2 endpoint/port, service negotiation and matchmaking contract, title DNS/TLS/SNI mapping, and SMM2 NNCS/NAT/P2P endpoints and timing.
+
+### Public account-server source discrepancy
+
+The public \`nextendo-account\` source currently differs from the Developer Documentation: its OAuth allow-list contains only \`identity\` and \`friends\`; third-party authorization-code responses return no refresh token; \`/api/nex-token\` validates a web-session token (not an OAuth bearer) and returns no \`expires_in\`; and \`/api/presence\` accepts a web-session or \`nx2.\` token (not the documented OAuth bearer). The production deployment may have moved ahead, but NEX has not independently verified that. NEX therefore continues to use only the documented public OAuth flow and will not switch to private web-session authentication.
+
+### BAAS builder boundary
+
+\`NextendoBaasIdTokenBuilder\` now defines the compact-JWT boundary: RS256 header, NEX-provisioned \`kid\`, HTTPS issuer/JWKS values supplied by the contract provider, and the server-issued \`nx2.\` token inserted into the \`nnex\` claim. The signing key is behind \`NextendoBaasSigner\`; no private key or fallback signer is included. The builder is not yet connected to Eden ACC and must stay disabled until Nextendo provisions the NEX-specific contract and signer. Unit tests use a fake signer only to test serialization and rejection behavior.
