@@ -163,10 +163,10 @@ These are build/test results only. They do not prove live account-service accept
 
 Required before claiming in-game online support:
 
-1. BAAS JWT construction and claim/signature validation using NEX-issued key material.
+1. Connect the new BAAS JWT builder and AuthenticationInfo serializer to Eden ACC/LoginEx, then validate claims and RS256 signatures against NEX's provisioned live JWKS.
 2. Confirmed OAuth/game-token/refresh/presence API behavior in the live deployment.
 3. A verified NEX PID ↔ game account/NSA mapping and guest-visible HLE IPC tests.
-4. PRUDP handshake, authentication, reliability, RMC payload and SMM2 service integration tests.
+4. Derive the secure Kerberos ticket/check payload from LoginEx, connect both SMM2 PRUDP sessions to Eden's title lifecycle, and pass live authentication/reliability/RMC integration tests.
 5. SMM2 title-specific DNS/TLS/SNI tests with certificate validation enabled.
 6. NAT state, live UDP mapping retention, keepalive, peer discovery, hole-punching and cleanup tests.
 7. End-to-end testing with two NEX accounts, two Android devices and Super Mario Maker 2.
