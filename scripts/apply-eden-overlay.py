@@ -331,6 +331,48 @@ NextendoFriendInfo MakeNextendoFriendInfo(
     return out;
 }
 
+inline constexpr u64 NextendoHomeMenuTitleId = 0x0100000000001000ULL;
+inline constexpr std::size_t NextendoFriendRecordV2Size = 0x220;
+inline constexpr std::size_t NextendoFriendDetailedInfoV2Size = 0x800;
+inline constexpr std::size_t NextendoFriendPresenceV2Size = 0x80;
+inline constexpr std::size_t NextendoUserPresenceViewV2Size = 0xE8;
+
+// SDK 20+ HOME Menu friend tile: a 0x40-byte identity header, title ID at 0xE0,
+// 0xE0-byte presence block at 0xE8, and the valid flag at 0x21F.
+void WriteNextendoFriendRecordV2(
+    u8* record, const Common::NextendoFriendCache::Entry& entry, u64 requested_network_id) {
+    const auto legacy = MakeNextendoFriendInfo(entry, requested_network_id);
+    std::memset(record, 0, NextendoFriendRecordV2Size);
+    std::memcpy(record, &legacy, 0x40);
+    std::memcpy(record + 0xE8,
+                reinterpret_cast<const u8*>(&legacy) + 0x40, 0xE0);
+    if (entry.presence_status > 0) {
+        const u64 title_id = entry.application_id != 0
+            ? entry.application_id
+            : NextendoHomeMenuTitleId;
+        std::memcpy(record + 0xE0, &title_id, sizeof(title_id));
+    }
+    record[0x21F] = 1;
+}
+
+// The SDK 20+ friend page reads its current title from 0x570/0x578.
+// Unknown history, avatar and "friends since" fields remain empty.
+void WriteNextendoFriendDetailedInfoV2(
+    std::array<u8, NextendoFriendDetailedInfoV2Size>& output,
+    const Common::NextendoFriendCache::Entry& entry, u64 requested_network_id) {
+    output.fill(0);
+    const auto legacy = MakeNextendoFriendInfo(entry, requested_network_id);
+    std::memcpy(output.data(), &legacy, 0x40);
+    output[0x608] = 1;
+    if (entry.presence_status > 0) {
+        const u64 title_id = entry.application_id != 0
+            ? entry.application_id
+            : NextendoHomeMenuTitleId;
+        std::memcpy(output.data() + 0x570, &title_id, sizeof(title_id));
+        std::memcpy(output.data() + 0x578, &title_id, sizeof(title_id));
+    }
+}
+
 std::vector<u64> ReadNextendoPids(HLERequestContext& ctx) {
     constexpr std::size_t MaxRequestedIds = Common::NextendoFriendCache::MaxFriends;
     std::vector<u64> pids;
