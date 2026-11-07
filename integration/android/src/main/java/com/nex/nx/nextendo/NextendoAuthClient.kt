@@ -32,7 +32,7 @@ object NextendoAuthClient {
     private const val USERINFO_URL = "$BASE_URL/api/oauth/userinfo"
 
     // Exact scopes shown by the current NEX URL generated in the Nextendo portal.
-    const val SCOPES = "identity friends presence game.matchmaking"
+    const val SCOPES = "identity friends presence profil game.matchmaking emulator.status"
 
     data class PendingAuthorization(
         val codeVerifier: String,

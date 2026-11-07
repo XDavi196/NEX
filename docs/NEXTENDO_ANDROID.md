@@ -9,10 +9,12 @@ This document describes the code present in the NEX branch and separates it from
 - Nextendo public Client ID: \`nxc_yAdR-14bOEq7\`
 - Android application ID: \`com.nex.nx\`
 - Redirect URI: \`com.nex.nx://oauth/callback\`
-- Requested scopes: \`identity friends presence game.matchmaking\`
+- Requested scopes (matching the owner's generated portal URL): `identity friends presence profil game.matchmaking emulator.status`
 - Application identity header: \`X-Nextendo-Client-Id: nxc_yAdR-14bOEq7\`
 
 NEX is a public Android OAuth client. It uses Authorization Code + PKCE (S256); no client secret or bot token is embedded in the APK. No Den2 or other emulator credential, token, session, signing key or attestation is reused.
+
+The app owner's current portal-generated URL selects six scopes: `identity friends presence profil game.matchmaking emulator.status`. NEX requests those exact names, including the portal's spelling `profil`. A requested scope is not assumed to be granted: the authorization response's `scope` field remains the source of truth. The meaning and live API contract for `profil` and `emulator.status` still require confirmation; requesting them does not imply that NEX already calls their APIs.
 
 ## OAuth and account API flow
 

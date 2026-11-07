@@ -29,7 +29,7 @@ The documentation update following run #99 does not change compiled sources. The
 ### Android account identity
 
 - NEX uses its own public OAuth Authorization Code + PKCE (S256) client registration, callback, Android Keystore-backed session storage and account panel.
-- Requested scopes are \`identity friends presence game.matchmaking\`.
+- Requested scopes now match the owner-provided portal URL exactly: `identity friends presence profil game.matchmaking emulator.status`.
 - OAuth access tokens and \`nx2.\` game tokens are separate credential types.
 - The game-token parser requires the documented \`nx2.\` prefix, positive PID, username and positive \`expires_in\`. The token remains opaque; NEX does not forge or decode its internal signature.
 - Refresh-token rotation is serialized and the returned token set is persisted as a whole. If a refresh token is absent, NEX does not invent one.
@@ -176,7 +176,7 @@ Open the NEX application entry at https://nextendo.network/developers and verify
 1. Application type: **Public** (Android is a distributed native client and must use PKCE; do not configure or embed a client secret).
 2. Client ID: \`nxc_yAdR-14bOEq7\`.
 3. Registered redirect URI: \`com.nex.nx://oauth/callback\` (exact spelling, scheme and path).
-4. Requested and actually enabled scopes: \`identity\`, \`friends\`, \`presence\`, \`game.matchmaking\`. The first two are accepted by the current public account-server source; the last two are documented by NexWiki but are not present in the public OAuth scope allow-list inspected for this audit. Do not treat a requested scope as granted; verify the returned consent/granted-scope list.
+4. The owner-provided portal-generated URL selects: `identity friends presence profil game.matchmaking emulator.status`. NEX requests this exact list. The inspected public account-server source has only `identity` and `friends` in its OAuth allow-list; it does not currently show `presence`, `profil`, `game.matchmaking` or `emulator.status`. The live deployment may differ, so verify the actual token response's `scope` field and report any `invalid_scope` response to Nextendo. Do not silently assume that portal selection equals a granted permission.
 5. Application status and NEX team member role/approval: confirm the app can be used by the owner/test account in the current portal rollout.
 
 Do **not** generate or send a bot token for this Android login flow. Do not send access tokens, refresh tokens, authorization codes, the \`nx2.\` game token, passwords, client secrets, or private keys in chat or screenshots. A public app should not have a client secret.
