@@ -129,7 +129,9 @@ internal class NextendoSmm2SessionClient(
                 return
             }
             try {
-                authTransport?.sendRmc(request)
+                val activeAuthTransport = authTransport
+                    ?: throw IllegalStateException("SMM2 auth transport is unavailable.")
+                activeAuthTransport.sendRmc(request)
             } catch (error: Throwable) {
                 fail(error)
             } finally {

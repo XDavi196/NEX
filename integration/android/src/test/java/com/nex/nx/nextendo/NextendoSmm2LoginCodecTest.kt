@@ -9,7 +9,7 @@ class NextendoSmm2LoginCodecTest {
         val authenticationInfo = byteArrayOf(0x41, 0x42, 0x43)
         val body = NextendoSmm2LoginCodec.encodeBody("player", authenticationInfo)
 
-        assertEquals(10, body[0].toInt() and 0xFF)
+        assertEquals(7, body[0].toInt() and 0xFF)
         assertEquals(0, body[1].toInt() and 0xFF)
         assertEquals("player", String(body, 2, 6, Charsets.UTF_8))
         assertEquals(0, body[8].toInt() and 0xFF)

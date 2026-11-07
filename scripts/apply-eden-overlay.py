@@ -220,7 +220,7 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
 }
 
 JNIEXPORT void JNICALL
-Java_org_yuzu_yuzu_emu_NativeLibrary_updateNextendoBaasIdToken(
+Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoBaasIdToken(
     JNIEnv* env, [[maybe_unused]] jobject obj, jbyteArray token) {
     constexpr jsize MaxTokenBytes = 8192;
     if (token == nullptr) {
@@ -246,7 +246,7 @@ Java_org_yuzu_yuzu_emu_NativeLibrary_updateNextendoBaasIdToken(
 }
 
 JNIEXPORT void JNICALL
-Java_org_yuzu_yuzu_emu_NativeLibrary_clearNextendoBaasIdToken(
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Common::NextendoBaasTokenCache::Clear();
 }
@@ -258,9 +258,9 @@ Java_org_yuzu_yuzu_emu_NativeLibrary_clearNextendoBaasIdToken(
     acc_cpp = eden / "src/core/hle/service/acc/acc.cpp"
     replace_once(
         acc_cpp,
-        '#include "core/hle/service/acc/acc.h"\\n',
-        '#include "core/hle/service/acc/acc.h"\\n'
-        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\\n',
+        '#include "core/hle/service/acc/acc.h"\n',
+        '#include "core/hle/service/acc/acc.h"\n'
+        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n',
     )
     replace_once(
         acc_cpp,
