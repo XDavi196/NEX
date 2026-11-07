@@ -6,31 +6,19 @@ A successful APK build proves that the configured Android source and native tool
 
 ## Verified build evidence
 
-- Original requested baseline: [Actions run #54](https://github.com/XDavi196/NEX/actions/runs/42193366726), successful.
-- Original baseline release: [NEX v0.1.0-alpha.54](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.54).
-- Intermediate verified build: [Actions run #97](https://github.com/XDavi196/NEX/actions/runs/42321531501), successful.
-- Previous verified baseline: [Actions run #102](https://github.com/XDavi196/NEX/actions/runs/42382244088), successful.
-- Latest verified visual build: [Actions run #103](https://github.com/XDavi196/NEX/actions/runs/42395716701), successful.
-- Release: [NEX v0.1.0-alpha.103](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.103).
-- APK: `NEX-Android-v0.2.0-rc1-optimized.apk`, 27,276,975 bytes.
-- Direct APK: [Download alpha.103](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.103/NEX-Android-v0.2.0-rc1-optimized.apk).
-- Release includes `SHA256SUMS.txt`.
-- Run #102 source commit: \`1eeaef07c96ae9d365c9739c22eb523c857937c2\`.
-- Release: [NEX v0.1.0-alpha.102](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.102).
-- APK: \`NEX-Android-v0.2.0-rc1-optimized.apk\`, 27,281,806 bytes.
-- GitHub release asset SHA-256: \`2ae9258b771204107e5aad879122d1ab77ae83f27517b292458207c96fda2cc4\`.
-- Release also includes \`SHA256SUMS.txt\`.
-- Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It requested all six portal scopes.
-- Commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` restores the original NEX logo and removes the fragment-wide glass treatment; this is included in successful run #103 and release alpha.103.
-- Commit `0584d738af5834f49f5f60f8c7722c40dc31cda9` adds OAuth-scope and presence diagnostics (run #104).
-- Commits `36c38dd3333eae4b1e37340686371dd5c6e4f91d` and `c75cc2afa148b007959b2506fdbb353738609c4e` add encrypted persistence of the `/api/nex-token` result and show the diagnostic after login. Run #106 was queued after these commits.
-- Pinned Eden source: \`v0.2.0-rc1\`, commit \`8e373eb714aa01117ec885680477501cdb572112\`.
-- Android application ID: \`com.nex.nx\`.
-- OAuth callback: \`com.nex.nx://oauth/callback\`.
-- NEX public OAuth Client ID: \`nxc_yAdR-14bOEq7\`.
-- Development branch: \`nex/eden-v0.2.0-rc1-nextendo\`.
+- Latest verified Android build: [Actions run #108](https://github.com/XDavi196/NEX/actions/runs/42399598481), successful.
+- Published prerelease: [NEX v0.1.0-alpha.108](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108).
+- Direct APK: [Download alpha.108](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk).
+- APK size: 27,285,737 bytes. The release includes `SHA256SUMS.txt`.
+- Run #108 source commit: `e5c1a235e1ad87551d6e8cc97709713f3a66e0b5`. This build passed the native friend-cache/HLE host test, all then-current Android Nextendo unit tests, the optimized APK build, artifact upload and prerelease publication. It contains PRUDP-Lite transport, WSS adapter and NEX adaptive branding, but predates the BAAS/SMM2 profile additions.
+- Latest BAAS/SMM2 source validation: [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607), triggered for commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. It was still running at the time of this update; no APK or release from #121 is verified yet.
+- The current development branch is `nex/eden-v0.2.0-rc1-nextendo`, head `40f2c6248b00788dccb941cb1d7e95bab90f6a17`. The two commits after #121 are documentation-only.
+- Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
+- Android application ID: `com.nex.nx`.
+- OAuth callback: `com.nex.nx://oauth/callback`.
+- NEX public OAuth Client ID: `nxc_yAdR-14bOEq7`.
 
-Run #103 verifies source commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` and includes the requested visual cleanup. It does not contain the later runtime-diagnostic commits; those require run #106 or a later successful build.
+A successful build proves that the selected source compiles and its automated tests pass. It does not prove that the live account APIs, BAAS signer, SMM2 server, or multiplayer path work end to end.
 
 ## Implemented in NEX
 
@@ -47,6 +35,13 @@ Run #103 verifies source commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` and i
 ### Runtime diagnostics
 
 The account panel shows the exact scopes returned in the OAuth token response and whether `game.matchmaking` is present. Presence publishing and `GET /api/nex-token` keep separate safe result labels: accepted 2xx, HTTP 401/403/404, other HTTP status, missing scope, network error, session unavailable or response-contract error. The last game-token result is persisted inside the encrypted Android Keystore-backed session, so it remains available after closing and reopening NEX. Tokens, authorization codes and request headers are never included.
+
+### Public Nextendo Network statistics
+
+- The NEX account panel requests `GET /api/stats` without player credentials.
+- The response parser accepts only the documented non-negative integer counters: `online_players`, `total_registered` and `games_online`.
+- The optional request uses a short timeout; a stats endpoint failure does not block account sign-in or profile display.
+- Unit tests cover the documented response shape and reject missing, malformed, non-integer or negative counters.
 
 ### ACC and player identity
 
@@ -123,11 +118,11 @@ NEX follows the published Developer Documentation where a public contract exists
 
 ### Super Mario Maker 2 NEX service
 
-Super Mario Maker 2 is the first intended live test target. As of 7 November 2026, the Nextendo homepage lists SMM2 among its online games and shows it at 70% progress, describing Course World, uploads, world records and comments. This is positive evidence that the service has active SMM2 work; it is not proof that this Android NEX client has the correct live hostname, BAAS registration or full multiplayer flow.
+Super Mario Maker 2 is the first intended live test target. The current [Nextendo compatibility page](https://wiki.nextendo.network/games) lists SMM2 as **Experimental / In preparation**, at **70%**, with matchmaking and presence marked untested. This is the public service's current compatibility indication; it means the server side is not yet advertised as fully validated. Even a fully integrated NEX client would still need a live SMM2 test, and a failed matchmaking attempt could be a server-side limitation rather than an NEX client regression.
 
-There is a documentation gap: the public [Nextendo architecture guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md) still diagrams only MK8D, Splatoon 2 and Smash as per-game NEX services, and the [deployment guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md) does not list SMM2 in its example port table. The older compatibility entry labelled SMM2 Experimental/70% and matchmaking/presence untested should therefore not be treated as definitive current server status without reconciliation against the live homepage.
+The public [Nextendo architecture guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md) still diagrams only MK8D, Splatoon 2 and Smash as per-game NEX services, and the [deployment guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md) does not list SMM2 in its example port table. The separate public SMM2 server repository is evidence of active implementation work, not proof of a production hostname or completed matchmaking service.
 
-The organization publishes a dedicated [SMM2 NEX server repository](https://github.com/NextendoNetwork/super-mario-maker-2). Its public server-side DataStore layer and the `nextendo-nex` core document selected SMM2 methods (RegisterUser 47, GetUsers 48, SyncUserProfile 49, CanPostCourse 60, GetMiiClothes 63, SearchCoursesPostedBy 74 and GetEventCourseStatus 154). The handler returns an explicit not-implemented response for other DataStore methods. That is useful protocol evidence, but it is not a complete SMM2 client handshake specification or proof of end-to-end Course World/matchmaking.
+The organization publishes a dedicatedThe organization publishes a dedicated [SMM2 NEX server repository](https://github.com/NextendoNetwork/super-mario-maker-2). Its public server-side DataStore layer and the `nextendo-nex` core document selected SMM2 methods (RegisterUser 47, GetUsers 48, SyncUserProfile 49, CanPostCourse 60, GetMiiClothes 63, SearchCoursesPostedBy 74 and GetEventCourseStatus 154). The handler returns an explicit not-implemented response for other DataStore methods. That is useful protocol evidence, but it is not a complete SMM2 client handshake specification or proof of end-to-end Course World/matchmaking.
 
 The public server source does provide the public per-title PRUDP access key \`fdf6617f\`, NEX version \`40000\`, auth WSS port \`:443\`, secure server default port \`:60007\`, auth PRUDP minor \`5\` and secure minor \`0\`. The secure server can override its port and advertises the actual destination in a \`prudps:/address=...;port=...\` StationURL returned by LoginEx. The NEX profile now records these values and follows that StationURL rather than assuming a deployment endpoint.
 
@@ -223,3 +218,12 @@ The public \`nextendo-account\` source currently differs from the Developer Docu
 ### BAAS builder boundary
 
 \`NextendoBaasIdTokenBuilder\` builds the RS256 compact JWT with the NEX-provisioned \`kid\` and JWS \`jku\` header, externally supplied \`iss\`, \`aud\` and \`sub\`, \`hm=true\`, and the current server-issued \`nx2.\` token in the \`nnex\` claim. \`NextendoBaasAuthenticationInfo\` wraps that JWT as the \`Token\` field in an \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\` (SMM2 server version \`40000\`). The signer exposes only an interface; no private key or production fallback is included. The payload builder and DataHolder encoder are not yet connected to Eden ACC. Unit tests use a fake signer solely for local serialization and rejection checks. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
+
+
+## Latest source update — 7 November 2026
+
+The development branch now includes the public SMM2 profile, BAAS JWT builder and AuthenticationInfo DataHolder serializer. The Android BAAS builder has a fail-closed signer interface: no production signing key, JWK registration, issuer/audience/subject mapping or client-attestation material is embedded in the client. The payload builders are not yet wired into Eden ACC/LoginEx.
+
+Run #121 is the first CI run that includes these BAAS/SMM2 source changes. Its completion will establish whether the Kotlin and Android project compile; it will not establish a live BAAS login or successful SMM2 matchmaking. The current branch remains a development branch, not a complete online release.
+
+The public [Nextendo Developer Documentation](https://wiki.nextendo.network/developers) describes OAuth PKCE, a separate `nx2.` game token, the `nnex` BAAS claim and public aggregate `/api/stats`. The official [architecture](https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md) and [deployment guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md) show that online play additionally requires title DNS redirection, TLS/SNI, device authentication, a per-game auth/secure server, NNCS NAT checks and P2P. Addresses and signing secrets are runtime configuration; the public deployment guides use placeholders rather than publishing production IPs or private keys.

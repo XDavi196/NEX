@@ -55,6 +55,17 @@ object NextendoAuthClient {
         val friendCode: String
     )
 
+    /** Public aggregate statistics; this endpoint does not require a player token. */
+    fun fetchNetworkStats(): NextendoNetworkStats {
+        val response = request(
+            url = "$BASE_URL/api/stats",
+            method = "GET",
+            connectTimeoutMs = 4_000,
+            readTimeoutMs = 4_000
+        )
+        return NextendoNetworkStatsParser.parse(response)
+    }
+
     class NextendoException(
         val httpStatus: Int,
         message: String
@@ -246,13 +257,15 @@ object NextendoAuthClient {
         url: String,
         method: String,
         headers: Map<String, String> = emptyMap(),
-        body: ByteArray? = null
+        body: ByteArray? = null,
+        connectTimeoutMs: Int = 15_000,
+        readTimeoutMs: Int = 20_000
     ): String {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = method
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 20_000
+            connection.connectTimeout = connectTimeoutMs
+            connection.readTimeout = readTimeoutMs
             connection.useCaches = false
             connection.instanceFollowRedirects = false
             connection.setRequestProperty("Accept", "application/json")

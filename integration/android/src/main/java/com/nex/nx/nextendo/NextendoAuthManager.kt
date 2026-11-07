@@ -192,6 +192,11 @@ object NextendoAuthManager {
                     ?: displaySession.friendCode.ifBlank { "Ainda não disponível" }
                 val pid = profile?.pid?.takeIf { it > 0L } ?: displaySession.pid
                 val avatar = profile?.avatarUrl.orEmpty()
+                // Public network statistics are optional and use short timeouts;
+                // a stats outage must never break account sign-in or profile display.
+                val networkStats = runCatching {
+                    NextendoAuthClient.fetchNetworkStats()
+                }.getOrNull()
 
                 val gameTokenReady = hasValidGameToken(displaySession)
                 val details = buildString {
@@ -211,7 +216,18 @@ object NextendoAuthManager {
                     append(if ("game.matchmaking" in displaySession.grantedScopes) "concedida" else "ausente na resposta OAuth")
                     append("\nPresença Nextendo: ")
                     append(NextendoPresencePublisher.diagnostic())
-                    append("\nSuper Mario Maker 2: NÃO CONECTADO")
+                    append("\n\nESTATÍSTICAS PÚBLICAS DA REDE")
+                    if (networkStats != null) {
+                        append("\nJogadores online: ")
+                        append(networkStats.onlinePlayers)
+                        append("\nContas registradas: ")
+                        append(networkStats.totalRegistered)
+                        append("\nJogos online: ")
+                        append(networkStats.gamesOnline)
+                    } else {
+                        append("\nEstatísticas indisponíveis no momento")
+                    }
+                    append("\n\nSuper Mario Maker 2: NÃO CONECTADO")
                     append("\nAinda falta autenticação BAAS/nnex assinada, endpoint e sessão PRUDP confirmados para o NEX.")
                     append("\nQLaunch / nn::friends: integração parcial")
                     append("\nA API pública não confirma NSA/UUID para todos os amigos; sem esses IDs, o QLaunch não pode montar uma lista de amigos válida.")

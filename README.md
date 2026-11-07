@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.webp" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.102">Get the latest verified experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
- > **Please read before installing:** NEX is an experimental preview. Build #102 passed the native friend-cache/HLE serializer tests, Android Nextendo unit tests, optimized APK build and experimental release publication. These checks do not prove that account endpoints or in-game online play work against the live Nextendo service. In-game online multiplayer is not ready.
+ > **Please read before installing:** NEX is an experimental preview. The latest verified APK is **alpha.108** (source commit `e5c1a235`); its native friend-cache tests, Android Nextendo unit tests and optimized APK build passed. Alpha.108 includes the PRUDP-Lite transport and adaptive NEX icon, but it predates the newer BAAS/SMM2 profile work now on the development branch. In-game online multiplayer is not ready.
 
 ## What NEX is
 
@@ -35,13 +35,13 @@ NEX uses its **own public Client ID** from the Nextendo Developer Portal. The An
 
 The current requested scopes are:
 
-`identity friends presence game.matchmaking`
+`identity friends presence profil game.matchmaking emulator.status`
 
 The first in-game validation target is **Super Mario Maker 2**. Nextendo publishes a dedicated SMM2 NEX server, but NEX still needs the title's confirmed client endpoint, authentication and network configuration before it can connect. The account screen and a successful APK build do not mean SMM2 multiplayer is ready.
 
 ### Where to find it
 
-The verified `v0.1.0-alpha.102` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
+The verified `v0.1.0-alpha.108` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
 
 ### Connecting your account
 
@@ -53,34 +53,31 @@ The verified `v0.1.0-alpha.102` build includes a clearly labeled **Nextendo Netw
 
 The account panel can show the username, Friend Code, and PID when those details are available. Choose **Friends** to request the friend list.
 
-### Friends and presence
+### Friends, presence and network stats
 
-The NEX-owned friend-list screen can display profile, Friend Code and presence fields when the service returns them. However, the published Nextendo Developer Portal and public account-server source currently describe different OAuth contracts: the public source does not accept the OAuth access token on `/api/friends` or `/api/presence`. Therefore, the friends/presence flow is not yet verified against the deployed service; see [the contract audit](docs/NEXTENDO_ONLINE_STATUS.md).
+The account panel shows the signed-in player's identity, Friend Code, PID, granted OAuth scopes, game-token readiness and the latest presence diagnostic. The Friends screen reads the OAuth-scoped `/api/oauth/userinfo` response and does not invent missing presence, incoming requests, NSA or Switch account UUID values. The richer game-friend endpoint is requested separately with the `nx2.` token; only entries with an explicit NSA can be passed to the game-facing friend cache.
 
-The screen is currently read-only. Incoming friend requests and account mutations are not yet supported by the currently verified OAuth response. Presence is informational; it is not proof that a game session or peer-to-peer connection is active.
+The account panel also reads the public `/api/stats` endpoint and displays aggregate counts for online players, registered accounts and online games. This request is optional and has a short timeout; a stats outage does not block account sign-in.
 
-### What online does not mean yet
+The documented API and the inspected public account-server source still disagree on some scopes, refresh-token behavior, game-token access and presence authorization. NEX follows the public OAuth contract and records safe diagnostics rather than falling back to private web-session authentication. See [the contract audit](docs/NEXTENDO_ONLINE_STATUS.md).
 
-**Playing a game online is not available in this preview.** The Android account and presence code is only one part of the work. Real game networking still needs:
+### Current online readiness
 
-- BAAS/ACC game authentication and a correctly signed `id_token` containing the NEX `nx2.` token in the `nnex` claim.
-- Game-side `nn::friends` services backed by the NEX social data.
-- Per-host Nextendo DNS mapping and verified TLS/SNI routing.
-- NEX/PRUDP game-service communication and matchmaking.
-- NAT checks, UDP mapping preservation, peer discovery, and P2P hole-punching.
-- End-to-end tests with two NEX accounts and a supported game.
+The development branch now contains protocol components for PRUDP-Lite, a WSS transport, an RMC envelope codec, a BAAS RS256 JWT/AuthenticationInfo builder, a public SMM2 profile, partial `nn::friends`/qLaunch HLE handlers, and NAT probe parsing/classification. These are meaningful implementation steps, but they are not yet connected into one working game-login and multiplayer path.
 
-Until those pieces work together and have been tested, please do not expect online play to work. The technical details are tracked in [the online implementation status](docs/NEXTENDO_ONLINE_STATUS.md).
+Still required are the NEX-provisioned BAAS signer/JWKS and identity/attestation contract, Eden ACC/LoginEx integration, the live SMM2 auth hostname and DNS/TLS routing, the secure Kerberos ticket/check payload, complete title RMC calls, actual matchmaking, live NAT sockets and P2P hole-punching, and validation with two NEX accounts on two devices.
+
+The Nextendo compatibility page currently lists Super Mario Maker 2 as **Experimental / In preparation (70%)**, with matchmaking and presence untested. Even a completed NEX client integration therefore needs a live SMM2 service test before it can be announced as working. See [the online implementation status](docs/NEXTENDO_ONLINE_STATUS.md).
 
 ## Downloads
 
-The latest verified Android baseline is available as an experimental GitHub prerelease:
+The latest verified Android APK is the experimental prerelease:
 
-**[NEX v0.1.0-alpha.102 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.102)**
+**[NEX v0.1.0-alpha.108 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk)
 
-The APK asset is named `NEX-Android-v0.2.0-rc1-optimized.apk`. The release also includes `SHA256SUMS.txt`, which can be used to verify the file's SHA-256 checksum.
+The release includes `SHA256SUMS.txt`. Alpha.108 is built from commit `e5c1a235`; it contains the PRUDP-Lite transport and the requested NEX branding changes. It does **not** contain the later BAAS/SMM2 profile additions now on the development branch, and it does not provide working in-game multiplayer. The BAAS/SMM2 branch code is being validated separately by the newer Actions run.
 
-This is an early preview, not a stable release. It includes the NEX app identity, the Nextendo account integration, and tested protocol-parsing primitives. It does not include a live PRUDP session, verified game authentication, or in-game multiplayer.
+This is an experimental preview, not a stable or online-ready release.
 
 You can follow the [GitHub Actions runs](https://github.com/XDavi196/NEX/actions) to see build progress and the [Releases page](https://github.com/XDavi196/NEX/releases) for published APKs. A release is created only after the complete build and artifact upload succeed.
 
@@ -110,7 +107,7 @@ For sign-in problems, first check that the Nextendo Developer Portal registratio
 
 ## Development notes
 
-The repository contains the Android Nextendo client, encrypted session handling, OAuth callback activity, player profile and friends views, friend-presence presentation, the app-presence publisher, the official NEX logo asset, and the repeatable overlay that applies NEX changes to the pinned Eden checkout.
+The repository contains the Android Nextendo OAuth client, encrypted session handling, public network statistics, account/friends UI, app-presence publisher, partial game-facing friend HLE, PRUDP-Lite and RMC protocol components, BAAS/SMM2 payload builders, the original NEX logo, and the repeatable overlay for the pinned Eden source. The [online status document](docs/NEXTENDO_ONLINE_STATUS.md) separates tested code from features that are not yet connected to the live service.
 
 Useful technical documents:
 
