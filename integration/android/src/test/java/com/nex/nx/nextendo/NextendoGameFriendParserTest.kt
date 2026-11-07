@@ -26,7 +26,7 @@ class NextendoGameFriendParserTest {
     }
 
     @Test
-    fun acceptsOnlyStringNsaAndAppIdsWithExactlySixteenHexDigits() {
+    fun usesPidFallbackWhenNsaIsAbsentOrMalformedAndKeepsValidExplicitNsa() {
         val friends = NextendoGameFriendParser.parse(
             """{"friends":[
                 {"pid":5,"nsa":161,"name":"Numeric NSA","presence":{"status":1,"app_id":"0000000000000001","app_field":""}},
@@ -35,9 +35,9 @@ class NextendoGameFriendParserTest {
             ]}"""
         )
         assertEquals(3, friends.size)
-        assertEquals(0L, friends.first { it.pid == 5L }.networkServiceAccountId)
+        assertEquals(5L, friends.first { it.pid == 5L }.networkServiceAccountId)
         assertEquals(1L, friends.first { it.pid == 5L }.appIdValue)
-        assertEquals(0L, friends.first { it.pid == 6L }.networkServiceAccountId)
+        assertEquals(6L, friends.first { it.pid == 6L }.networkServiceAccountId)
         assertEquals(0L, friends.first { it.pid == 6L }.appIdValue)
         assertEquals(161L, friends.first { it.pid == 7L }.networkServiceAccountId)
         assertEquals(0x0100F8F0000A2000L, friends.first { it.pid == 7L }.appIdValue)
@@ -60,12 +60,12 @@ class NextendoGameFriendParserTest {
     }
 
     @Test
-    fun missingNsaRemainsUnavailableInsteadOfBeingDerivedFromPid() {
+    fun missingNsaUsesTheDocumentedNextendoPidMapping() {
         val friends = NextendoGameFriendParser.parse(
             """{"friends":[{"pid":1800000002,"username":"Friend","presence":{"status":1}}]}"""
         )
         assertEquals(1, friends.size)
-        assertEquals(0L, friends.single().networkServiceAccountId)
+        assertEquals(1800000002L, friends.single().networkServiceAccountId)
     }
 
     @Test
