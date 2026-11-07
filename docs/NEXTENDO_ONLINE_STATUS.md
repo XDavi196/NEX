@@ -64,7 +64,7 @@ The account panel shows the exact scopes returned in the OAuth token response an
 - Android transfers a bounded friend snapshot through JNI to a mutex-protected NEX-owned native cache.
 - Each entry may contain PID, explicit NetworkServiceAccountId (NSA), username, presence status, current application ID and bounded AppField.
 - Game-facing list/profile/detail/presence handlers and qLaunch V2 serializers are wired to that cache in the Eden overlay.
-- Records are exposed only when the API provides an explicit non-zero NSA. PID is not silently substituted for a friend's NSA.
+- Records use the persistent Nextendo PID as the game-facing NetworkServiceAccountId when the API omits an explicit NSA, matching the reference emulator's account binding. An explicit NSA from the service takes precedence.
 - Switch account UUIDs and last-seen timestamps are not synthesized. Unknown fields remain zero.
 - Presence status is preserved as supplied. Ordinary online status is not promoted to OnlinePlay, and a title ID is written only when the friend is explicitly in-game and the API supplied a valid title ID.
 - The public friend response may omit NSA and Switch UUID fields. Nextendo's reference emulator explicitly binds its persistent player PID to the Switch NetworkServiceAccountId. NEX now follows that same service-specific mapping when NSA is absent, while preserving a valid explicit NSA if one is returned. Switch UUID and last-seen fields are still not synthesized.
@@ -88,12 +88,14 @@ The session coordinator is an explicit protocol client/test harness. It is **not
 
 The BAAS builder is connected through `NextendoBaasRuntime` to Eden's ACC token cache, but it has no production signer/provider. As a result, ACC currently reports no BAAS token and the guest cannot complete BAAS-backed LoginEx. Complete title-specific RMC methods, matchmaking and live NAT/P2P are still unfinished. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
 
-### NAT primitives
+### NAT primitives and UDP socket lifetime
 
 - A 16-byte big-endian NNCS probe codec follows the public Nextendo NNCS implementation.
-- A conservative two-vantage tracker classifies equal mappings, changed ports and ambiguous observations.
-- The tracker rejects duplicate/unknown vantage observations and clears its state on close.
-- The tracker owns no UDP socket. It does not preserve the emulator's live mapping, schedule keepalives, discover peers or perform P2P hole-punching.
+- A conservative two-vantage tracker classifies equal mappings, changed ports and ambiguous observations. It rejects duplicate/unknown vantage observations and clears its state on close.
+- Eden's native network layer now has an NEX UDP socket keeper. While a Nextendo PID is active, a bound, unconnected UDP socket can be parked for five seconds when the guest closes it.
+- The keeper holds at most eight sockets, keys them by local port, and adopts only when the next bind uses the same local IPv4 address. It closes expired/replaced entries and clears all parked sockets on account change/logout or network-instance shutdown.
+- This implements the short close/reopen preservation used by P2P NAT-probe flows; it does not itself send NNCS probes, schedule keepalives, discover peers, signal matchmaking, or perform UDP hole-punching.
+- The native cache has deterministic tests for same-port adoption, address mismatch, expiry, replacement, capacity and cleanup. The full Android overlay still requires successful compilation and runtime validation on two devices.
 
 ## Current Nextendo public-contract audit
 
