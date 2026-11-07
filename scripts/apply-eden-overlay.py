@@ -143,9 +143,9 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoFriendCache(
                 .network_service_account_id =
                     static_cast<std::uint64_t>(nsa_values[static_cast<std::size_t>(i)]),
                 .username = name_chars,
+                .presence_status = static_cast<std::uint32_t>(status_values[static_cast<std::size_t>(i)]),
                 .application_id =
                     static_cast<std::uint64_t>(app_id_values[static_cast<std::size_t>(i)]),
-                .presence_status = static_cast<std::uint32_t>(status_values[static_cast<std::size_t>(i)]),
             };
 
             if (field_object != nullptr) {
