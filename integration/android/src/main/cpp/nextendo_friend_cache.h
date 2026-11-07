@@ -23,6 +23,7 @@ struct Entry {
     std::uint64_t network_service_account_id{};
     std::string username;
     std::uint32_t presence_status{};
+    std::uint64_t application_id{};
     std::array<std::uint8_t, MaxAppFieldBytes> app_field{};
     std::size_t app_field_size{};
 };
