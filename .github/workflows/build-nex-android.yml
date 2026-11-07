@@ -105,6 +105,10 @@ jobs:
             integration/android/src/test/cpp/nextendo_friend_cache_test.cpp \
             -o "$RUNNER_TEMP/nextendo_friend_cache_test"
           "$RUNNER_TEMP/nextendo_friend_cache_test"
+          g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+            integration/android/src/test/cpp/nextendo_dns_redirect_cache_test.cpp \
+            -o "$RUNNER_TEMP/nextendo_dns_redirect_cache_test"
+          "$RUNNER_TEMP/nextendo_dns_redirect_cache_test"
 
       - name: Run NEX Nextendo unit tests
         working-directory: eden/src/android
