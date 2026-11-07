@@ -44,3 +44,12 @@ Still missing:
 A successful OAuth login or retrieval of an `nx2.` token does not by itself prove multiplayer works. See [the online status checklist](../../docs/NEXTENDO_ONLINE_STATUS.md).
 
 Never print access tokens, refresh tokens, game tokens, callback codes or PKCE verifiers to Android logs.
+
+
+## NEX glass and online readiness display
+
+\`NexGlassEffect.kt\` styles fragment bars, Material buttons, selected cards and switches with an Android-native translucent treatment. The overlay registers the helper for fragment views so settings and game screens receive the same appearance. The Games screen header and launcher use the official NEX logo.
+
+The account panel distinguishes OAuth account connectivity and the \`nx2.\` game token from actual in-game readiness. It reports SMM2 as disconnected while BAAS signing, title endpoints and a PRUDP session are missing. qLaunch friend rows are only available when the public API supplies an explicit NSA; a PID is never substituted.
+
+The OAuth callback must include the matching state value. A missing or mismatched state is rejected before exchanging the authorization code.

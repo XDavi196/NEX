@@ -72,7 +72,7 @@ The Eden overlay now:
 
 The current public friend response has PID and presence data but no confirmed NSA/UUID mapping. With that response, the native game-facing friend list intentionally remains empty rather than sending guessed account identifiers.
 
-The ACC adapter currently supplies the linked NEX PID through Eden's account-ID getter. That is a provisional identity bridge, not proof that the BAAS account token or the game's expected NSA mapping is valid. It still needs confirmation against the exact Nextendo game-auth contract and guest-level testing.
+The ACC adapter no longer substitutes a Nextendo PID for Eden's account ID. The PID-to-NSA/account-ID equivalence has not been confirmed by Nextendo, so Eden retains its existing local ACC identity until an explicit mapping and game-auth contract are issued. The NEX PID remains available to NEX's own friend cache and must not be treated as a BAAS identity proof.
 
 The C++ host test checks cache bounds, duplicate filtering, explicit-NSA filtering, presence fields and serialized qLaunch V2 record layouts. This does not replace IPC tests inside a running game or qLaunch.
 
@@ -125,3 +125,8 @@ When title routing is implemented, it must preserve the original hostname for SN
 - Android unit tests: \`integration/android/src/test/java/com/nex/nx/nextendo/\`
 - Repeatable Eden integration: \`scripts/apply-eden-overlay.py\`
 - Full status and blockers: [NEXTENDO_ONLINE_STATUS.md](NEXTENDO_ONLINE_STATUS.md)
+
+
+## NEX visual layer
+
+The NEX Android overlay uses the official NEX logo in the app icon and the Games screen header. A NEX-owned \`NexGlassEffect\` Kotlin helper applies translucent gradients, accent outlines, glass-style buttons/bars and checked/unchecked switch tints across fragment screens. It is an Android-native visual treatment compatible with Android 11; it does not claim to provide system backdrop blur. The Expo \`expo-glass-effect\` package is not installed because it is an Expo/React Native component and currently renders the native effect only on iOS 26+, falling back to a regular View on Android.

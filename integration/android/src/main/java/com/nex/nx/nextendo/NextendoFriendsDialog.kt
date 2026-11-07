@@ -183,6 +183,15 @@ object NextendoFriendsDialog {
             }
         }
 
+        content.addView(
+            TextView(activity).apply {
+                text = "Integração de jogo: a lista do QLaunch só pode usar amigos com NSA confirmado. A resposta pública atual pode não fornecer esse identificador; nomes mostrados aqui não garantem sincronização dentro do jogo."
+                textSize = 11f
+                setTextColor(0xFF9CA3AF.toInt())
+                setPadding(dp(0), dp(2), dp(0), dp(10))
+            }
+        )
+
         addSectionTitle("AMIGOS")
         if (result.friends.isEmpty()) {
             content.addView(

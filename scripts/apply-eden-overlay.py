@@ -211,49 +211,8 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
 '''
     replace_once(native_cpp, native_jni_anchor, native_jni_bridge + native_jni_anchor)
 
-    # ACC exposes the linked NEX PID as NetworkServiceAccountId to games.
-    acc_cpp = eden / "src/core/hle/service/acc/acc.cpp"
-    replace_once(
-        acc_cpp,
-        '#include "core/hle/service/acc/acc.h"\n',
-        '#include "core/hle/service/acc/acc.h"\n'
-        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n',
-    )
-    replace_once(
-        acc_cpp,
-        """    Result GetAccountId(Out<u64> out_account_id) {
-        LOG_WARNING(Service_ACC, "(STUBBED) called");
-        *out_account_id = account_id.Hash();
-        R_SUCCEED();
-    }""",
-        """    Result GetAccountId(Out<u64> out_account_id) {
-        const auto nex_pid = Common::NextendoFriendCache::GetPlayerPid();
-        *out_account_id = nex_pid != 0 ? nex_pid : account_id.Hash();
-        LOG_INFO(Service_ACC, "[NEX Nextendo] GetAccountId -> {}",
-                 *out_account_id);
-        R_SUCCEED();
-    }""",
-    )
-    replace_once(
-        acc_cpp,
-        """    void GetAccountId(HLERequestContext& ctx) {
-        LOG_DEBUG(Service_ACC, "called");
-
-        IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(ResultSuccess);
-        rb.PushRaw<u64>(profile_manager->GetLastOpenedUser().Hash());
-    }""",
-        """    void GetAccountId(HLERequestContext& ctx) {
-        const auto nex_pid = Common::NextendoFriendCache::GetPlayerPid();
-        const auto account_id = nex_pid != 0
-            ? nex_pid
-            : profile_manager->GetLastOpenedUser().Hash();
-        LOG_INFO(Service_ACC, "[NEX Nextendo] GetAccountId -> {}", account_id);
-        IPC::ResponseBuilder rb{ctx, 4};
-        rb.Push(ResultSuccess);
-        rb.PushRaw<u64>(account_id);
-    }""",
-    )
+    # Keep Eden's local ACC identity until Nextendo confirms the NEX PID/NSA mapping.
+    # A Nextendo PID is not assumed to be a NetworkServiceAccountId.
 
     # Connect Eden's nn::friends HLE to the NEX-owned read-only cache.
     friend_cpp = eden / "src/core/hle/service/friend/friend.cpp"
@@ -677,6 +636,36 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     }""",
     )
 
+    # Apply the NEX glass treatment to every fragment screen, including settings.
+    main_activity = app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt"
+    native_import = "import org.yuzu.yuzu_emu.NativeLibrary\n"
+    replace_once(
+        main_activity,
+        native_import,
+        native_import + "import com.nex.nx.nextendo.NexGlassEffect\n",
+    )
+    replace_once(
+        main_activity,
+        "        setContentView(binding.root)\n",
+        """        setContentView(binding.root)
+
+        supportFragmentManager.registerFragmentLifecycleCallbacks(
+            object : androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks() {
+                override fun onFragmentViewCreated(
+                    fragmentManager: androidx.fragment.app.FragmentManager,
+                    fragment: androidx.fragment.app.Fragment,
+                    view: android.view.View,
+                    savedInstanceState: Bundle?
+                ) {
+                    view.post { NexGlassEffect.apply(view) }
+                }
+            },
+            true
+        )
+        binding.root.post { NexGlassEffect.apply(binding.root) }
+""",
+    )
+
     gradle = app_dir / "build.gradle.kts"
     replace_once(
         gradle,
@@ -796,6 +785,24 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     # Add a clearly visible Nextendo shortcut to the main games header, following
     # the placement familiar to Den2 users while keeping all authentication NEX-owned.
     games_layout = app_dir / "src/main/res/layout/fragment_games.xml"
+    layout_text = games_layout.read_text(encoding="utf-8")
+    title_anchor = """        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            style="@style/SynthwaveText.Title"
+            android:textSize="27sp"
+            />"""
+    title_logo = """        <ImageView
+            android:id="@+id/title"
+            android:layout_width="88dp"
+            android:layout_height="48dp"
+            android:contentDescription="NEX"
+            android:scaleType="fitCenter"
+            android:src="@drawable/nex_logo"
+            />"""
+    replace_once(games_layout, title_anchor, title_logo)
     layout_text = games_layout.read_text(encoding="utf-8")
     header_anchor = """    </LinearLayout>
 

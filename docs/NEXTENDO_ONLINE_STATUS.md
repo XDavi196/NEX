@@ -153,3 +153,17 @@ Required before claiming in-game online support:
 7. End-to-end testing with two NEX accounts, two Android devices and Super Mario Maker 2.
 
 Until those checks pass, NEX in-game multiplayer remains **not implemented / not verified**.
+
+
+## NEX UI and current device-facing status
+
+- The official NEX logo is used in the Android launcher identity and the Games screen header.
+- A NEX-owned Android glass layer styles fragment bars, Material buttons, selected card surfaces and on/off switches with translucent gradients and accent strokes. It remains compatible with Android 11 and does not depend on the iOS-only Expo GlassEffect component.
+- The account panel now separates account sign-in from game readiness. A valid \`nx2.\` token is displayed as a prerequisite only; SMM2 is still marked disconnected until BAAS/nnex signing, title endpoint and PRUDP session are implemented and verified.
+- The friends panel explains that an OAuth-visible friend is not automatically a game-visible friend: qLaunch records still require a confirmed NSA/UUID mapping.
+- OAuth callback state is now mandatory and compared in constant time before exchanging an authorization code.
+- The account panel retries the documented game-token request when a granted \`game.matchmaking\` scope exists and the stored game token is missing/expired. Failure does not invalidate OAuth account access and is not presented as multiplayer readiness.
+
+## CI capacity blocker
+
+The supplied GitHub Budgets and Alerts screenshot shows all five configured budgets at 100% with \`Usage blocked\`. GitHub documents that an exhausted budget with \`Stop usage when budget limit is reached\` can block GitHub Actions hosted runners. A code push can update the branch, but a new build/release cannot be considered verified until the applicable Actions budget is raised or the stop-usage setting is changed by the account owner. This is a billing/runner-capacity blocker, not an NEX source compile result.

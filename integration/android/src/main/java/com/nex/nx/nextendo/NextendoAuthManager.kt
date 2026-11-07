@@ -196,6 +196,7 @@ object NextendoAuthManager {
                 val pid = profile?.pid?.takeIf { it > 0L } ?: displaySession.pid
                 val avatar = profile?.avatarUrl.orEmpty()
 
+                val gameTokenReady = hasValidGameToken(displaySession)
                 val details = buildString {
                     append("Jogador: ")
                     append(username)
@@ -203,6 +204,14 @@ object NextendoAuthManager {
                     append(friendCode)
                     append("\nPID: ")
                     append(if (pid > 0L) pid.toString() else "Aguardando token de jogo")
+                    append("\n\nSTATUS ONLINE DO NEX")
+                    append("\nConta Nextendo: conectada")
+                    append("\nToken de jogo nx2.: ")
+                    append(if (gameTokenReady) "disponível" else "não disponível ou expirado")
+                    append("\nSuper Mario Maker 2: NÃO CONECTADO")
+                    append("\nAinda falta autenticação BAAS/nnex assinada, endpoint e sessão PRUDP confirmados para o NEX.")
+                    append("\nQLaunch / nn::friends: integração parcial")
+                    append("\nA API pública não confirma NSA/UUID para todos os amigos; sem esses IDs, o QLaunch não pode montar uma lista de amigos válida.")
                     if (avatar.isNotBlank()) {
                         append("\n\nAvatar: ")
                         append(avatar)
@@ -321,7 +330,21 @@ object NextendoAuthManager {
     ): NextendoSessionStore.Session {
         // Always re-read the current session in the synchronized refresher:
         // another worker may already have rotated the refresh token.
-        return NextendoSessionRefresher.getValidSession(context, 60L).also(::syncNativeIdentity)
+        var session = NextendoSessionRefresher.getValidSession(context, 60L)
+
+        // Refresh the separate nx2. credential when this client was granted
+        // game.matchmaking. Failure leaves account login usable but does not imply
+        // that game authentication or multiplayer is ready.
+        if (!hasValidGameToken(session) && "game.matchmaking" in session.grantedScopes) {
+            runCatching {
+                NextendoAuthClient.fetchNexGameToken(session.accessToken)
+            }.onSuccess { gameToken ->
+                NextendoSessionStore.saveNexGameToken(context, gameToken)
+                session = NextendoSessionStore.load(context) ?: session
+            }
+        }
+        syncNativeIdentity(session)
+        return session
     }
 
     fun refreshSession(
