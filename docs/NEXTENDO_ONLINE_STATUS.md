@@ -57,7 +57,7 @@ The account panel shows the exact scopes returned in the OAuth token response an
 - `IManagerForApplication::CheckAvailability` now reports whether the cache contains a token. `LoadIdTokenCache` and the deprecated async interface return the exact compact-JWT bytes. They return a zero byte-count if no token exists or the guest output buffer is too small; the previous fake 0x100-byte zero-filled result is removed.
 - `NextendoBaasRuntime` connects the RS256 builder and `AuthenticationInfo` DataHolder serializer to the ACC cache only when a NEX-specific provisioned signing provider exists and the current `nx2.` game token is valid. It clears ACC state on logout, absent/expired token, missing signer or invalid claims.
 - No production signer/provider is installed in this branch. The bridge is implemented and fail-closed, but the guest receives no BAAS token until the NEX key/JWKS, `kid`, `iss`, `aud`, `sub`/PID and any required attestation are provisioned.
-- Eden's local account ID, Switch UUID and NSA remain separate from the Nextendo PID. NEX does not substitute one identifier for another.
+- Eden's local profile UUID remains the offline fallback. For a linked Nextendo account, the game-facing ACC NetworkServiceAccountId is the persistent Nextendo PID, matching the reference emulator's account binding. A Switch UUID is not derived from PID.
 
 ### Native friend cache and nn::friends HLE
 
@@ -67,7 +67,7 @@ The account panel shows the exact scopes returned in the OAuth token response an
 - Records are exposed only when the API provides an explicit non-zero NSA. PID is not silently substituted for a friend's NSA.
 - Switch account UUIDs and last-seen timestamps are not synthesized. Unknown fields remain zero.
 - Presence status is preserved as supplied. Ordinary online status is not promoted to OnlinePlay, and a title ID is written only when the friend is explicitly in-game and the API supplied a valid title ID.
-- The public account-server friend response currently has no confirmed NSA or Switch UUID field. Therefore the game-facing friend list remains empty for entries without an explicit NSA. This is fail-closed behavior, not a claim that the social API is complete.
+- The public friend response may omit NSA and Switch UUID fields. Nextendo's reference emulator explicitly binds its persistent player PID to the Switch NetworkServiceAccountId. NEX now follows that same service-specific mapping when NSA is absent, while preserving a valid explicit NSA if one is returned. Switch UUID and last-seen fields are still not synthesized.
 - The C++ host test validates cache bounds, duplicate filtering, explicit-NSA filtering and qLaunch V2 record serialization. Guest-visible IPC behavior still needs validation inside Eden/qLaunch and a supported game.
 
 ### PRUDP, RMC and SMM2 protocol primitives
