@@ -106,6 +106,15 @@ def main() -> None:
     dns_cache_destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(dns_cache_source, dns_cache_destination)
 
+    # Copy the bounded UDP socket keeper used to preserve the NAT mapping
+    # across the short probe-socket close/reopen sequence in P2P titles.
+    udp_keeper_source = NEX_SOURCE / "integration/android/src/main/cpp/nextendo_udp_port_keeper.h"
+    udp_keeper_destination = eden / "src/core/internal_network/nextendo_udp_port_keeper.h"
+    if not udp_keeper_source.is_file():
+        raise RuntimeError(f"Missing NEX UDP port keeper header: {udp_keeper_source}")
+    udp_keeper_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(udp_keeper_source, udp_keeper_destination)
+
     native_cpp = app_dir / "src/main/jni/native.cpp"
     replace_once(
         native_cpp,
@@ -487,6 +496,164 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
         1,
     )
     sfdnsres_cpp.write_text(sfdnsres_text, encoding="utf-8")
+
+    # Keep a short-lived host UDP socket alive across the game's NAT-probe
+    # close/reopen sequence. This preserves the external mapping announced to peers.
+    network_cpp = eden / "src/core/internal_network/network.cpp"
+    replace_once(
+        network_cpp,
+        '#include "core/internal_network/sockets.h"\n',
+        '#include "core/internal_network/sockets.h"\n'
+        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
+        '#include "core/internal_network/nextendo_udp_port_keeper.h"\n',
+    )
+    udp_keeper_helpers = r'''using NextendoUdpSocketCache = Common::NextendoUdpPortKeeper::Cache<SOCKET>;
+
+NextendoUdpSocketCache& GetNextendoUdpSocketCache() {
+    static NextendoUdpSocketCache cache;
+    return cache;
+}
+
+void CloseNextendoUdpSockets(const std::vector<SOCKET>& sockets) {
+    for (const SOCKET socket : sockets) {
+        if (socket != INVALID_SOCKET) {
+            (void)closesocket(socket);
+        }
+    }
+}
+
+bool IsNextendoUnconnectedUdpSocket(SOCKET socket, sockaddr_in* local_address) {
+    if (socket == INVALID_SOCKET) {
+        return false;
+    }
+
+    int socket_type = 0;
+    socklen_t socket_type_size = sizeof(socket_type);
+    if (getsockopt(socket, SOL_SOCKET, SO_TYPE,
+                   reinterpret_cast<char*>(&socket_type), &socket_type_size) != 0 ||
+        socket_type != SOCK_DGRAM) {
+        return false;
+    }
+
+    sockaddr_in local{};
+    socklen_t local_size = sizeof(local);
+    if (getsockname(socket, reinterpret_cast<sockaddr*>(&local), &local_size) != 0 ||
+        local.sin_family != AF_INET || local.sin_port == 0) {
+        return false;
+    }
+
+    sockaddr_in peer{};
+    socklen_t peer_size = sizeof(peer);
+    if (getpeername(socket, reinterpret_cast<sockaddr*>(&peer), &peer_size) == 0) {
+        return false;
+    }
+
+    if (local_address != nullptr) {
+        *local_address = local;
+    }
+    return true;
+}
+
+bool TryParkNextendoUdpSocket(SOCKET socket, bool non_blocking) {
+    if (Common::NextendoFriendCache::GetPlayerPid() == 0) {
+        return false;
+    }
+
+    sockaddr_in local{};
+    if (!IsNextendoUnconnectedUdpSocket(socket, &local)) {
+        return false;
+    }
+
+    const auto address = TranslateIPv4(local.sin_addr);
+    const auto close_handles = GetNextendoUdpSocketCache().Park(
+        ntohs(local.sin_port), address, socket, non_blocking);
+    CloseNextendoUdpSockets(close_handles);
+    LOG_INFO(Network, "[NEX] Parked UDP socket on local port {} for P2P NAT mapping reuse",
+             ntohs(local.sin_port));
+    return true;
+}
+
+bool TryAdoptNextendoUdpSocket(SOCKET& socket, const SockAddrIn& bind_address,
+                               bool& non_blocking) {
+    if (Common::NextendoFriendCache::GetPlayerPid() == 0 || socket == INVALID_SOCKET ||
+        bind_address.portno == 0) {
+        return false;
+    }
+
+    int socket_type = 0;
+    socklen_t socket_type_size = sizeof(socket_type);
+    if (getsockopt(socket, SOL_SOCKET, SO_TYPE,
+                   reinterpret_cast<char*>(&socket_type), &socket_type_size) != 0 ||
+        socket_type != SOCK_DGRAM) {
+        return false;
+    }
+
+    sockaddr_in local{};
+    socklen_t local_size = sizeof(local);
+    if (getsockname(socket, reinterpret_cast<sockaddr*>(&local), &local_size) != 0 ||
+        local.sin_port != 0) {
+        return false;
+    }
+
+    auto result = GetNextendoUdpSocketCache().Take(bind_address.portno, bind_address.ip);
+    CloseNextendoUdpSockets(result.close_handles);
+    if (!result.adopted.has_value()) {
+        return false;
+    }
+
+    (void)closesocket(socket);
+    socket = result.adopted->handle;
+    non_blocking = result.adopted->non_blocking;
+    LOG_INFO(Network, "[NEX] Reused parked UDP socket on local port {} for P2P",
+             bind_address.portno);
+    return true;
+}
+
+void ClearNextendoUdpSocketCache() {
+    CloseNextendoUdpSockets(GetNextendoUdpSocketCache().Clear());
+}
+
+'''
+    network_anchor = "Errno GetAndLogLastError(CallType call_type = CallType::Other) {\n"
+    replace_once(network_cpp, network_anchor, udp_keeper_helpers + network_anchor)
+
+    replace_once(
+        network_cpp,
+        """NetworkInstance::~NetworkInstance() {
+    Finalize();
+}""",
+        """NetworkInstance::~NetworkInstance() {
+    ClearNextendoUdpSocketCache();
+    Finalize();
+}""",
+    )
+    replace_once(
+        network_cpp,
+        """Errno Socket::Bind(SockAddrIn addr) {
+    const sockaddr addr_in = TranslateFromSockAddrIn(addr);
+""",
+        """Errno Socket::Bind(SockAddrIn addr) {
+    if (TryAdoptNextendoUdpSocket(fd, addr, is_non_blocking)) {
+        return Errno::SUCCESS;
+    }
+
+    const sockaddr addr_in = TranslateFromSockAddrIn(addr);
+""",
+    )
+    replace_once(
+        network_cpp,
+        """Errno Socket::Close() {
+    [[maybe_unused]] const int result = closesocket(fd);
+""",
+        """Errno Socket::Close() {
+    if (TryParkNextendoUdpSocket(fd, is_non_blocking)) {
+        fd = INVALID_SOCKET;
+        return Errno::SUCCESS;
+    }
+
+    [[maybe_unused]] const int result = closesocket(fd);
+""",
+    )
 
     # Connect Eden's nn::friends HLE to the NEX-owned read-only cache.
     friend_cpp = eden / "src/core/hle/service/friend/friend.cpp"
