@@ -40,4 +40,14 @@ internal object NextendoNativeBridge {
     fun clearIdentity() {
         runCatching { NativeLibrary.clearNextendoIdentity() }
     }
+
+    /** Makes a previously validated, provisioned BAAS JWT available to Eden ACC. */
+    fun updateBaasIdToken(idToken: String) {
+        require(idToken.isNotBlank()) { "BAAS id_token is empty." }
+        NativeLibrary.updateNextendoBaasIdToken(idToken.toByteArray(Charsets.US_ASCII))
+    }
+
+    fun clearBaasIdToken() {
+        runCatching { NativeLibrary.clearNextendoBaasIdToken() }
+    }
 }

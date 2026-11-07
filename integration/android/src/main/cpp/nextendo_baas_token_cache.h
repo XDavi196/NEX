@@ -23,6 +23,8 @@ inline bool IsBase64Url(char value) {
 }
 
 /** Checks the compact-JWS shape; signature verification remains the BAAS server's job. */
+inline void Clear();
+
 inline bool IsCompactJws(const std::uint8_t* data, std::size_t size) {
     if (data == nullptr || size == 0 || size > MaxTokenBytes) {
         return false;

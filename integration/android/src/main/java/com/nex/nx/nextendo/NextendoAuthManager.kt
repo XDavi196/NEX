@@ -130,6 +130,7 @@ object NextendoAuthManager {
 
                 val savedSession = NextendoSessionStore.load(context)
                 savedSession?.let(::syncNativeIdentity)
+                NextendoBaasRuntime.refresh(savedSession)
                 if (savedSession?.let(::hasValidGameToken) == true) {
                     runCatching {
                         NextendoAuthClient.fetchGameFriends(savedSession.nexGameToken)
@@ -215,6 +216,8 @@ object NextendoAuthManager {
                     append(if ("game.matchmaking" in displaySession.grantedScopes) "concedida" else "ausente na resposta OAuth")
                     append("\nPresença Nextendo: ")
                     append(NextendoPresencePublisher.diagnostic())
+                    append("\nToken BAAS no ACC: ")
+                    append(NextendoBaasRuntime.diagnostic)
                     append("\n\nESTATÍSTICAS PÚBLICAS DA REDE")
                     if (networkStats != null) {
                         append("\nJogadores online: ")
@@ -247,6 +250,7 @@ object NextendoAuthManager {
                         NextendoPresencePublisher.stop(activity)
                         NextendoNativeBridge.clearFriendCache()
                         NextendoNativeBridge.clearIdentity()
+                        NextendoBaasRuntime.clear()
                         runCatching { NextendoSessionStore.clear(activity) }
                         Toast.makeText(
                             activity,
@@ -362,6 +366,7 @@ object NextendoAuthManager {
             }
         }
         syncNativeIdentity(session)
+        NextendoBaasRuntime.refresh(session)
         return session
     }
 
@@ -389,6 +394,7 @@ object NextendoAuthManager {
                 NextendoPresencePublisher.start(context)
                 val session = NextendoSessionStore.load(context)
                 session?.let(::syncNativeIdentity)
+                NextendoBaasRuntime.refresh(session)
                 val gameTokenReady = session?.let(::hasValidGameToken) == true
                 if (session != null && gameTokenReady) {
                     runCatching {
