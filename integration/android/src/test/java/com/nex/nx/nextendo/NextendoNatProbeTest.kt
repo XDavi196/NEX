@@ -31,10 +31,10 @@ class NextendoNatProbeTest {
     fun classifiesSameMappingAsConeAndDifferentPortsAsSymmetric() {
         val cone = NextendoNatProbeTracker(setOf("primary", "secondary"))
         cone.begin()
-        assertNull(cone.record("primary", response(101L, 45000, "198.51.100.5", "203.0.113.10")))
+        assertNull(cone.record("primary", probeResponse(101L, 45000, "198.51.100.5", "203.0.113.10")))
         val coneResult = cone.record(
             "secondary",
-            response(102L, 45000, "198.51.100.5", "203.0.113.11")
+            probeResponse(102L, 45000, "198.51.100.5", "203.0.113.11")
         )
         assertEquals(NextendoNatProbeTracker.NatType.CONE, coneResult?.type)
         assertEquals(NextendoNatProbeTracker.State.CLASSIFIED, cone.state)
@@ -44,10 +44,10 @@ class NextendoNatProbeTest {
 
         val symmetric = NextendoNatProbeTracker(setOf("primary", "secondary"))
         symmetric.begin()
-        symmetric.record("primary", response(101L, 45000, "198.51.100.5", "203.0.113.10"))
+        symmetric.record("primary", probeResponse(101L, 45000, "198.51.100.5", "203.0.113.10"))
         val symmetricResult = symmetric.record(
             "secondary",
-            response(102L, 45001, "198.51.100.5", "203.0.113.11")
+            probeResponse(102L, 45001, "198.51.100.5", "203.0.113.11")
         )
         assertEquals(NextendoNatProbeTracker.NatType.SYMMETRIC, symmetricResult?.type)
         symmetric.close()
@@ -57,10 +57,10 @@ class NextendoNatProbeTest {
     fun unknownWhenExternalAddressChangesAcrossVantages() {
         val tracker = NextendoNatProbeTracker(setOf("primary", "secondary"))
         tracker.begin()
-        tracker.record("primary", response(101L, 45000, "198.51.100.5", "203.0.113.10"))
+        tracker.record("primary", probeResponse(101L, 45000, "198.51.100.5", "203.0.113.10"))
         val result = tracker.record(
             "secondary",
-            response(102L, 45000, "198.51.100.6", "203.0.113.11")
+            probeResponse(102L, 45000, "198.51.100.6", "203.0.113.11")
         )
         assertEquals(NextendoNatProbeTracker.NatType.UNKNOWN, result?.type)
         tracker.close()
@@ -85,6 +85,16 @@ class NextendoNatProbeTest {
             expectedTestId = 101L
         )
     }
+
+    private fun probeResponse(
+        testId: Long,
+        externalPort: Int,
+        externalAddress: String,
+        serverAddress: String
+    ): NextendoNatProbeCodec.Response = NextendoNatProbeCodec.decodeResponse(
+        response(testId, externalPort, externalAddress, serverAddress),
+        expectedTestId = testId
+    )
 
     private fun response(
         testId: Long,
