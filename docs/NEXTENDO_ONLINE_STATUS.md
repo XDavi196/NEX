@@ -9,22 +9,28 @@ A successful APK build proves that the configured Android source and native tool
 - Original requested baseline: [Actions run #54](https://github.com/XDavi196/NEX/actions/runs/42193366726), successful.
 - Original baseline release: [NEX v0.1.0-alpha.54](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.54).
 - Intermediate verified build: [Actions run #97](https://github.com/XDavi196/NEX/actions/runs/42321531501), successful.
-- Last verified baseline before this visual cleanup: [Actions run #102](https://github.com/XDavi196/NEX/actions/runs/42382244088), successful.
+- Previous verified baseline: [Actions run #102](https://github.com/XDavi196/NEX/actions/runs/42382244088), successful.
+- Latest verified visual build: [Actions run #103](https://github.com/XDavi196/NEX/actions/runs/42395716701), successful.
+- Release: [NEX v0.1.0-alpha.103](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.103).
+- APK: `NEX-Android-v0.2.0-rc1-optimized.apk`, 27,276,975 bytes.
+- Direct APK: [Download alpha.103](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.103/NEX-Android-v0.2.0-rc1-optimized.apk).
+- Release includes `SHA256SUMS.txt`.
 - Run #102 source commit: \`1eeaef07c96ae9d365c9739c22eb523c857937c2\`.
 - Release: [NEX v0.1.0-alpha.102](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.102).
 - APK: \`NEX-Android-v0.2.0-rc1-optimized.apk\`, 27,281,806 bytes.
 - GitHub release asset SHA-256: \`2ae9258b771204107e5aad879122d1ab77ae83f27517b292458207c96fda2cc4\`.
 - Release also includes \`SHA256SUMS.txt\`.
 - Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It requested all six portal scopes.
-- Commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` restores the original NEX logo and removes the fragment-wide glass treatment. Run #103 is the verification build for those changes; it is still in progress.
-- Commit `0584d738af5834f49f5f60f8c7722c40dc31cda9` adds OAuth-scope and presence diagnostics. The current commit adds persisted game-token endpoint diagnostics; its CI run must validate these changes before release.
+- Commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` restores the original NEX logo and removes the fragment-wide glass treatment; this is included in successful run #103 and release alpha.103.
+- Commit `0584d738af5834f49f5f60f8c7722c40dc31cda9` adds OAuth-scope and presence diagnostics (run #104).
+- Commits `36c38dd3333eae4b1e37340686371dd5c6e4f91d` and `c75cc2afa148b007959b2506fdbb353738609c4e` add encrypted persistence of the `/api/nex-token` result and show the diagnostic after login. Run #106 was queued after these commits.
 - Pinned Eden source: \`v0.2.0-rc1\`, commit \`8e373eb714aa01117ec885680477501cdb572112\`.
 - Android application ID: \`com.nex.nx\`.
 - OAuth callback: \`com.nex.nx://oauth/callback\`.
 - NEX public OAuth Client ID: \`nxc_yAdR-14bOEq7\`.
 - Development branch: \`nex/eden-v0.2.0-rc1-nextendo\`.
 
-Run #102 verified code commit \`1eeaef07c96ae9d365c9739c22eb523c857937c2\`. The logo and visual cleanup in the current branch are newer source changes and are not covered by that APK until the next build completes.
+Run #103 verifies source commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` and includes the requested visual cleanup. It does not contain the later runtime-diagnostic commits; those require run #106 or a later successful build.
 
 ## Implemented in NEX
 
