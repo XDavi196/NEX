@@ -59,7 +59,6 @@ class NextendoBaasAuthenticationInfoTest {
             "iss" to JsonPrimitive("https://baas.example.test/issuer"),
             "aud" to JsonPrimitive("smm2-test"),
             "sub" to JsonPrimitive("test-player"),
-            "jku" to JsonPrimitive("https://baas.example.test/1.0.0/certificates"),
             "hm" to JsonPrimitive(true)
         )
         val idToken = NextendoBaasIdTokenBuilder.build(
