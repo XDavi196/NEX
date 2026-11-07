@@ -265,7 +265,8 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
         acc_cpp,
         '#include "core/hle/service/acc/acc.h"\n',
         '#include "core/hle/service/acc/acc.h"\n'
-        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n',
+        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n'
+        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n',
     )
     replace_once(
         acc_cpp,
