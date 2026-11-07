@@ -50,4 +50,18 @@ internal object NextendoNativeBridge {
     fun clearBaasIdToken() {
         runCatching { NativeLibrary.clearNextendoBaasIdToken() }
     }
+
+    /**
+     * Installs one explicit hostname-to-IPv4 route in Eden's guest DNS resolver.
+     * The resolver keeps the original hostname in its result for TLS/SNI.
+     */
+    fun updateDnsRedirect(hostname: String, ipv4: String) {
+        require(NativeLibrary.updateNextendoDnsRedirect(hostname, ipv4)) {
+            "Nextendo DNS route was rejected. Use one exact hostname and a valid IPv4 address."
+        }
+    }
+
+    fun clearDnsRedirects() {
+        runCatching { NativeLibrary.clearNextendoDnsRedirects() }
+    }
 }
