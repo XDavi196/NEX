@@ -1,6 +1,8 @@
 package com.nex.nx.nextendo
 
 import android.content.Context
+import android.util.Base64
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
@@ -18,6 +20,11 @@ import java.util.concurrent.TimeUnit
 object NextendoPresencePublisher {
     private const val HEARTBEAT_SECONDS = 60L
     private const val TOKEN_REFRESH_MARGIN_SECONDS = 90L
+    private const val HOME_MENU_TITLE_ID = "0100000000001000"
+    private val HOME_MENU_APP_FIELD = Base64.encodeToString(
+        "sys_description\u0000HOME Menu · NEX\u0000".toByteArray(StandardCharsets.UTF_8),
+        Base64.NO_WRAP
+    )
 
     private val lock = Any()
     private val executor: ScheduledExecutorService =
@@ -77,7 +84,17 @@ object NextendoPresencePublisher {
         executor.execute { publishCurrentPresence() }
     }
 
-    /** Return to ordinary online status when no game is running. */
+    /** Publish the actual Switch HOME Menu identity while qLaunch is active. */
+    fun setHomeMenuActivity(context: Context) {
+        setGameActivity(
+            context,
+            HOME_MENU_TITLE_ID,
+            "HOME",
+            HOME_MENU_APP_FIELD
+        )
+    }
+
+    /** Return to ordinary online status when no game or qLaunch is active. */
     fun clearGameActivity(context: Context) {
         gameTitleId = ""
         gameDetail = ""
