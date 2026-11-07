@@ -48,7 +48,7 @@ internal object NextendoBaasIdTokenBuilder {
             "The nnex claim is reserved for the validated Nextendo game token."
         }
 
-        requireHttpsUrl(claims["iss"]?.let(::jsonString), "iss")
+        requireHttpsUrl(jsonString(claims["iss"]), "iss")
         requireHttpsUrl(signer.jwksUrl, "jku")
         requireNonBlankStringClaim(claims, "aud")
         requireNonBlankStringClaim(claims, "sub")
@@ -82,8 +82,10 @@ internal object NextendoBaasIdTokenBuilder {
         return encodedHeader + "." + encodedPayload + "." + base64Url(signature)
     }
 
-    private fun jsonString(value: JsonElement?): String? =
-        (value as? JsonPrimitive)?.contentOrNull
+    private fun jsonString(value: JsonElement?): String? {
+        val primitive = value as? JsonPrimitive ?: return null
+        return primitive.contentOrNull.takeIf { primitive.isString }
+    }
 
     private fun requireHttpsUrl(value: String?, name: String) {
         val uri = value?.let { runCatching { URI(it) }.getOrNull() }
