@@ -64,10 +64,10 @@ internal object NextendoBaasAuthenticationInfo {
             write(fields)
         }.toByteArray()
 
-        // DataHolder: name, u32(body length + 4), then a Buffer(body).
+        // DataHolder: name followed by one NEX Buffer containing the versioned structure.
+        // This matches the public Nextendo server's wrapAsExtraData serialization.
         return ByteArrayOutputStream().apply {
             writeNexString(HOLDER_NAME)
-            writeUInt32(structure.size + 4)
             writeUInt32(structure.size)
             write(structure)
         }.toByteArray()

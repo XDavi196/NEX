@@ -31,10 +31,8 @@ class NextendoBaasAuthenticationInfoTest {
 
         val input = ByteBuffer.wrap(extraData).order(ByteOrder.LITTLE_ENDIAN)
         assertEquals("AuthenticationInfo", readNexString(input))
-        val holderSize = input.int
         val dataSize = input.int
-        assertEquals(extraData.size - 2 - "AuthenticationInfo".toByteArray(StandardCharsets.UTF_8).size - 1 - 8, dataSize)
-        assertEquals(dataSize + 4, holderSize)
+        assertEquals(extraData.size - input.position(), dataSize)
 
         assertEquals(1, input.get().toInt() and 0xFF)
         val structureFieldSize = input.int
