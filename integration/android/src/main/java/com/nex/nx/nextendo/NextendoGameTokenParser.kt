@@ -13,9 +13,15 @@ internal object NextendoGameTokenParser {
         fun requiredString(field: String): String =
             payload[field]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                 ?: throw IllegalArgumentException("Nextendo game-token response is missing $field.")
-        fun requiredLong(field: String): Long =
-            payload[field]?.jsonPrimitive?.longOrNull
+        fun requiredLong(field: String): Long {
+            val primitive = payload[field]?.jsonPrimitive
                 ?: throw IllegalArgumentException("Nextendo game-token response is missing a valid $field.")
+            require(!primitive.isString) {
+                "Nextendo game-token response field $field must be a JSON integer, not a string."
+            }
+            return primitive.longOrNull
+                ?: throw IllegalArgumentException("Nextendo game-token response is missing a valid $field.")
+        }
 
         val token = requiredString("nex_token")
         require(token.startsWith("nx2.") && token.length > 4) { "Nextendo returned a malformed nx2 game token." }

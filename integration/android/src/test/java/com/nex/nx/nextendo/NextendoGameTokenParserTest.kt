@@ -33,6 +33,11 @@ class NextendoGameTokenParserTest {
         invalid("""{"nex_token":"nx2.opaque","pid":1,"username":"Player","expires_in":0}""", now)
     }
 
+    @Test fun rejectsStringValuesForIntegerFields() {
+        invalid("""{"nex_token":"nx2.opaque","pid":"1800000001","username":"Player","expires_in":60}""", now)
+        invalid("""{"nex_token":"nx2.opaque","pid":1800000001,"username":"Player","expires_in":"86400"}""", now)
+    }
+
     @Test fun rejectsExpiryOverflow() = invalid(
         """{"nex_token":"nx2.opaque","pid":1,"username":"Player","expires_in":60}""", Long.MAX_VALUE - 10L)
 

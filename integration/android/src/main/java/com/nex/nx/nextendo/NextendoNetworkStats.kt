@@ -21,6 +21,9 @@ internal object NextendoNetworkStatsParser {
         fun count(name: String): Long {
             val primitive = root[name] as? JsonPrimitive
                 ?: throw IllegalArgumentException("Nextendo stats response is missing $name.")
+            require(!primitive.isString) {
+                "Nextendo stats field $name must be a JSON integer, not a string."
+            }
             val value = primitive.longOrNull
                 ?: throw IllegalArgumentException("Nextendo stats field $name is not an integer.")
             require(value >= 0L) { "Nextendo stats field $name cannot be negative." }

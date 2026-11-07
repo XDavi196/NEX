@@ -20,6 +20,7 @@ class NextendoNetworkStatsParserTest {
     fun rejectsMissingOrNonIntegerCounters() {
         invalid("""{"online_players":2,"games_online":1}""")
         invalid("""{"online_players":"2","total_registered":10,"games_online":1}""")
+        invalid("""{"online_players":2,"total_registered":"10","games_online":1}""")
         invalid("""{"online_players":2.5,"total_registered":10,"games_online":1}""")
     }
 
