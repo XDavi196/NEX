@@ -77,9 +77,11 @@ A validação TLS da plataforma permanece ativa; nenhum certificado é ignorado.
 
 ## 7. NAT e P2P
 
-Foi implementado o parser de um probe NNCS de 16 bytes e um tracker de duas observações para classificar mapeamentos iguais, portas diferentes ou observações inconclusivas. O tracker limpa os dados em close().
+O NEX tem o parser de um probe NNCS de 16 bytes e um tracker de duas observações para classificar mapeamentos iguais, portas diferentes ou observações inconclusivas.
 
-Isso não preserva o socket UDP do jogo. Não existe ainda integração com o ciclo de vida do socket BSD do Eden, keepalive, descoberta de jogadores, negociação de sessão, hole-punching ou teardown P2P. Os endpoints e portas NNCS são específicos por título; não foram copiados os ports de Mario Kart 8 para o SMM2.
+O overlay também liga um cache limitado de sockets UDP à camada de rede nativa do Eden. Enquanto existe um PID Nextendo ativo, sockets UDP vinculados e não conectados podem ser estacionados por cinco segundos quando o jogo os fecha. Se o jogo reabrir a mesma porta no mesmo IP local dentro desse intervalo, o Eden recupera o mesmo socket do host e preserva o mapeamento NAT. O cache é limitado a oito sockets e é limpo em troca/logout de conta ou encerramento da instância de rede. Há testes determinísticos para reuso, endereço incompatível, expiração, substituição, limite e limpeza.
+
+Isso fecha a parte de preservação do socket durante o padrão probe/close/reopen, mas ainda não implementa os sockets de probe NNCS, keepalive periódico, descoberta de peers, sinalização de matchmaking, hole-punching UDP nem teardown coordenado da sessão. Os endpoints e portas NNCS são específicos por título; não copiamos os ports de Mario Kart 8 para o SMM2. O fluxo precisa ser validado em dois dispositivos reais.
 
 ## 8. Segurança e bloqueios
 
@@ -87,7 +89,7 @@ Isso não preserva o socket UDP do jogo. Não existe ainda integração com o ci
 - Não inventar hostnames, endereços IP, access keys, claims, formatos de pacote ou regras de aceitação.
 - Não desativar verificação de certificado TLS.
 - Não publicar AppField fictício.
-- Não converter PID em NSA ou UUID.
+- Usar o PID persistente como NetworkServiceAccountId apenas no mapeamento definido pelo serviço Nextendo; nunca derivar UUID de Switch a partir do PID.
 - Não declarar multiplayer funcional sem teste com duas contas NEX, dois dispositivos e um jogo Nextendo suportado.
 
 Bloqueios externos atuais: chave BAAS/attestation específica do NEX; contrato JWT/JWKS; alinhamento das rotas OAuth públicas; NSA/UUID por amigo; endpoint e access key do SMM2; payloads de matchmaking; mapa DNS/TLS/SNI; e fluxo NNCS/P2P do título.
