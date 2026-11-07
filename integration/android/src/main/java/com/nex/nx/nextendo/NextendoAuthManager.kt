@@ -339,6 +339,46 @@ object NextendoAuthManager {
             session.pid > 0L
     }
 
+    /**
+     * Rehydrates process-local ACC identity before a game starts.
+     *
+     * Android Keystore-backed session data survives app restarts, but the native
+     * Eden cache does not. Restore it synchronously from the encrypted local
+     * session, then refresh OAuth/game credentials and the friend snapshot off
+     * the UI thread.
+     */
+    fun restoreCachedIdentity(context: Context) {
+        val cached = runCatching { NextendoSessionStore.load(context) }.getOrNull()
+        if (cached == null) {
+            NextendoNativeBridge.clearIdentity()
+            NextendoNativeBridge.clearFriendCache()
+            NextendoBaasRuntime.clear()
+            return
+        }
+
+        syncNativeIdentity(cached)
+        NextendoBaasRuntime.refresh(cached)
+
+        executor.execute {
+            val active = runCatching {
+                refreshSessionIfNeeded(context)
+            }.getOrElse {
+                cached
+            }
+
+            syncNativeIdentity(active)
+            NextendoBaasRuntime.refresh(active)
+            if (hasValidGameToken(active)) {
+                runCatching {
+                    NextendoAuthClient.fetchGameFriends(active.nexGameToken)
+                }.onSuccess(NextendoNativeBridge::replaceFriendCache)
+                    .onFailure { NextendoNativeBridge.clearFriendCache() }
+            } else {
+                NextendoNativeBridge.clearFriendCache()
+            }
+        }
+    }
+
     private fun syncNativeIdentity(session: NextendoSessionStore.Session) {
         // The HOME Menu needs the linked account identity even when the game-token
         // endpoint is not yet enabled for this public client. Game authentication
