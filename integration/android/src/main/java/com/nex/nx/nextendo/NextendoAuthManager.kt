@@ -88,6 +88,9 @@ object NextendoAuthManager {
                 )
 
                 NextendoSessionStore.saveFreshOAuthTokens(context, tokens)
+                // A new OAuth grant may belong to a different player. Remove the
+                // previous guest-visible BAAS identity before any network call.
+                NextendoBaasRuntime.clear()
                 NextendoSessionStore.clearPendingAuthorization(context)
                 NextendoNativeBridge.clearFriendCache()
                 NextendoNativeBridge.clearIdentity()
