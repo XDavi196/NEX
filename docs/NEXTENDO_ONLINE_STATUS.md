@@ -95,6 +95,8 @@ The BAAS builder is connected through `NextendoBaasRuntime` to Eden's ACC token 
 - Eden's native network layer now has an NEX UDP socket keeper. While a Nextendo PID is active, a bound, unconnected UDP socket can be parked for five seconds when the guest closes it.
 - The keeper holds at most eight sockets, keys them by local port, and adopts only when the next bind uses the same local IPv4 address. It closes expired/replaced entries and clears all parked sockets on account change/logout or network-instance shutdown.
 - This implements the short close/reopen preservation used by P2P NAT-probe flows; it does not itself send NNCS probes, schedule keepalives, discover peers, signal matchmaking, or perform UDP hole-punching.
+- The public `nextendo-nncs` source documents UDP ports `10025` and `10125` for Mario Kart 8's `nncs1-lp1`/`nncs2-lp1` probes. Those are title-specific MK8 values and are deliberately not copied into the SMM2 profile.
+- No public SMM2-specific NNCS hostname/port pair, second-vantage mapping or NAT probe lifecycle has been confirmed.
 - The native cache has deterministic tests for same-port adoption, address mismatch, expiry, replacement, capacity and cleanup. The full Android overlay still requires successful compilation and runtime validation on two devices.
 
 ## Current Nextendo public-contract audit
