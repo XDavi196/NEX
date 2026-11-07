@@ -63,3 +63,8 @@ The profile and serializers are code-level progress. They do not establish that 
 The ticket codec consumes the one-time source key returned by the LoginEx response to decrypt the outer ClientTicket and recover the session key plus opaque inner server ticket. It does not derive or contain the secure server's Kerberos password. The secure CONNECT payload encrypts the PID/CID/check tuple with the recovered session key and validates the server's incremented check reply.
 
 The auth/secure WSS coordinator takes an explicit original auth hostname and negotiated PRUDP station values. It preserves TLS hostname verification and follows the actual secure StationURL returned by LoginEx; it contains no guessed production host/IP, server password or attestation key. It is protocol code and is not yet wired into the guest game's own socket lifecycle.
+
+
+## AuthenticationInfo wire-format verification
+
+The DataHolder is encoded as the NEX String `AuthenticationInfo` followed by exactly one NEX Buffer. The Buffer body is a version-1 NEX Structure: one version byte, one little-endian u32 content length, then the structure fields (`Token` NEX String, `NGSVersion` u32, `TokenType` u8 and `ServerVersion` u32). This matches the public Nextendo test helper's `String("AuthenticationInfo")` + `Buffer(body)` and the public NEX `WriteStructure` implementation. The former extra outer u32 length has been removed. The LoginEx RMC request then appends this complete DataHolder as raw `extraData` immediately after the username NEX String.

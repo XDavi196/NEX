@@ -41,7 +41,7 @@ The first in-game validation target is **Super Mario Maker 2**. Nextendo publish
 
 ### Where to find it
 
-The verified `v0.1.0-alpha.108` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
+The verified `v0.1.0-alpha.121` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
 
 ### Connecting your account
 
@@ -75,7 +75,7 @@ The latest verified Android APK is the experimental prerelease:
 
 **[NEX v0.1.0-alpha.121 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.121/NEX-Android-v0.2.0-rc1-optimized.apk)
 
-The release includes `SHA256SUMS.txt`. Alpha.121 is built from commit `88df712f`; it contains the PRUDP-Lite transport, NEX branding, BAAS builder and public SMM2 profile. It does **not** contain the newer ACC bridge and LoginEx/ticket codecs now in the development branch, and it does not provide working in-game multiplayer. Those additions are being validated by Actions run #131.
+The release includes `SHA256SUMS.txt`. Alpha.121 is built from commit `88df712f`; it contains the PRUDP-Lite transport, NEX branding, BAAS builder and public SMM2 profile. It does **not** contain the newer ACC bridge and LoginEx/ticket codecs now in the development branch, and it does not provide working in-game multiplayer. Those additions are being validated by Actions run #135.
 
 This is an experimental preview, not a stable or online-ready release.
 

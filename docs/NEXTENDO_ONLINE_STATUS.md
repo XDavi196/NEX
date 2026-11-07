@@ -9,8 +9,10 @@ A successful APK build proves that the configured Android source and native tool
 - Latest verified Android APK: [NEX v0.1.0-alpha.121](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121), from successful [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607).
 - Direct APK: [Download alpha.121](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.121/NEX-Android-v0.2.0-rc1-optimized.apk). APK size 27,285,729 bytes; release includes `SHA256SUMS.txt`.
 - Run #121 built source commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. Native tests, Kotlin tests, Android optimized APK build, artifact upload and prerelease publication all passed. This APK includes the BAAS builder and public SMM2 profile but predates the ACC bridge, LoginEx/ticket codecs and session coordinator.
-- [Actions run #131](https://github.com/XDavi196/NEX/actions/runs/42405238518) is the current validation for the ACC bridge and SMM2 LoginEx/ticket source, commit `9d5c6e02ca6999e7bb912b6f4a6d6e475065b60c`. At this update it has started and is installing the pinned Android toolchain; no artifact is available yet.
-- The current branch is `nex/eden-v0.2.0-rc1-nextendo`, head `affe2c965bef3f53a3d5c8a1a4feb4bb76d10861`. The latest commit after #131's source is documentation-only.
+- [Run #132](https://github.com/XDavi196/NEX/actions/runs/42405574408) passed the native friend-cache/BAAS-cache test and all Kotlin/Nextendo unit tests, and is still building the Android Optimized APK from commit `3359151b51fd88632fc642f2ead204ef669acac0`. It predates the AuthenticationInfo framing correction and account-switch cache clear; no APK from this run is verified.
+- Runs #133 and #134 were automatically cancelled/superseded as newer commits entered the single-branch concurrency queue; these are not test failures.
+- [Run #135](https://github.com/XDavi196/NEX/actions/runs/42406074897) is pending. It includes the corrected single-Buffer AuthenticationInfo DataHolder framing, explicit native `<algorithm>` include and immediate BAAS cache clearing on account switch.
+- Current branch: `nex/eden-v0.2.0-rc1-nextendo`, head `9cc4e677cd19b983e693eddf348597f0d42484e1`.
 - Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 - Android application ID: `com.nex.nx`.
 - OAuth callback: `com.nex.nx://oauth/callback`.
@@ -229,17 +231,21 @@ The public \`nextendo-account\` source currently differs from the Developer Docu
 
 ### BAAS builder boundary
 
-\`NextendoBaasIdTokenBuilder\` builds the RS256 compact JWT with the NEX-provisioned \`kid\` and JWS \`jku\` header, externally supplied \`iss\`, \`aud\` and \`sub\`, \`hm=true\`, and the current server-issued \`nx2.\` token in the \`nnex\` claim. \`NextendoBaasAuthenticationInfo\` wraps that JWT as the \`Token\` field in an \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\` (SMM2 server version \`40000\`). The signer exposes only an interface; no private key or production fallback is included. The payload builder and DataHolder encoder are not yet connected to Eden ACC. Unit tests use a fake signer solely for local serialization and rejection checks. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
+`NextendoBaasIdTokenBuilder` builds the RS256 compact JWT with the NEX-provisioned `kid` and JWS `jku` header, externally supplied `iss`, `aud` and `sub`, `hm=true`, and the current server-issued `nx2.` token in the `nnex` claim. `NextendoBaasAuthenticationInfo` encodes the JWT as the `Token` field in an `AuthenticationInfo` DataHolder for `LoginEx.extraData` (SMM2 server version `40000`).
+
+The DataHolder encoding matches the public Nextendo helper: NEX String `AuthenticationInfo`, followed by one NEX Buffer containing the version-1 structure header and its content-length-prefixed fields. The Android runtime feeds the exact compact JWT into Eden's ACC cache only when a NEX-specific signer/claims provider exists.
+
+The bridge is now connected, but no production signer or private key is included. The cache therefore remains empty until NEX's BAAS/JWKS and required attestation are provisioned. Unit tests use a fake signer only for local serialization and rejection checks. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
+
 
 
 ## Latest source update — 7 November 2026
 
-The development branch now includes the public SMM2 profile, BAAS JWT builder and AuthenticationInfo DataHolder serializer. The Android BAAS builder has a fail-closed signer interface: no production signing key, JWK registration, issuer/audience/subject mapping or client-attestation material is embedded in the client. The payload builders are not yet wired into Eden ACC/LoginEx.
+The development branch now includes the ACC cache bridge, the fail-closed Android BAAS provider boundary, the public SMM2 profile, LoginEx request/response codecs, client-ticket decryption, secure CONNECT proof construction and an explicit auth/secure WSS coordinator. The AuthenticationInfo DataHolder encoder was corrected to match the public server helper and public NEX structure writer: one outer Buffer length followed by a version-1 structure containing its own content length. A new-login callback also clears the previous account's BAAS cache before doing more network work.
 
-Run #121 is the first CI run that includes these BAAS/SMM2 source changes. Its completion will establish whether the Kotlin and Android project compile; it will not establish a live BAAS login or successful SMM2 matchmaking. The current branch remains a development branch, not a complete online release.
+Run #132 passed its native cache and Kotlin/Nextendo test steps and is still building the Android APK; this run predates the DataHolder framing correction, explicit native `<algorithm>` include and account-switch cache clear. Run #135 is pending with those final corrections. Neither a successful build nor the session harness proves a live BAAS login or successful SMM2 matchmaking. The current branch remains a development branch, not a complete online release.
 
 The public [Nextendo Developer Documentation](https://wiki.nextendo.network/developers) describes OAuth PKCE, a separate `nx2.` game token, the `nnex` BAAS claim and public aggregate `/api/stats`. The official [architecture](https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md) and [deployment guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md) show that online play additionally requires title DNS redirection, TLS/SNI, device authentication, a per-game auth/secure server, NNCS NAT checks and P2P. Addresses and signing secrets are runtime configuration; the public deployment guides use placeholders rather than publishing production IPs or private keys.
-
 
 ## Client attestation source note
 
@@ -250,6 +256,6 @@ The Nextendo public [Ryujinx-Nextendo changelog](https://wiki.nextendo.network/c
 
 The source overlay now adds the native BAAS cache to Eden, exposes JNI update/clear methods and patches application ACC. The cache accepts bounded compact-JWS-shaped bytes; it does not itself verify the RSA signature. The signing provider and Nextendo's live BAAS server/JWKS perform that trust function.
 
-The Android session manager refreshes the ACC cache through `NextendoBaasRuntime`. The runtime clears the cache when there is no valid `nx2.` game token, no installed NEX signing provider or invalid provisioned claims. Since the NEX production signer/JWKS has not been provisioned, the expected diagnostic remains `signer_not_provisioned` and no JWT is currently exposed to the guest.
+The Android session manager refreshes the ACC cache through `NextendoBaasRuntime`. The runtime clears the cache when there is no valid `nx2.` game token, no installed NEX signing provider or invalid provisioned claims. It also clears the previous BAAS identity immediately after a new OAuth grant is stored, before further network calls. Since the NEX production signer/JWKS has not been provisioned, the expected diagnostic remains `signer_not_provisioned` and no JWT is currently exposed to the guest.
 
 The LoginEx and secure ticket codecs have independent unit tests. The auth/secure WSS coordinator requires the original auth hostname and PRUDP station values from a real client/server negotiation; it is not automatically invoked by SMM2's guest socket lifecycle.
