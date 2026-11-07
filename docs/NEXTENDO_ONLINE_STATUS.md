@@ -11,10 +11,10 @@ A successful APK build proves that the configured Android source and native tool
 - Direct APK: [Download alpha.108](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk).
 - APK size: 27,285,737 bytes. The release includes `SHA256SUMS.txt`.
 - Run #108 source commit: `e5c1a235e1ad87551d6e8cc97709713f3a66e0b5`. This build passed the native friend-cache/HLE host test, all then-current Android Nextendo unit tests, the optimized APK build, artifact upload and prerelease publication. It contains PRUDP-Lite transport, WSS adapter and NEX adaptive branding, but predates the BAAS/SMM2 profile additions.
-- Latest BAAS/SMM2 source validation: [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607), triggered for commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. Its native and Kotlin tests passed and the Android APK build was running at the time of this update; no APK or release from #121 is verified yet.
-- [Actions run #122](https://github.com/XDavi196/NEX/actions/runs/42402908702) was automatically cancelled when the newer source fix was queued; it is not a compile failure.
-- [Actions run #123](https://github.com/XDavi196/NEX/actions/runs/42403049793) contains the stats UI-thread fix and is pending behind #121.
-- The current development branch is `nex/eden-v0.2.0-rc1-nextendo`, head `079d8baa7896aa3dbf27cf0dd066dfe45d0fe806`. The commit after #121 is the stats feature and its UI-thread correction.
+- Latest BAAS/SMM2 source validation: [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607), triggered for commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. Its native and Kotlin tests passed; the Android APK build is still in progress and no #121 APK/release is verified.
+- [Runs #122](https://github.com/XDavi196/NEX/actions/runs/42402908702), [#123](https://github.com/XDavi196/NEX/actions/runs/42403049793) and [#124](https://github.com/XDavi196/NEX/actions/runs/42403368156) were superseded/cancelled or remain queued as newer changes were pushed; these are concurrency effects, not confirmed source failures.
+- [Run #125](https://github.com/XDavi196/NEX/actions/runs/42403418659) is the newest queued validation. It includes public network stats on a background executor, Kotlin visibility correction, and strict numeric response parsing tests.
+- The current development branch is `nex/eden-v0.2.0-rc1-nextendo`, head `e4da3cef4c1a27b46507f1cf1d808012f54e70d1`.
 - Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 - Android application ID: `com.nex.nx`.
 - OAuth callback: `com.nex.nx://oauth/callback`.
