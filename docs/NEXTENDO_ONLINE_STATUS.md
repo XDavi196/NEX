@@ -29,9 +29,10 @@ Additional contract-alignment work:
 - OAuth session parsing accepts an access token even when a third-party response omits `refresh_token`; when that access token expires without a refresh credential, the app requests interactive sign-in.
 - Profile and accepted-friend reads use the OAuth-protected `/api/oauth/userinfo` route. Friend records without an explicit presence field are displayed as presence unavailable, not incorrectly labelled offline.
 - Incoming friend requests, presence mutations and game-token issuance are not inferred from routes that the published server source does not authorize for OAuth access tokens.
-- An Android-to-native bridge transfers at most 300 accepted friend PID/name records into a mutex-protected NEX-owned cache and clears it on account replacement/logout.
-- The Eden overlay registers `nn::friends` list-ID, list, friend-detail, profile-list and count handlers against that cache. Native build/ABI verification is pending.
-- HLE presence fields remain neutral/offline because OAuth userinfo does not return live presence. NEX does not fabricate online status, timestamps or AppKeyValueStorage data. Incoming requests, mutations and joinable-room metadata remain unavailable.
+- An Android-to-native bridge transfers at most 300 accepted game-token friend records (PID, NSA, nickname, presence status, current application ID and bounded AppField) into a mutex-protected NEX-owned cache. The friend snapshot is refreshed on the 60-second Nextendo heartbeat; failed refreshes retain the last validated snapshot.
+- The Eden overlay now registers legacy `nn::friends` list/profile handlers and the modern qLaunch SDK commands `GetFriendDetailedInfoV2` (20107), `GetFriendListForViewerV2` (20108), `GetFriendDetailListV2` (20109), `GetFriendPresenceV2` (20111) and `GetUserPresenceViewV2` (20601). Modern list records use the 0x220-byte layout; friend detail and presence buffers use 0x800, 0x80 and 0xE8 bytes respectively. The native build and guest-visible IPC behavior are still pending verification.
+- The overlay carries the parsed game title ID into friend records and maps an explicitly online friend to the qLaunch online state. Unknown title IDs, play history, avatars, timestamps and friendship metadata are left blank; they are not fabricated. The user's own qLaunch presence uses the HOME Menu title ID only when the SDK's V2 presence view is requested.
+- OAuth `/api/oauth/userinfo` alone still does not provide live presence. The richer `/api/friends` refresh remains conditional on a valid `nx2.` game token, following the public account-server implementation. Incoming requests, friend mutations, profile-image delivery and joinable-room metadata remain unavailable.
 - Presence publishing currently uses the NEX-issued `nx2.` token because the inspected public account-server implementation accepts web-session/`nx2.` credentials on `/api/presence`; the NexWiki specifies OAuth `presence` scope instead. This behavior is provisional and must be changed to the documented OAuth flow if Nextendo confirms the production gateway follows the wiki.
 
 These changes are partial account/HLE integration, not a claim that a game can authenticate, join matchmaking or play online.
@@ -84,14 +85,14 @@ The NexWiki is the intended developer contract. NEX keeps OAuth and `nx2.` crede
 
 **Blocker:** a reproducible, permitted client protocol reference and a first supported game's service contract are required before implementing packet formats.
 
-### 3. Game-facing `nn::friends` HLE
+### 3. Game-facing `nn::friends` HLE and qLaunch
 
-- NEX now has a bounded native cache and Android/JNI bridge for OAuth-authorized accepted-friend PID/name records.
-- The overlay registers handlers for `GetFriendListIds`, `GetFriendList`, `UpdateFriendInfo`, `GetFriendCount`, `GetFriendListForViewer`, `GetFriendDetailedInfo`, `GetProfileList` and `GetProfileListV2`, using the 0x200 friend and 0x40 profile layouts verified in the public Den2 implementation and checked against the pinned Eden base. The overlay still requires successful native compilation and IPC tests.
-- Presence IPC remains deliberately incomplete: OAuth userinfo does not return live presence, and NEX does not populate app fields, playing status or timestamps from guesses. Incoming friend requests and mutation commands are also not wired.
+- NEX has a bounded native friend cache and an Android/JNI bridge that now retains the actual friend application ID as well as the PID/NSA, nickname, status and validated AppField.
+- The overlay handles the legacy list/profile commands and adds the modern qLaunch commands 20107, 20108, 20109, 20111 and 20601. The modern list serializer follows the public Nextendo 0x220-byte friend-record layout; the friend-page serializer returns the 0x800-byte detail buffer and places a known current title ID at the documented qLaunch offsets.
+- When the active emulated title is the Switch HOME Menu (`0100000000001000`), the Android presence publisher uses `app_detail=HOME` and the qLaunch description field. The qLaunch own-presence IPC view also returns the HOME Menu title for a linked NEX PID.
+- Friend status and current title data are refreshed with the 60-second account heartbeat. No unknown avatar, play history, friend code, last-seen time or notification data is fabricated.
 
-**Remaining blocker:** native compilation/ABI verification plus a documented OAuth-authorized presence/friend-request contract. The current HLE cache can expose basic accepted-friend identities to game IPC; it does not make game matchmaking or multiplayer work.
-
+**Remaining blocker:** the current overlay commit must pass the full pinned-Eden native/Android build, then be exercised in qLaunch with a linked Nextendo account and live friends. Profile images, online notifications, received requests, friend mutations and some profile-page fields remain incomplete. This menu/HLE work does not make game matchmaking or multiplayer work.
 ### 4. Title-scoped DNS and TLS/SNI
 
 - The deployment guide requires DNS redirection of the relevant retail online hostnames, TLS certificates valid for those hostnames, and SNI routing to the correct title service.
