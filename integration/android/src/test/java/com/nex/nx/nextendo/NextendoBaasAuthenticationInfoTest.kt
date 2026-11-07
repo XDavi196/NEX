@@ -5,14 +5,15 @@ import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 import kotlinx.serialization.json.JsonPrimitive
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
 class NextendoBaasAuthenticationInfoTest {
     private class TestSigner : NextendoBaasSigner {
         override val keyId = "nex-test-key"
+        override val jwksUrl = "https://baas.example.test/1.0.0/certificates"
         override fun signRs256(signingInput: ByteArray) = byteArrayOf(0x41, 0x42, 0x43)
     }
 
@@ -23,7 +24,6 @@ class NextendoBaasAuthenticationInfoTest {
             "iss" to JsonPrimitive("https://baas.example.test/issuer"),
             "aud" to JsonPrimitive("smm2-test"),
             "sub" to JsonPrimitive("test-player"),
-            "jku" to JsonPrimitive("https://baas.example.test/1.0.0/certificates"),
             "hm" to JsonPrimitive(true)
         )
         val idToken = NextendoBaasIdTokenBuilder.build(claims, gameToken, TestSigner())
