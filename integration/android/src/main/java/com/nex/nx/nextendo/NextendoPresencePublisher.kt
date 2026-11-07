@@ -172,6 +172,13 @@ object NextendoPresencePublisher {
                 appDetail = if (inGame) gameDetail else ""
             )
         }
+
+        // Keep qLaunch's in-process friends cache in sync while the menu stays open.
+        // Failed network refreshes leave the last validated snapshot in place.
+        runCatching {
+            NextendoAuthClient.fetchGameFriends(accessToken)
+        }.onSuccess(NextendoNativeBridge::replaceFriendCache)
+
         // Network failures are retried on the next heartbeat; never log tokens.
     }
 }
