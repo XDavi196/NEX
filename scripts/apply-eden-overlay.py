@@ -630,6 +630,118 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         RespondNextendoFriendDetails(ctx, "GetFriendDetailedInfo");
     }
 
+    // SDK 20+: qLaunch asks for the 0x800-byte detailed friend record when a tile is opened.
+    void GetFriendDetailedInfoV2(HLERequestContext& ctx) {
+        IPC::RequestParser rp{ctx};
+        [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
+        const auto requested_id = rp.Pop<u64>();
+        std::array<u8, NextendoFriendDetailedInfoV2Size> output{};
+        const auto friends = Common::NextendoFriendCache::Get();
+        const auto found = std::find_if(friends.begin(), friends.end(),
+            [requested_id](const auto& entry) {
+                return entry.pid == requested_id ||
+                    entry.network_service_account_id == requested_id;
+            });
+        if (found != friends.end()) {
+            WriteNextendoFriendDetailedInfoV2(output, *found, requested_id);
+        }
+        ctx.WriteBuffer(output);
+        LOG_INFO(Service_Friend, "[NEX Nextendo] GetFriendDetailedInfoV2 id={} found={}",
+                 requested_id, found != friends.end());
+        IPC::ResponseBuilder rb{ctx, 2};
+        rb.Push(ResultSuccess);
+    }
+
+    // SDK 22+: modern HOME Menu list. Records use a 0x220-byte stride.
+    void GetFriendListForViewerV2(HLERequestContext& ctx) {
+        IPC::RequestParser rp{ctx};
+        [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
+        const auto offset = rp.Pop<s32>();
+        [[maybe_unused]] const auto filter = rp.PopRaw<SizedFriendFilter>();
+        const auto friends = Common::NextendoFriendCache::Get();
+        const auto output_bytes =
+            ctx.GetWriteBufferNumElements<u64>() * sizeof(u64);
+        const auto capacity = output_bytes / NextendoFriendRecordV2Size;
+        std::size_t count = 0;
+        std::vector<u8> output;
+        if (offset >= 0 && static_cast<std::size_t>(offset) < friends.size()) {
+            count = std::min(friends.size() - static_cast<std::size_t>(offset), capacity);
+            output.resize(count * NextendoFriendRecordV2Size);
+            for (std::size_t i = 0; i < count; ++i) {
+                const auto& entry = friends[static_cast<std::size_t>(offset) + i];
+                WriteNextendoFriendRecordV2(
+                    output.data() + i * NextendoFriendRecordV2Size, entry, entry.pid);
+            }
+        }
+        if (!output.empty()) {
+            ctx.WriteBuffer(output);
+        }
+        LOG_INFO(Service_Friend, "[NEX Nextendo] GetFriendListForViewerV2 offset={} count={}",
+                 offset, count);
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+        rb.Push<u32>(static_cast<u32>(count));
+    }
+
+    // SDK 22+: fills one 0x220-byte modern friend record for each requested PID/NSA.
+    void GetFriendDetailListV2(HLERequestContext& ctx) {
+        IPC::RequestParser rp{ctx};
+        [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
+        const auto requested = ReadNextendoPids(ctx);
+        const auto output_bytes =
+            ctx.GetWriteBufferNumElements<u64>() * sizeof(u64);
+        const auto capacity = output_bytes / NextendoFriendRecordV2Size;
+        const auto count = std::min(requested.size(), capacity);
+        const auto friends = Common::NextendoFriendCache::Get();
+        std::vector<u8> output(count * NextendoFriendRecordV2Size);
+        for (std::size_t i = 0; i < count; ++i) {
+            const auto requested_id = requested[i];
+            const auto found = std::find_if(friends.begin(), friends.end(),
+                [requested_id](const auto& entry) {
+                    return entry.pid == requested_id ||
+                        entry.network_service_account_id == requested_id;
+                });
+            if (found != friends.end()) {
+                WriteNextendoFriendRecordV2(
+                    output.data() + i * NextendoFriendRecordV2Size, *found, requested_id);
+            }
+        }
+        if (!output.empty()) {
+            ctx.WriteBuffer(output);
+        }
+        LOG_INFO(Service_Friend, "[NEX Nextendo] GetFriendDetailListV2 ids={} returned={}",
+                 requested.size(), count);
+        IPC::ResponseBuilder rb{ctx, 2};
+        rb.Push(ResultSuccess);
+    }
+
+    // The official qLaunch handler returns a zeroed 0x80-byte presence detail view.
+    void GetFriendPresenceV2(HLERequestContext& ctx) {
+        IPC::RequestParser rp{ctx};
+        [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
+        const auto friend_id = rp.Pop<u64>();
+        std::array<u8, NextendoFriendPresenceV2Size> presence{};
+        ctx.WriteBuffer(presence);
+        LOG_INFO(Service_Friend, "[NEX Nextendo] GetFriendPresenceV2 id={}", friend_id);
+        IPC::ResponseBuilder rb{ctx, 2};
+        rb.Push(ResultSuccess);
+    }
+
+    // qLaunch SDK 19+ asks for the connected user's own 0xE8-byte presence view.
+    void GetUserPresenceViewV2(HLERequestContext& ctx) {
+        IPC::RequestParser rp{ctx};
+        [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
+        std::array<u8, NextendoUserPresenceViewV2Size> view{};
+        if (Common::NextendoFriendCache::GetPlayerPid() > 0) {
+            const u64 title_id = NextendoHomeMenuTitleId;
+            std::memcpy(view.data(), &title_id, sizeof(title_id));
+            view[0x20] = 2; // OnlinePlay: qLaunch shows the HOME Menu title card.
+        }
+        ctx.WriteBuffer(view);
+        IPC::ResponseBuilder rb{ctx, 2};
+        rb.Push(ResultSuccess);
+    }
+
 """
     replace_once(
         friend_cpp,
