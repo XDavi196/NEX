@@ -27,7 +27,7 @@ A presença do HOME Menu não inventa AppField. O campo fica vazio até que exis
 
 ## 3. BAAS e ACC
 
-O NEX mantém a identidade ACC local original do Eden. O PID Nextendo fica no contexto próprio do NEX e no cache social; não é convertido em NSA, UUID de Switch nem em identidade ACC do jogo. Isso não equivale à autenticação BAAS do jogo. A emissão de id_token assinado com o token nx2. dentro da claim nnex depende de:
+O NEX mantém o UUID local do perfil Eden para operações offline, mas quando há uma conta Nextendo vinculada o ACC do jogo apresenta o PID persistente Nextendo como NetworkServiceAccountId, seguindo o comportamento do emulador de referência. Isso não converte o PID em UUID Switch e não substitui a autenticação BAAS do jogo. A emissão de id_token assinado com o token nx2. dentro da claim nnex depende de:
 
 - contrato exato da claim, issuer, audience, kid, jku, algoritmo e validade;
 - chave privada emitida especificamente para o NEX;
@@ -40,9 +40,9 @@ A documentação pública manda seguir a implementação do emulador oficial, ma
 
 O Android mantém um snapshot limitado de amigos e transfere os campos validados para um cache nativo protegido por mutex. Os campos conhecidos são PID, username, presença, application ID, AppField e, quando a API realmente o fornece, NSA.
 
-O serviço nn::friends só expõe registros de jogo quando há um NSA explícito. O PID não é convertido em NSA. O PID também não é transformado em UUID Switch. Campos ausentes, como UUID e último acesso, permanecem zerados.
+O serviço nn::friends usa a identidade de conta definida pela Nextendo: o emulador de referência associa o PID persistente ao NetworkServiceAccountId. O NEX agora aplica o mesmo mapeamento quando a API omite o campo NSA e preserva um NSA explícito válido quando presente. O PID não é transformado em UUID Switch; campos ausentes como UUID e último acesso permanecem zerados.
 
-A API pública de amigos atualmente retorna PID e presença, mas não NSA nem UUID. Por isso, com essa resposta pública, a lista HLE fica vazia em vez de enviar IDs incorretos ao jogo. O aplicativo ainda pode mostrar os dados sociais que a API disponibilizar, mas isso não significa que o jogo consiga resolver esses amigos.
+A API pública de amigos pode retornar PID e presença sem NSA nem UUID. Com o mapeamento de conta usado pelo emulador de referência, o NEX associa PID a NSA para que o jogo consiga resolver os amigos, sem inventar UUID nem campos de presença. O aplicativo ainda depende dos dados sociais efetivamente fornecidos pela API.
 
 Os comandos modernos de qLaunch foram registrados no overlay e os serializers V2 têm testes nativos de host. Os buffers e comandos ainda precisam de validação dentro do qLaunch real. Os testes nativos do cache não substituem testes IPC visíveis ao jogo.
 
