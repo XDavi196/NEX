@@ -25,6 +25,7 @@ int main() {
     valid.network_service_account_id = 0xA1;
     valid.username = "Friend";
     valid.presence_status = 2;
+    valid.application_id = 0x0100152000022000ULL;
     valid.app_field[cache::MaxAppFieldBytes - 1] = 0x7F;
     valid.app_field_size = cache::MaxAppFieldBytes + 10;
 
@@ -60,6 +61,7 @@ int main() {
     assert(snapshot.front().network_service_account_id == 0xA1);
     assert(snapshot.front().username == "Friend");
     assert(snapshot.front().presence_status == 2);
+    assert(snapshot.front().application_id == 0x0100152000022000ULL);
     assert(snapshot.front().app_field_size == cache::MaxAppFieldBytes);
     assert(snapshot.front().app_field.back() == 0x7F);
 
