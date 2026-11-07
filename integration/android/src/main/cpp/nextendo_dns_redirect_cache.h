@@ -15,12 +15,12 @@ namespace Common::NextendoDnsRedirectCache {
 inline constexpr std::size_t MaxEntries = 32;
 inline constexpr std::size_t MaxHostnameBytes = 253;
 inline std::mutex cache_mutex;
-inline std::vector<struct Entry> cache_entries;
-
 struct Entry {
     std::string hostname;
     std::string ipv4;
 };
+
+inline std::vector<Entry> cache_entries;
 
 inline std::optional<std::string> NormalizeHostname(const std::string& value) {
     if (value.empty() || value.size() > MaxHostnameBytes) {
