@@ -352,8 +352,48 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
         rb.Push(token_size);
     }""",
     )
-    # Keep Eden's local ACC identity until Nextendo confirms the NEX PID/NSA mapping.
-    # A Nextendo PID is not assumed to be a NetworkServiceAccountId.
+    # Nextendo's reference emulator binds the persistent Nextendo PID to the
+    # Switch NetworkServiceAccountId. Keep Eden's local UUID hash as the offline fallback.
+    replace_once(
+        acc_cpp,
+        """    void GetAccountId(HLERequestContext& ctx) {
+        LOG_DEBUG(Service_ACC, "called");
+
+        IPC::ResponseBuilder rb{ctx, 4};
+        rb.Push(ResultSuccess);
+        rb.PushRaw<u64>(profile_manager->GetLastOpenedUser().Hash());
+    }""",
+        """    void GetAccountId(HLERequestContext& ctx) {
+        const auto nextendo_pid = Common::NextendoFriendCache::GetPlayerPid();
+        const auto account_id = nextendo_pid != 0
+            ? nextendo_pid
+            : profile_manager->GetLastOpenedUser().Hash();
+        LOG_DEBUG(Service_ACC, "[NEX] GetAccountId -> {}", account_id);
+
+        IPC::ResponseBuilder rb{ctx, 4};
+        rb.Push(ResultSuccess);
+        rb.PushRaw<u64>(account_id);
+    }""",
+    )
+    replace_once(
+        acc_cpp,
+        """        IPC::ResponseBuilder rb{ctx, 4};
+        rb.Push(ResultSuccess);
+        rb.PushRaw<u64>(profile_manager->GetLastOpenedUser().Hash());
+    }
+
+    void StoreOpenContext(HLERequestContext& ctx) {""",
+        """        const auto nextendo_pid = Common::NextendoFriendCache::GetPlayerPid();
+        const auto account_id = nextendo_pid != 0
+            ? nextendo_pid
+            : profile_manager->GetLastOpenedUser().Hash();
+        IPC::ResponseBuilder rb{ctx, 4};
+        rb.Push(ResultSuccess);
+        rb.PushRaw<u64>(account_id);
+    }
+
+    void StoreOpenContext(HLERequestContext& ctx) {""",
+    )
 
     # Connect Eden's nn::friends HLE to the NEX-owned read-only cache.
     friend_cpp = eden / "src/core/hle/service/friend/friend.cpp"
