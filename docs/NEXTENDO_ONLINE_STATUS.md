@@ -150,6 +150,19 @@ The public source still does not publish the live deployment's actual SMM2 auth 
 
 **Current split:** the public service homepage indicates SMM2 activity, but the published deployment documents do not expose its production endpoint configuration. The NEX client can implement the public protocol profile and payload structure; actual login, course interactions and matchmaking still need to be validated from this Android client against the live deployment.
 
+### Device/application authentication routing (DAUTH)
+
+The public Nextendo `nx-dauth` server source documents these exact SNI hostnames:
+
+- `dauth-lp1.ndas.srv.nintendo.net`: `POST /v8/challenge`, `POST /v8/device_auth_tokens`, `POST /v8/edge_tokens`.
+- `dcert-lp1.ndas.srv.nintendo.net`: `GET /keys` (device-token JWKS).
+- `aauth.hac.lp1.ndas.srv.nintendo.net` and the `aauth-lp1.ndas.srv.nintendo.net` alias: `POST /v5/application_auth_token`.
+- `acert-lp1.ndas.srv.nintendo.net`: `GET /keys` (application-token JWKS).
+- `dragons.hac.lp1.dragons.nintendo.net` and `dragonst.hac.lp1.dragons.nintendo.net`: title/application entitlement routes.
+
+The exact-host DNS cache can carry these names once the official route IPv4 is provisioned. The public server source does not publish the production service IP, certificate chain, deployed SNI router address or a client-ready trust configuration. NEX therefore does not install these mappings or weaken TLS verification automatically. DAUTH routing is an infrastructure prerequisite for games that request those device/application tokens; the NEX BAAS `nnex` assertion is a separate game-account binding step.
+
+
 ### Title DNS and TLS/SNI
 
 - Eden's guest `sfdnsres` now has an NEX-owned exact-host redirect cache (up to 32 routes). Kotlin/JNI can install or clear hostname-to-IPv4 mappings at runtime.
