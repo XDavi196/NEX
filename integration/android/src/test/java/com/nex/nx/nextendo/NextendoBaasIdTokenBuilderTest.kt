@@ -56,9 +56,12 @@ class NextendoBaasIdTokenBuilderTest {
             header["jku"].toString().trim('"')
         )
         assertEquals("nx2.test-server-issued-token", payload["nnex"].toString().trim('"'))
+        assertEquals(
+            "https://baas.test.invalid/1.0.0/certificates",
+            payload["jku"].toString().trim('"')
+        )
         assertEquals("https://baas.test.invalid/issuer", payload["iss"].toString().trim('"'))
         assertEquals("true", payload["hm"].toString())
-        assertFalse("jku must be a JOSE header parameter, not a payload claim", "jku" in payload)
         assertEquals(
             parts[0] + "." + parts[1],
             String(signer.lastSigningInput!!, StandardCharsets.US_ASCII)
@@ -115,10 +118,17 @@ class NextendoBaasIdTokenBuilderTest {
     }
 
     @Test
-    fun rejectsCallerSuppliedNnexClaimAndMissingSignerIdentity() {
+    fun rejectsCallerSuppliedNnexOrJkuClaimAndMissingSignerIdentity() {
         invalid {
             NextendoBaasIdTokenBuilder.build(
                 claims() + ("nnex" to JsonPrimitive("nx2.not-the-current-token")),
+                "nx2.test-server-issued-token",
+                TestSigner()
+            )
+        }
+        invalid {
+            NextendoBaasIdTokenBuilder.build(
+                claims() + ("jku" to JsonPrimitive("https://attacker.invalid/jwks")),
                 "nx2.test-server-issued-token",
                 TestSigner()
             )
