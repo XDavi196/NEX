@@ -94,6 +94,8 @@ internal class NextendoPrudpLiteWebSocketTransport(
                         NextendoPrudpLiteSession.Event.Disconnected -> {
                             closed = true
                             session.close()
+                            webSocket.close(1000, "Nextendo PRUDP session disconnected")
+                            socket = null
                             events.onDisconnected()
                         }
                     }

@@ -26,9 +26,9 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
         val minorVersion: Int,
         val supportedFunctions: Int,
         val connectPayload: ByteArray = byteArrayOf(),
-        val fragmentSize: Int = DEFAULT_FRAGMENT_SIZE,
-        val maxRmcMessageBytes: Int = DEFAULT_MAX_RMC_BYTES,
-        val maxPendingReliablePackets: Int = DEFAULT_MAX_PENDING
+        val fragmentSize: Int = 1300,
+        val maxRmcMessageBytes: Int = 1024 * 1024,
+        val maxPendingReliablePackets: Int = 256
     ) {
         init {
             require(accessKey.isNotBlank()) { "A runtime-provided PRUDP access key is required." }
@@ -43,10 +43,10 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
                 "PRUDP supported-function mask is out of range."
             }
             require(fragmentSize in 1..0xFFFF) { "PRUDP fragment size is out of range." }
-            require(maxRmcMessageBytes in 1..MAX_ALLOWED_RMC_BYTES) {
+            require(maxRmcMessageBytes in 1..(8 * 1024 * 1024)) {
                 "Maximum RMC message size is out of range."
             }
-            require(maxPendingReliablePackets in 1..MAX_ALLOWED_PENDING) {
+            require(maxPendingReliablePackets in 1..4096) {
                 "Maximum pending reliable packet count is out of range."
             }
             require(connectPayload.size <= 0xFFFF) {
@@ -445,6 +445,9 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
             outbound += acknowledgement(packet)
         }
         currentState = State.CLOSED
+        releaseSecrets()
+        connectFrame = null
+        connectionSignature = null
         decoder.close()
         pendingReliable.clear()
         resetFragmentBuffer()
@@ -492,12 +495,17 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
         throw IllegalStateException("No free PRUDP packet sequence id is available.")
     }
 
-    @Synchronized
-    override fun close() {
-        if (currentState == State.CLOSED) return
-        currentState = State.CLOSED
+    private fun releaseSecrets() {
         runtimeAccessKey = null
         connectPayload.fill(0)
+    }
+
+    @Synchronized
+    override fun close() {
+        currentState = State.CLOSED
+        releaseSecrets()
+        connectFrame = null
+        connectionSignature = null
         decoder.close()
         pendingReliable.clear()
         resetFragmentBuffer()
@@ -509,11 +517,6 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
             flags and NextendoPrudpLiteCodec.FLAG_HAS_SIZE != 0
 
     private companion object {
-        const val DEFAULT_FRAGMENT_SIZE = 1300
-        const val DEFAULT_MAX_RMC_BYTES = 1024 * 1024
-        const val MAX_ALLOWED_RMC_BYTES = 8 * 1024 * 1024
-        const val DEFAULT_MAX_PENDING = 256
-        const val MAX_ALLOWED_PENDING = 4096
         const val MAX_FRAGMENT_COUNT = 255
         const val RECEIVED_WINDOW_SIZE = 128
         const val CONNECTION_SIGNATURE_BYTES = 16
