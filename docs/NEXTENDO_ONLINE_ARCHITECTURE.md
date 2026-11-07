@@ -81,7 +81,7 @@ O NEX tem o parser de um probe NNCS de 16 bytes e um tracker de duas observaçõ
 
 O overlay também liga um cache limitado de sockets UDP à camada de rede nativa do Eden. Enquanto existe um PID Nextendo ativo, sockets UDP vinculados e não conectados podem ser estacionados por cinco segundos quando o jogo os fecha. Se o jogo reabrir a mesma porta no mesmo IP local dentro desse intervalo, o Eden recupera o mesmo socket do host e preserva o mapeamento NAT. O cache é limitado a oito sockets e é limpo em troca/logout de conta ou encerramento da instância de rede. Há testes determinísticos para reuso, endereço incompatível, expiração, substituição, limite e limpeza.
 
-Isso fecha a parte de preservação do socket durante o padrão probe/close/reopen, mas ainda não implementa os sockets de probe NNCS, keepalive periódico, descoberta de peers, sinalização de matchmaking, hole-punching UDP nem teardown coordenado da sessão. Os endpoints e portas NNCS são específicos por título; não copiamos os ports de Mario Kart 8 para o SMM2. O fluxo precisa ser validado em dois dispositivos reais.
+Isso fecha a parte de preservação do socket durante o padrão probe/close/reopen, mas ainda não implementa os sockets de probe NNCS, keepalive periódico, descoberta de peers, sinalização de matchmaking, hole-punching UDP nem teardown coordenado da sessão. O código público do `nextendo-nncs` documenta `10025` e `10125` para o fluxo de Mario Kart 8 (`nncs1-lp1`/`nncs2-lp1`); esses valores não são transferidos ao SMM2. O hostname e as portas NNCS do SMM2 continuam sem contrato público confirmado. O fluxo precisa ser validado em dois dispositivos reais.
 
 ## 8. Segurança e bloqueios
 
