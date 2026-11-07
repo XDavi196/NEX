@@ -6,13 +6,11 @@ A successful APK build proves that the configured Android source and native tool
 
 ## Verified build evidence
 
-- Latest verified Android APK: [NEX v0.1.0-alpha.108](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108), from successful [Actions run #108](https://github.com/XDavi196/NEX/actions/runs/42399598481).
-- Direct APK: [Download alpha.108](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk). APK size 27,285,737 bytes; release includes `SHA256SUMS.txt`.
-- Alpha.108 predates the ACC BAAS bridge, LoginEx/ticket codecs and SMM2 session coordinator described below. It is not an online-ready release.
-- [Actions run #131](https://github.com/XDavi196/NEX/actions/runs/42405238518) is the first queued run for the ACC/BAAS, LoginEx and secure-ticket code, commit `9d5c6e02ca6999e7bb912b6f4a6d6e475065b60c`. It is pending; it has not produced an APK.
-- [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607) passed its native and Kotlin test steps but remains stuck in the Android APK build step, last updated 7 November 2026 at 18:42 UTC. No #121 artifact/release is verified.
-- Runs #122–#130 were superseded/cancelled in the single-branch concurrency queue; that is not a test-failure result.
-- Current branch: `nex/eden-v0.2.0-rc1-nextendo`, source head `9d5c6e02ca6999e7bb912b6f4a6d6e475065b60c`.
+- Latest verified Android APK: [NEX v0.1.0-alpha.121](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121), from successful [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607).
+- Direct APK: [Download alpha.121](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.121/NEX-Android-v0.2.0-rc1-optimized.apk). APK size 27,285,729 bytes; release includes `SHA256SUMS.txt`.
+- Run #121 built source commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. Native tests, Kotlin tests, Android optimized APK build, artifact upload and prerelease publication all passed. This APK includes the BAAS builder and public SMM2 profile but predates the ACC bridge, LoginEx/ticket codecs and session coordinator.
+- [Actions run #131](https://github.com/XDavi196/NEX/actions/runs/42405238518) is the current validation for the ACC bridge and SMM2 LoginEx/ticket source, commit `9d5c6e02ca6999e7bb912b6f4a6d6e475065b60c`. At this update it has started and is installing the pinned Android toolchain; no artifact is available yet.
+- The current branch is `nex/eden-v0.2.0-rc1-nextendo`, head `affe2c965bef3f53a3d5c8a1a4feb4bb76d10861`. The latest commit after #131's source is documentation-only.
 - Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 - Android application ID: `com.nex.nx`.
 - OAuth callback: `com.nex.nx://oauth/callback`.

@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.webp" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108">Get the latest verified experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
- > **Please read before installing:** NEX is an experimental preview. The latest verified APK is **alpha.108** (source commit `e5c1a235`); its native friend-cache tests, Android Nextendo unit tests and optimized APK build passed. Alpha.108 includes the PRUDP-Lite transport and adaptive NEX icon, but it predates the newer BAAS/SMM2 profile work now on the development branch. In-game online multiplayer is not ready.
+ > **Please read before installing:** NEX is an experimental preview. The latest verified APK is **alpha.121** (source commit `88df712f`); its native friend-cache tests, Android Nextendo unit tests, optimized APK build and prerelease publication passed. Alpha.121 includes the PRUDP-Lite transport, adaptive NEX icon, BAAS builder and public SMM2 client profile, but predates the newer ACC bridge and LoginEx/ticket codecs now on the development branch. In-game online multiplayer is not ready.
 
 ## What NEX is
 
@@ -73,9 +73,9 @@ The Nextendo compatibility page lists Super Mario Maker 2 as **Experimental / In
 
 The latest verified Android APK is the experimental prerelease:
 
-**[NEX v0.1.0-alpha.108 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk)
+**[NEX v0.1.0-alpha.121 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.121/NEX-Android-v0.2.0-rc1-optimized.apk)
 
-The release includes `SHA256SUMS.txt`. Alpha.108 is built from commit `e5c1a235`; it contains the PRUDP-Lite transport and the requested NEX branding changes. It does **not** contain the later BAAS/SMM2 profile additions now on the development branch, and it does not provide working in-game multiplayer. The BAAS/SMM2 branch code is being validated separately by the newer Actions run.
+The release includes `SHA256SUMS.txt`. Alpha.121 is built from commit `88df712f`; it contains the PRUDP-Lite transport, NEX branding, BAAS builder and public SMM2 profile. It does **not** contain the newer ACC bridge and LoginEx/ticket codecs now in the development branch, and it does not provide working in-game multiplayer. Those additions are being validated by Actions run #131.
 
 This is an experimental preview, not a stable or online-ready release.
 
