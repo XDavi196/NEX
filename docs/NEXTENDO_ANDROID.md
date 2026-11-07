@@ -82,15 +82,19 @@ The C++ host test checks cache bounds, duplicate filtering, explicit-NSA filteri
 
 NEX now owns a testable PRUDP-Lite client and WebSocket transport layer:
 
-- The HMAC-MD5 CONNECT proof follows the public Nextendo Lite algorithm and accepts the title access key only from runtime configuration.
+- The HMAC-MD5 CONNECT proof follows the public Nextendo Lite algorithm.
+- The SMM2 profile records public title values from the public server source: NEX version \`40000\`, PRUDP title access key \`fdf6617f\`, auth WSS port \`443\`, public secure-port default \`60007\`, auth minor version \`5\`, and secure minor version \`0\`.
+- The secure endpoint is not guessed: \`NextendoSmm2Profile\` parses the \`prudps:/address=...;port=...\` StationURL advertised by LoginEx, then constructs the WSS endpoint.
 - The client state machine handles SYN/SYN-ACK/CONNECT/CONNECT-ACK, reliable DATA, ACK/MULTI-ACK, duplicate suppression, fragment reassembly, PING and DISCONNECT.
-- The OkHttp transport sends and receives binary WebSocket frames over `wss://`; ordinary TLS certificate and hostname verification remain enabled.
+- The OkHttp transport sends and receives binary WebSocket frames over \`wss://\`; ordinary TLS certificate and hostname verification remain enabled.
 - The RMC envelope codec supports request, success and error messages. Outbound sends are restricted to requests.
 - The SMM2 DataStore protocol identifier 115 and publicly documented method identifiers are recorded in code.
 
-Nine Android tests cover the exact CONNECT signature vector, handshake, reliable DATA/ACK, fragment assembly, duplicate suppression, PING and DISCONNECT. These tests validate local protocol behavior; they do not prove acceptance by a live Nextendo service.
+The BAAS side now has a JWT builder and an \`AuthenticationInfo\` DataHolder encoder for the \`LoginEx.extraData\` field. Unit tests cover the public title profile, StationURL parsing, the \`nnex\` binding and local serialization. They do not prove acceptance by a live Nextendo service.
 
-**Not yet connected to a live title:** NEX still needs the NEX-specific BAAS CONNECT payload, a verified SMM2 WSS endpoint and title access key. It also lacks complete SMM2 RMC argument serialization, a timed retry policy, title matchmaking and NAT/P2P socket lifecycle. No host, port, key or token is hardcoded.
+**Not yet connected to a live title:** NEX still needs the provisioned NEX RSA signer/JWKS registration and issuer/audience/subject values; the original SMM2 auth hostname and its DNS/TLS route; and the secure CONNECT ticket/check payload that follows LoginEx. The title key above is public, but it is not a substitute for the server-issued ticket. Complete SMM2 RMC arguments, retry policy, matchmaking and NAT/P2P lifecycle also remain unfinished.
+
+See [the detailed SMM2 BAAS and PRUDP profile](NEXTENDO_SMM2_PROFILE.md).
 
 ## NAT and P2P
 
@@ -100,9 +104,16 @@ The tracker owns no UDP socket. NEX does not yet preserve the game's socket mapp
 
 ## BAAS / ACC game authentication
 
-The Developer Documentation says that the separate \`nx2.\` game token belongs in the \`nnex\` claim of the BAAS \`id_token\`, and that the game server validates the signature, expiry and PID. It points to the official emulator's \`ManagerServer.cs\` for the exact construction.
+The public Nextendo core's \`authbinding.go\` and \`authbinding_test.go\` now confirm the payload placement: the signed compact JWT is the \`Token\` field of an \`AuthenticationInfo\` DataHolder carried in TicketGranting \`LoginEx.extraData\`. Its payload carries the string-valued \`nnex\` claim with the \`nx2.\` game token; the service also recognizes optional \`tv\`. The public BAAS-JWKS service selects the matching RSA key with \`kid\` and publishes it at the URL carried in the JWS \`jku\` header.
 
-The public Developer Documentation page does not enumerate the complete NEX-specific JWT contract: exact claim shape/value, issuer, audience, key identifier, key URL, signing algorithm and time-claim rules. The NEX-specific private signing key and its public-key/JWKS registration have not been issued to this project. The current Nextendo changelog also describes cryptographic client attestation for emulator API requests; NEX has no NEX-issued attestation signing material or confirmed signing procedure.
+NEX now has:
+- An RS256 JWT builder with provisioned \`kid\` and HTTPS \`jku\`, plus externally supplied \`iss\`, \`aud\` and \`sub\`; it sets the public profile's \`hm=true\` claim and the current \`nnex\` token.
+- An NEX DataHolder encoder for \`AuthenticationInfo\` with the SMM2 NEX server version fields.
+- Unit tests for the token-to-\`nnex\` binding and LoginEx extraData serialization.
+
+**Still not provisioned or wired:** the NEX-specific RSA private key, its registered public JWK, the issuer/audience/subject mapping, any required client-attestation material, and the Eden ACC/LoginEx lifecycle hook. The code uses test signers in unit tests only; it does not invent a production key or token.
+
+The BAAS JWT belongs in LoginEx extraData, **not** in the PRUDP CONNECT packet. Secure CONNECT happens after LoginEx and requires the issued Kerberos ticket plus the encrypted check request. The generic PRUDP session does not yet construct that payload.
 
 No BAAS JWT or attestation is fabricated. The ACC HLE identity bridge must not be treated as completed game authentication.
 
