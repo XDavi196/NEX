@@ -14,6 +14,14 @@ class NextendoRequestDiagnosticTest {
     }
 
     @Test
+    fun convertsFailuresToSafeLabelsWithoutCopyingErrorMessages() {
+        val http = NextendoAuthClient.NextendoException(403, "sensitive response text")
+        assertEquals("HTTP 403 (permission or client not authorized)", NextendoRequestDiagnostic.fromFailure(http))
+        assertEquals("network_error", NextendoRequestDiagnostic.fromFailure(java.io.IOException("sensitive network text")))
+        assertEquals("response_contract_error", NextendoRequestDiagnostic.fromFailure(IllegalArgumentException("sensitive body")))
+    }
+
+    @Test
     fun reportsMissingScopeByName() {
         assertEquals("scope_missing:game.matchmaking", NextendoRequestDiagnostic.missingScope("game.matchmaking"))
     }

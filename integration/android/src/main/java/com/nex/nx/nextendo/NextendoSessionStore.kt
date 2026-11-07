@@ -35,7 +35,8 @@ object NextendoSessionStore {
         val nexGameTokenExpiresAtEpochSeconds: Long = 0L,
         val pid: Long = 0L,
         val username: String = "",
-        val friendCode: String = ""
+        val friendCode: String = "",
+        val gameTokenDiagnostic: String = "not_checked"
     )
 
     data class PendingAuthorization(
@@ -57,7 +58,8 @@ object NextendoSessionStore {
                 nexGameTokenExpiresAtEpochSeconds = previous?.nexGameTokenExpiresAtEpochSeconds ?: 0L,
                 pid = previous?.pid ?: 0L,
                 username = previous?.username.orEmpty(),
-                friendCode = previous?.friendCode.orEmpty()
+                friendCode = previous?.friendCode.orEmpty(),
+                gameTokenDiagnostic = previous?.gameTokenDiagnostic ?: "not_checked"
             )
         )
     }
@@ -104,9 +106,20 @@ object NextendoSessionStore {
                 nexGameTokenExpiresAtEpochSeconds = token.expiresAtEpochSeconds,
                 pid = token.pid,
                 username = token.username,
-                friendCode = token.friendCode
+                friendCode = token.friendCode,
+                gameTokenDiagnostic = "HTTP 200 (nx2 accepted)"
             )
         )
+    }
+
+    /** Persists a token-free result label inside the encrypted session blob. */
+    fun saveGameTokenDiagnostic(context: Context, diagnostic: String) {
+        require(diagnostic.isNotBlank() && diagnostic.length <= 96) {
+            "The game-token diagnostic must be a short, non-empty status label."
+        }
+        val current = load(context)
+            ?: throw IllegalStateException("Cannot save a game-token diagnostic without a linked Nextendo session.")
+        saveSession(context, current.copy(gameTokenDiagnostic = diagnostic))
     }
 
     fun load(context: Context): Session? {
@@ -131,7 +144,8 @@ object NextendoSessionStore {
             nexGameTokenExpiresAtEpochSeconds = json.optLong("nex_expires_at", 0L),
             pid = json.optLong("pid", 0L),
             username = json.optString("username"),
-            friendCode = json.optString("friend_code")
+            friendCode = json.optString("friend_code"),
+            gameTokenDiagnostic = json.optString("game_token_diagnostic", "not_checked")
         )
     }
 
@@ -207,6 +221,7 @@ object NextendoSessionStore {
             .put("pid", session.pid)
             .put("username", session.username)
             .put("friend_code", session.friendCode)
+            .put("game_token_diagnostic", session.gameTokenDiagnostic)
 
         val (iv, ciphertext) = encrypt(json.toString())
         val saved = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)

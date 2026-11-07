@@ -3,7 +3,7 @@
 This folder contains the NEX-owned Android integration source:
 
 - `NextendoAuthClient.kt` — OAuth Authorization Code + PKCE, registered Client ID header, token refresh, userinfo, presence publishing and the separate `nx2.` game-token request.
-- `NextendoSessionStore.kt` — AES-GCM encrypted OAuth/game session and pending PKCE transaction storage using Android Keystore.
+- `NextendoSessionStore.kt` — AES-GCM encrypted OAuth/game session, token-free API diagnostics and pending PKCE transaction storage using Android Keystore.
 - `NextendoAuthManager.kt` — Chrome Custom Tab login, callback verification, account panel, friends UI and background session refresh.
 - `NextendoCallbackActivity.kt` — Android deep-link callback handler.
 - `NextendoAccountApi.kt` — authenticated read-only player profile lookup.
@@ -46,13 +46,11 @@ A successful OAuth login or retrieval of an `nx2.` token does not by itself prov
 Never print access tokens, refresh tokens, game tokens, callback codes or PKCE verifiers to Android logs.
 
 
-## NEX glass and online readiness display
+## NEX visual identity and online diagnostics
 
-\`NexGlassEffect.kt\` styles fragment bars, Material buttons, selected cards and switches with an Android-native translucent treatment. The overlay registers the helper for fragment views so settings and game screens receive the same appearance. The Games screen header and launcher use the official NEX logo.
+The fragment-wide glass treatment was removed. The launcher and Games header use the original NEX logo, while the app retains Eden's existing Material styling.
 
-The account panel distinguishes OAuth account connectivity and the \`nx2.\` game token from actual in-game readiness. It reports SMM2 as disconnected while BAAS signing, title endpoints and a PRUDP session are missing. qLaunch friend rows are only available when the public API supplies an explicit NSA; a PID is never substituted.
-
-The OAuth callback must include the matching state value. A missing or mismatched state is rejected before exchanging the authorization code.
+The account panel distinguishes OAuth connectivity from the separate `nx2.` game credential. It displays the scopes returned by OAuth, the latest token-free HTTP result for the presence and game-token requests, and whether SMM2 is ready. The game-token result is saved inside the encrypted Android Keystore-backed session. qLaunch friend rows are only available when the public API supplies an explicit NSA; a PID is never substituted.
 
 
 ## BAAS boundary (not enabled)

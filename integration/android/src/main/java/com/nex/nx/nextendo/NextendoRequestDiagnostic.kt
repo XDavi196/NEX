@@ -17,6 +17,14 @@ internal object NextendoRequestDiagnostic {
         }
     }
 
+    fun fromFailure(error: Throwable): String = when (error) {
+        is NextendoAuthClient.NextendoException -> fromHttpStatus(error.httpStatus)
+        is java.io.IOException -> "network_error"
+        is IllegalStateException -> "session_unavailable"
+        is IllegalArgumentException -> "response_contract_error"
+        else -> "request_error"
+    }
+
     fun missingScope(scope: String): String {
         require(scope.isNotBlank()) { "A scope name is required." }
         return "scope_missing:$scope"

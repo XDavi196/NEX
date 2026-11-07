@@ -17,7 +17,7 @@ A successful APK build proves that the configured Android source and native tool
 - Release also includes \`SHA256SUMS.txt\`.
 - Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It requested all six portal scopes.
 - Commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` restores the original NEX logo and removes the fragment-wide glass treatment. Run #103 is the verification build for those changes; it is still in progress.
-- The current work adds token-free runtime diagnostics for the OAuth scopes granted by the server and the HTTP result of presence publishing. The next build must validate this code.
+- Commit `0584d738af5834f49f5f60f8c7722c40dc31cda9` adds OAuth-scope and presence diagnostics. The current commit adds persisted game-token endpoint diagnostics; its CI run must validate these changes before release.
 - Pinned Eden source: \`v0.2.0-rc1\`, commit \`8e373eb714aa01117ec885680477501cdb572112\`.
 - Android application ID: \`com.nex.nx\`.
 - OAuth callback: \`com.nex.nx://oauth/callback\`.
@@ -40,7 +40,7 @@ Run #102 verified code commit \`1eeaef07c96ae9d365c9739c22eb523c857937c2\`. The 
 
 ### Runtime diagnostics
 
-The account panel shows the exact scopes returned in the OAuth token response and whether `game.matchmaking` is present. Presence publishing records only safe result labels: accepted 2xx, HTTP 401, HTTP 403, HTTP 404, other HTTP status, missing scope, network error or session unavailable. It never prints access tokens, refresh tokens, `nx2.` tokens, authorization codes or request headers. This lets the owner report the live deployment result without exposing credentials.
+The account panel shows the exact scopes returned in the OAuth token response and whether `game.matchmaking` is present. Presence publishing and `GET /api/nex-token` keep separate safe result labels: accepted 2xx, HTTP 401/403/404, other HTTP status, missing scope, network error, session unavailable or response-contract error. The last game-token result is persisted inside the encrypted Android Keystore-backed session, so it remains available after closing and reopening NEX. Tokens, authorization codes and request headers are never included.
 
 ### ACC and player identity
 
@@ -112,11 +112,13 @@ NEX follows the published Developer Documentation where a public contract exists
 
 ### Super Mario Maker 2 NEX service
 
-Super Mario Maker 2 is the first intended live test target. The official Nextendo organization publishes a dedicated [SMM2 NEX server repository](https://github.com/NextendoNetwork/super-mario-maker-2), confirming that Nextendo has a title-specific server implementation.
+Super Mario Maker 2 is the first intended live test target. The [Nextendo game-compatibility page](https://wiki.nextendo.network/games) currently lists it as **In preparation / Experimental**, at 70% support for game version 3.0.3, with matchmaking and presence marked **Untested**. This is a service-readiness limitation as well as a client integration task; version 3.0.3 is the listed game version, not proof of working matchmaking.
 
-The public server repository is server-side code, not a complete client handshake specification. The current public sources do not provide a verified SMM2 client hostname/port, NEX access key, title service negotiation, authenticated session contract, full RMC payload schema for the required game flow or the deployed endpoint mapping for this NEX registration.
+The organization publishes a dedicated [SMM2 NEX server repository](https://github.com/NextendoNetwork/super-mario-maker-2). Its public server-side DataStore layer and the `nextendo-nex` core document selected SMM2 methods (RegisterUser 47, GetUsers 48, SyncUserProfile 49, CanPostCourse 60, GetMiiClothes 63, SearchCoursesPostedBy 74 and GetEventCourseStatus 154). The handler returns an explicit not-implemented response for other DataStore methods. That is useful protocol evidence, but it is not a complete SMM2 client handshake specification or proof of end-to-end Course World/matchmaking.
 
-**Blocker:** Nextendo must confirm the SMM2 client endpoint and title-specific authentication/matchmaking contract before NEX opens a live connection. NEX does not guess a server address or access key.
+The public sources still do not provide a verified SMM2 client hostname/port, deployed NEX access-key configuration, complete title login/session contract, all RMC payloads needed by the game or the mapping for this NEX registration. NEX does not guess server addresses or keys.
+
+**Current split:** the NEX client can continue implementing generic DNS/TLS, PRUDP/RMC, account and friend integration where contracts are known. End-to-end SMM2 matchmaking remains unverified while the public service itself lists those features as untested.
 
 ### Title DNS and TLS/SNI
 
@@ -161,7 +163,7 @@ Until those checks pass, NEX in-game multiplayer remains **not implemented / not
 ## NEX UI and current device-facing status
 
 - The official NEX logo is used in the Android launcher identity and the Games screen header.
-- The fragment-wide glass layer was removed. The Android app uses the owner's original NEX logo and Eden's original Material styling for bars, buttons, cards and switches.
+- The fragment-wide glass treatment was removed. The Android app uses the owner's original NEX logo and Eden's original Material styling for bars, buttons, cards and switches.
 - The account panel separates account sign-in from game readiness. It displays the scopes actually returned by OAuth, whether `game.matchmaking` was granted, and a token-free diagnostic for the latest presence request (HTTP status, missing scope or network/session failure). A valid `nx2.` token is only a prerequisite; SMM2 remains disconnected until BAAS/nnex signing, title endpoint and PRUDP session are implemented and verified.
 - The friends panel explains that an OAuth-visible friend is not automatically a game-visible friend: qLaunch records still require a confirmed NSA/UUID mapping.
 - OAuth callback state is now mandatory and compared in constant time before exchanging an authorization code.

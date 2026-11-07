@@ -112,17 +112,14 @@ object NextendoAuthManager {
                     }
                 }
                 val gameToken = gameTokenAttempt.getOrNull()
-                val gameTokenDiagnostic = gameTokenAttempt.fold(
-                    onSuccess = { "HTTP 200: nx2 accepted" },
-                    onFailure = { error ->
-                        when (error) {
-                            is NextendoAuthClient.NextendoException -> "HTTP " + error.httpStatus
-                            is java.io.IOException -> "network_error"
-                            is IllegalStateException -> "scope_missing"
-                            else -> "response_contract_error"
-                        }
-                    }
-                )
+                val gameTokenDiagnostic = if ("game.matchmaking" !in tokens.grantedScopes) {
+                    NextendoRequestDiagnostic.missingScope("game.matchmaking")
+                } else {
+                    gameTokenAttempt.fold(
+                        onSuccess = { "HTTP 200 (nx2 accepted)" },
+                        onFailure = NextendoRequestDiagnostic::fromFailure
+                    )
+                }
 
                 if (gameToken != null) {
                     NextendoSessionStore.saveNexGameToken(context, gameToken)
