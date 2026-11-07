@@ -75,6 +75,19 @@ O NEX ainda não tem os hostnames e IPs de produção do SMM2, nem a confirmaç�
 
 A validação TLS da plataforma permanece ativa; nenhum certificado é ignorado.
 
+## 6.1. DAUTH por SNI
+
+O código público `NextendoNetwork/nx-dauth` documenta os seguintes hostnames exatos:
+
+- `dauth-lp1.ndas.srv.nintendo.net`: `POST /v8/challenge`, `POST /v8/device_auth_tokens` e `POST /v8/edge_tokens`.
+- `dcert-lp1.ndas.srv.nintendo.net`: `GET /keys` para o JWKS dos tokens de dispositivo.
+- `aauth.hac.lp1.ndas.srv.nintendo.net` e o alias `aauth-lp1.ndas.srv.nintendo.net`: `POST /v5/application_auth_token`.
+- `acert-lp1.ndas.srv.nintendo.net`: `GET /keys` para o JWKS dos tokens de aplicativo.
+- `dragons.hac.lp1.dragons.nintendo.net` e `dragonst.hac.lp1.dragons.nintendo.net`: rotas de licença/entitlement do aplicativo.
+
+Esses nomes podem ser adicionados ao cache DNS exato depois que o IPv4 oficial da implantação for confirmado. O repositório público não publica o IP de produção, o certificado implantado, o destino do roteador SNI nem a configuração de confiança TLS adequada ao cliente NEX. Nenhuma rota DAUTH é ativada automaticamente e a validação TLS não é desativada. DAUTH fornece identidade/autenticação de dispositivo e aplicativo; o vínculo de conta Nextendo pela claim BAAS `nnex` continua sendo uma etapa separada.
+
+
 ## 7. NAT e P2P
 
 O NEX tem o parser de um probe NNCS de 16 bytes e um tracker de duas observações para classificar mapeamentos iguais, portas diferentes ou observações inconclusivas.
