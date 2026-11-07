@@ -61,7 +61,7 @@ def main() -> None:
     replace_once(
         native_library,
         "    external fun getAllUsers(): Array<String>?\n",
-        "    external fun updateNextendoFriendCache(pids: LongArray, nsas: LongArray, usernames: Array<String>, statuses: IntArray, appFields: Array<ByteArray>)\n"
+        "    external fun updateNextendoFriendCache(pids: LongArray, nsas: LongArray, appIds: LongArray, usernames: Array<String>, statuses: IntArray, appFields: Array<ByteArray>)\n"
         "    external fun clearNextendoFriendCache()\n"
         "    external fun updateNextendoIdentity(pid: Long)\n"
         "    external fun clearNextendoIdentity()\n"
@@ -92,28 +92,31 @@ def main() -> None:
     native_jni_bridge = r'''JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoFriendCache(
     JNIEnv* env, [[maybe_unused]] jobject obj, jlongArray pids, jlongArray nsas,
-    jobjectArray usernames, jintArray statuses, jobjectArray app_fields) {
-    if (pids == nullptr || nsas == nullptr || usernames == nullptr ||
-        statuses == nullptr || app_fields == nullptr) {
+    jlongArray app_ids, jobjectArray usernames, jintArray statuses, jobjectArray app_fields) {
+    if (pids == nullptr || nsas == nullptr || app_ids == nullptr ||
+        usernames == nullptr || statuses == nullptr || app_fields == nullptr) {
         Common::NextendoFriendCache::Clear();
         return;
     }
 
     const jsize pid_count = env->GetArrayLength(pids);
     const jsize nsa_count = env->GetArrayLength(nsas);
+    const jsize app_id_count = env->GetArrayLength(app_ids);
     const jsize name_count = env->GetArrayLength(usernames);
     const jsize status_count = env->GetArrayLength(statuses);
     const jsize field_count = env->GetArrayLength(app_fields);
     const jsize count = std::min<jsize>(
-        std::min(std::min(pid_count, nsa_count), std::min(name_count, status_count)),
+        std::min(std::min(std::min(pid_count, nsa_count), app_id_count), std::min(name_count, status_count)),
         std::min(field_count, static_cast<jsize>(Common::NextendoFriendCache::MaxFriends)));
 
     std::vector<jlong> pid_values(static_cast<std::size_t>(count));
     std::vector<jlong> nsa_values(static_cast<std::size_t>(count));
+    std::vector<jlong> app_id_values(static_cast<std::size_t>(count));
     std::vector<jint> status_values(static_cast<std::size_t>(count));
     if (count > 0) {
         env->GetLongArrayRegion(pids, 0, count, pid_values.data());
         env->GetLongArrayRegion(nsas, 0, count, nsa_values.data());
+        env->GetLongArrayRegion(app_ids, 0, count, app_id_values.data());
         env->GetIntArrayRegion(statuses, 0, count, status_values.data());
         if (env->ExceptionCheck()) {
             env->ExceptionClear();
@@ -140,6 +143,8 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoFriendCache(
                 .network_service_account_id =
                     static_cast<std::uint64_t>(nsa_values[static_cast<std::size_t>(i)]),
                 .username = name_chars,
+                .application_id =
+                    static_cast<std::uint64_t>(app_id_values[static_cast<std::size_t>(i)]),
                 .presence_status = static_cast<std::uint32_t>(status_values[static_cast<std::size_t>(i)]),
             };
 
@@ -898,7 +903,11 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         val currentTitleId = NativeLibrary.playTimeManagerGetCurrentTitleId()
         if (currentTitleId > 0L) {
             val titleId = java.lang.String.format(java.util.Locale.ROOT, "%016x", currentTitleId)
-            NextendoPresencePublisher.setGameActivity(this, titleId, "Playing")
+            if (titleId.equals("0100000000001000", ignoreCase = true)) {
+                NextendoPresencePublisher.setHomeMenuActivity(this)
+            } else {
+                NextendoPresencePublisher.setGameActivity(this, titleId, "Playing")
+            }
         } else {
             NextendoPresencePublisher.clearGameActivity(this)
         }
