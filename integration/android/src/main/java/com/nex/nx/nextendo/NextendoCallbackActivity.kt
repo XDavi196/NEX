@@ -34,7 +34,7 @@ class NextendoCallbackActivity : Activity() {
                     if (outcome.gameTokenReady) {
                         "Conta Nextendo conectada. Token de jogo OK (" + outcome.gameTokenDiagnostic + "); multiplayer ainda está em integração."
                     } else {
-                        "Conta conectada; token de jogo: " + outcome.gameTokenDiagnostic + ". Envie esse status ao suporte Nextendo, sem compartilhar tokens."
+                        "Conta conectada; token de jogo: " + outcome.gameTokenDiagnostic + ". Veja o diagnóstico completo no perfil Nextendo do NEX."
                     }
                 },
                 onFailure = {
