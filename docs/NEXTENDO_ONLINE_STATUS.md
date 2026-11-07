@@ -148,13 +148,15 @@ The public source still does not publish the live deployment's actual SMM2 auth 
 
 ### Title DNS and TLS/SNI
 
-- The Nextendo deployment guide describes title-scoped hostname routing, SNI passthrough and certificates valid for the original title hostnames.
-- The public SMM2 source supplies an auth endpoint port and a secure StationURL format, but not the original production hostname or deployed service IP.
-- The secure port can be overridden by server deployment configuration; the runtime StationURL is authoritative.
-- NEX preserves the hostname supplied to the WSS URI so normal TLS hostname verification and SNI can work; DNS must route that hostname to the correct service IP.
+- Eden's guest `sfdnsres` now has an NEX-owned exact-host redirect cache (up to 32 routes). Kotlin/JNI can install or clear hostname-to-IPv4 mappings at runtime.
+- The resolver applies a route only when the exact hostname is configured. Wildcards and broad `*.nintendo.net` redirects are rejected; unrelated domains continue through normal resolution.
+- The resolver retains the original hostname in the returned address record so guest TLS/SNI can still identify the intended virtual host.
+- Redirected Nintendo domains are allowed through the existing safety block only when an exact NEX route exists. Unconfigured Nintendo domains remain blocked by Eden as before.
+- No SMM2 production route is installed yet. The public SMM2 repository's local defaults are not production endpoints, and the deployment's live auth IP/DNS mapping and certificate route are not published in the inspected sources.
+- The secure port can be overridden by server deployment configuration; the runtime LoginEx `StationURL` remains authoritative.
 - NEX does not add guessed hostnames, IP addresses, wildcard redirects or disabled certificate checks.
 
-**Blocker:** the SMM2 auth hostname, its deployment target IP/DNS mapping, certificate coverage and live StationURL values remain unconfirmed. Platform TLS certificate validation remains enabled.
+**Blocker:** provision the original SMM2 auth hostname(s), the official Nextendo route IP(s), certificate/SNI coverage and NNCS host/port configuration. The code path is ready to consume exact routes, but no live SMM2 mapping is enabled.
 
 ### NAT, UDP mapping, discovery and P2P
 
