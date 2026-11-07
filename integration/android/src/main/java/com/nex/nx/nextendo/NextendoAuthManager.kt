@@ -179,6 +179,11 @@ object NextendoAuthManager {
             } else {
                 null
             }
+            // Fetch aggregate stats off the main thread; a stats outage does not
+            // block login and must never freeze the account dialog.
+            val networkStats = runCatching {
+                NextendoAuthClient.fetchNetworkStats()
+            }.getOrNull()
 
             // Immutable snapshot avoids the Kotlin smart-cast CI error caused by
             // capturing the mutable session variable inside this UI closure.
@@ -192,12 +197,6 @@ object NextendoAuthManager {
                     ?: displaySession.friendCode.ifBlank { "Ainda não disponível" }
                 val pid = profile?.pid?.takeIf { it > 0L } ?: displaySession.pid
                 val avatar = profile?.avatarUrl.orEmpty()
-                // Public network statistics are optional and use short timeouts;
-                // a stats outage must never break account sign-in or profile display.
-                val networkStats = runCatching {
-                    NextendoAuthClient.fetchNetworkStats()
-                }.getOrNull()
-
                 val gameTokenReady = hasValidGameToken(displaySession)
                 val details = buildString {
                     append("Jogador: ")
