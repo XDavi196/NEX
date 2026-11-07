@@ -67,7 +67,13 @@ O código do servidor Nextendo foi consultado como referência pública, não in
 
 ## 6. DNS, TLS e SNI por título
 
-O NEX ainda não possui o mapa validado de hostnames do SMM2 para os serviços Nextendo. Sem esse mapa, não há redirecionamento de DNS. Quando a rota for implementada, o hostname original deverá ser preservado para validação do certificado e SNI. A validação TLS da plataforma não pode ser desativada.
+O overlay agora liga um cache de rotas DNS exatas ao serviço `sfdnsres` do Eden. O Android/JNI pode instalar até 32 mapeamentos explícitos hostname → IPv4. Curingas não são aceitos; uma rota só se aplica quando o hostname consultado coincide exatamente. O hostname original permanece no resultado de resolução para que o jogo mantenha o nome correto ao abrir TLS e enviar SNI.
+
+A proteção de DNS do Eden continua bloqueando domínios Nintendo sem rota. Um domínio bloqueado só passa pelo resolvedor quando o NEX instalou uma rota exata para ele. Não há redirecionamento geral de `*.nintendo.net`.
+
+O NEX ainda não tem os hostnames e IPs de produção do SMM2, nem a confirmação de cobertura dos certificados e do SNI para esses endereços. Os valores locais de exemplo do servidor público não são usados como endpoints de produção. Portanto, o cache permanece vazio até receber o mapa oficial de produção. O endereço/porta do servidor seguro anunciado no LoginEx continua sendo a fonte autoritativa para a segunda conexão.
+
+A validação TLS da plataforma permanece ativa; nenhum certificado é ignorado.
 
 ## 7. NAT e P2P
 
