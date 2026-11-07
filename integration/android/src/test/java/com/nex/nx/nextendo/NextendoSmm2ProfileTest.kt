@@ -1,5 +1,6 @@
 package com.nex.nx.nextendo
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -15,6 +16,40 @@ class NextendoSmm2ProfileTest {
         assertEquals(5, NextendoSmm2Profile.AUTH_PRUDP_MINOR_VERSION)
         assertEquals(0, NextendoSmm2Profile.SECURE_PRUDP_MINOR_VERSION)
         assertEquals(1300, NextendoSmm2Profile.DEFAULT_FRAGMENT_SIZE)
+    }
+
+    @Test
+    fun createsSmm2AuthAndSecurePrudpConfigsWithDifferentMinorVersions() {
+        val station = NextendoSmm2Profile.PrudpStationParameters(
+            clientSourceType = 1,
+            clientSourcePort = 10,
+            serverDestinationType = 2,
+            serverDestinationPort = 20,
+            supportedFunctions = 0x1234
+        )
+        val auth = NextendoSmm2Profile.authSessionConfig(station)
+        assertEquals("fdf6617f", auth.accessKey)
+        assertEquals(5, auth.minorVersion)
+        assertTrue(auth.connectPayload.isEmpty())
+        assertEquals(1300, auth.fragmentSize)
+
+        val ticketAndCheck = byteArrayOf(1, 2, 3, 4)
+        val secure = NextendoSmm2Profile.secureSessionConfig(station, ticketAndCheck)
+        assertEquals("fdf6617f", secure.accessKey)
+        assertEquals(0, secure.minorVersion)
+        assertArrayEquals(ticketAndCheck, secure.connectPayload)
+    }
+
+    @Test
+    fun refusesToCreateSecureConfigWithoutLoginTicketAndCheckData() {
+        val station = NextendoSmm2Profile.PrudpStationParameters(
+            clientSourceType = 1,
+            clientSourcePort = 10,
+            serverDestinationType = 2,
+            serverDestinationPort = 20,
+            supportedFunctions = 0x1234
+        )
+        invalid { NextendoSmm2Profile.secureSessionConfig(station, byteArrayOf()) }
     }
 
     @Test
