@@ -497,6 +497,16 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     )
     sfdnsres_cpp.write_text(sfdnsres_text, encoding="utf-8")
 
+    network_header = eden / "src/core/internal_network/network.h"
+    replace_once(
+        network_header,
+        "void RestartSocketOperations();\n",
+        "void RestartSocketOperations();\n"
+        "\n"
+        "/** Clears short-lived Nextendo UDP sockets when the linked account changes. */\n"
+        "void ClearNextendoUdpSocketCache();\n",
+    )
+
     # Keep a short-lived host UDP socket alive across the game's NAT-probe
     # close/reopen sequence. This preserves the external mapping announced to peers.
     network_cpp = eden / "src/core/internal_network/network.cpp"
@@ -609,7 +619,7 @@ bool TryAdoptNextendoUdpSocket(SOCKET& socket, const SockAddrIn& bind_address,
     return true;
 }
 
-void ClearNextendoUdpSocketCache() {
+void ClearParkedNextendoUdpSockets() {
     CloseNextendoUdpSockets(GetNextendoUdpSocketCache().Clear());
 }
 
@@ -623,9 +633,17 @@ void ClearNextendoUdpSocketCache() {
     Finalize();
 }""",
         """NetworkInstance::~NetworkInstance() {
-    ClearNextendoUdpSocketCache();
+    ClearParkedNextendoUdpSockets();
     Finalize();
 }""",
+    )
+    replace_once(
+        network_cpp,
+        "NetworkInstance::NetworkInstance() {\n",
+        "void ClearNextendoUdpSocketCache() {\n"
+        "    ClearParkedNextendoUdpSockets();\n"
+        "}\n\n"
+        "NetworkInstance::NetworkInstance() {\n",
     )
     replace_once(
         network_cpp,
