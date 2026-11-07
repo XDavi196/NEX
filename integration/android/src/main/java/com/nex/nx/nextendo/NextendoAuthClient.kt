@@ -56,7 +56,7 @@ object NextendoAuthClient {
     )
 
     /** Public aggregate statistics; this endpoint does not require a player token. */
-    fun fetchNetworkStats(): NextendoNetworkStats {
+    internal fun fetchNetworkStats(): NextendoNetworkStats {
         val response = request(
             url = "$BASE_URL/api/stats",
             method = "GET",
