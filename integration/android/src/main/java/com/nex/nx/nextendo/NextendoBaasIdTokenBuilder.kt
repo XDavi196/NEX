@@ -11,15 +11,17 @@ import java.util.Base64
 /**
  * Signing boundary for the BAAS id_token sent through ACC to a game's NEX login.
  *
- * Nextendo's public protocol contract requires the nx2. game token in the JWT's
- * custom "nnex" claim. NEX must obtain its own registered RS256 signing material
- * and issuer/JWKS configuration before this boundary can be connected to ACC.
- *
- * No private key, fallback key or other emulator's signing material is bundled here.
+ * Nextendo's public core extracts the string-valued "nnex" payload claim from
+ * the AuthenticationInfo DataHolder in LoginEx.extraData. The public BAAS-JWKS
+ * service resolves the RSA public key from the JWS "jku" header and matching
+ * "kid". Those values must be provisioned for NEX; no private key is bundled.
  */
 internal interface NextendoBaasSigner {
-    /** NEX-specific key ID registered by Nextendo in the BAAS JWKS. */
+    /** NEX-specific key ID registered in the BAAS JWKS. */
     val keyId: String
+
+    /** HTTPS URL that publishes this signer's matching public JWK. */
+    val jwksUrl: String
 
     /** Signs the exact ASCII compact-JWT signing input using the NEX-issued RSA key. */
     fun signRs256(signingInput: ByteArray): ByteArray
@@ -28,8 +30,8 @@ internal interface NextendoBaasSigner {
 internal object NextendoBaasIdTokenBuilder {
     /**
      * Builds a compact RS256 id_token using claims supplied by a verified NEX
-     * BAAS contract provider. This method does not invent sub/iss/aud/jku/device
-     * claims: the caller must supply the exact values issued for NEX.
+     * provisioning provider. The JWK Set URL is a JOSE header parameter ("jku"),
+     * not an account payload claim. No sub/iss/aud values are invented here.
      */
     fun build(
         claims: Map<String, JsonElement>,
@@ -46,16 +48,20 @@ internal object NextendoBaasIdTokenBuilder {
             "The nnex claim is reserved for the validated Nextendo game token."
         }
 
-        requireHttpsClaim(claims, "iss")
-        requireHttpsClaim(claims, "jku")
+        requireHttpsUrl(claims["iss"]?.let(::jsonString), "iss")
+        requireHttpsUrl(signer.jwksUrl, "jku")
         requireNonBlankStringClaim(claims, "aud")
         requireNonBlankStringClaim(claims, "sub")
+        require(claims["hm"] == JsonPrimitive(true)) {
+            "The NEX BAAS hm claim must match the public AuthenticationInfo contract."
+        }
 
         val header = JsonObject(
             linkedMapOf(
                 "alg" to JsonPrimitive("RS256"),
                 "kid" to JsonPrimitive(signer.keyId),
-                "typ" to JsonPrimitive("id_token")
+                "typ" to JsonPrimitive("id_token"),
+                "jku" to JsonPrimitive(signer.jwksUrl)
             )
         )
         val payload = JsonObject(
@@ -76,11 +82,18 @@ internal object NextendoBaasIdTokenBuilder {
         return encodedHeader + "." + encodedPayload + "." + base64Url(signature)
     }
 
-    private fun requireHttpsClaim(claims: Map<String, JsonElement>, name: String) {
-        val value = requireNonBlankStringClaim(claims, name)
-        val uri = runCatching { URI(value) }.getOrNull()
-        require(uri != null && uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
-            "The NEX BAAS $name claim must be the HTTPS URL provisioned by Nextendo."
+    private fun jsonString(value: JsonElement?): String? =
+        (value as? JsonPrimitive)?.contentOrNull
+
+    private fun requireHttpsUrl(value: String?, name: String) {
+        val uri = value?.let { runCatching { URI(it) }.getOrNull() }
+        require(
+            uri != null &&
+                uri.scheme.equals("https", ignoreCase = true) &&
+                !uri.host.isNullOrBlank() &&
+                uri.userInfo == null
+        ) {
+            "The NEX BAAS $name must be an HTTPS URL provisioned for NEX."
         }
     }
 
@@ -88,7 +101,7 @@ internal object NextendoBaasIdTokenBuilder {
         claims: Map<String, JsonElement>,
         name: String
     ): String {
-        val value = (claims[name] as? JsonPrimitive)?.contentOrNull
+        val value = jsonString(claims[name])
         require(!value.isNullOrBlank()) {
             "The NEX BAAS $name claim has not been provisioned."
         }
