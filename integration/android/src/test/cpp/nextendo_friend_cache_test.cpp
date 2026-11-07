@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../../main/cpp/nextendo_friend_cache.h"
 #include "../../main/cpp/nextendo_friend_hle.h"
+#include "../../main/cpp/nextendo_baas_token_cache.h"
 
 #include <algorithm>
 #include <array>
