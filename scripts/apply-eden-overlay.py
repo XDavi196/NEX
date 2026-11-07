@@ -67,6 +67,8 @@ def main() -> None:
         "    external fun clearNextendoIdentity()\n"
         "    external fun updateNextendoBaasIdToken(idToken: ByteArray)\n"
         "    external fun clearNextendoBaasIdToken()\n"
+        "    external fun updateNextendoDnsRedirect(hostname: String, ipv4: String): Boolean\n"
+        "    external fun clearNextendoDnsRedirects()\n"
         "    external fun getAllUsers(): Array<String>?\n",
     )
 
@@ -96,6 +98,14 @@ def main() -> None:
     baas_cache_destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(baas_cache_source, baas_cache_destination)
 
+    # Copy the exact-host DNS redirect cache used by Eden's guest resolver.
+    dns_cache_source = NEX_SOURCE / "integration/android/src/main/cpp/nextendo_dns_redirect_cache.h"
+    dns_cache_destination = eden / "src/core/internal_network/nextendo_dns_redirect_cache.h"
+    if not dns_cache_source.is_file():
+        raise RuntimeError(f"Missing NEX DNS redirect cache header: {dns_cache_source}")
+    dns_cache_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(dns_cache_source, dns_cache_destination)
+
     native_cpp = app_dir / "src/main/jni/native.cpp"
     replace_once(
         native_cpp,
@@ -107,9 +117,37 @@ def main() -> None:
         '#include "core/hle/service/filesystem/filesystem.h"\n',
         '#include "core/hle/service/filesystem/filesystem.h"\n'
         '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
-        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n',
+        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n'
+        '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n',
     )
-    native_jni_anchor = """JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getAllUsers(
+    native_jni_anchor = """JNIEXPORT jboolean JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoDnsRedirect(
+    JNIEnv* env, [[maybe_unused]] jobject obj, jstring hostname, jstring ipv4) {
+    if (hostname == nullptr || ipv4 == nullptr) {
+        return JNI_FALSE;
+    }
+    const char* hostname_chars = env->GetStringUTFChars(hostname, nullptr);
+    const char* ipv4_chars = env->GetStringUTFChars(ipv4, nullptr);
+    if (hostname_chars == nullptr || ipv4_chars == nullptr) {
+        if (hostname_chars != nullptr) env->ReleaseStringUTFChars(hostname, hostname_chars);
+        if (ipv4_chars != nullptr) env->ReleaseStringUTFChars(ipv4, ipv4_chars);
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return JNI_FALSE;
+    }
+
+    const bool accepted = Common::NextendoDnsRedirectCache::Set(hostname_chars, ipv4_chars);
+    env->ReleaseStringUTFChars(hostname, hostname_chars);
+    env->ReleaseStringUTFChars(ipv4, ipv4_chars);
+    return accepted ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoDnsRedirects(
+    JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
+    Common::NextendoDnsRedirectCache::Clear();
+}
+
+JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getAllUsers(
         JNIEnv* env,
         [[maybe_unused]] jobject obj) {
 """
@@ -395,6 +433,63 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
 
     void StoreOpenContext(HLERequestContext& ctx) {""",
     )
+
+    # Route only explicitly provisioned Nintendo service hostnames. The original
+    # hostname remains in the guest resolver result so TLS/SNI can select the correct
+    # Nextendo virtual host; there is no wildcard or all-Nintendo redirect.
+    sfdnsres_cpp = eden / "src/core/hle/service/sockets/sfdnsres.cpp"
+    replace_once(
+        sfdnsres_cpp,
+        '#include "core/hle/service/sockets/sfdnsres.h"\n',
+        '#include "core/hle/service/sockets/sfdnsres.h"\n'
+        '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n',
+    )
+    sfdnsres_text = sfdnsres_cpp.read_text(encoding="utf-8")
+    block_guard = "if (IsBlockedHost(host))"
+    if sfdnsres_text.count(block_guard) != 2:
+        raise RuntimeError("Could not identify both SFDNSRES Nintendo-domain safety guards")
+    sfdnsres_text = sfdnsres_text.replace(
+        block_guard,
+        "if (IsBlockedHost(host) && !Common::NextendoDnsRedirectCache::Resolve(host).has_value())",
+    )
+    helper_anchor = """static NetDbError GetAddrInfoErrorToNetDbError(GetAddrInfoError result) {"""
+    helper = """static auto GetNextendoAwareAddressInfo(
+    const std::string& host, const std::optional<std::string>& service) {
+    const auto redirected = Common::NextendoDnsRedirectCache::Resolve(host);
+    if (!redirected.has_value()) {
+        return Network::GetAddressInfo(host, service);
+    }
+
+    auto result = Network::GetAddressInfo(*redirected, service);
+    if (result.has_value()) {
+        for (auto& entry : result.value()) {
+            entry.canon_name = host;
+        }
+        LOG_INFO(Network, "[NEX] Redirected exact host '{}' to {} (original hostname retained)",
+                 host, *redirected);
+    }
+    return result;
+}
+
+"""
+    if sfdnsres_text.count(helper_anchor) != 1:
+        raise RuntimeError("Could not identify SFDNSRES resolver helper insertion point")
+    sfdnsres_text = sfdnsres_text.replace(helper_anchor, helper + helper_anchor, 1)
+    if sfdnsres_text.count("Network::GetAddressInfo(host, /*service*/ std::nullopt)") != 1:
+        raise RuntimeError("Could not identify GetHostByName resolver call")
+    sfdnsres_text = sfdnsres_text.replace(
+        "Network::GetAddressInfo(host, /*service*/ std::nullopt)",
+        "GetNextendoAwareAddressInfo(host, /*service*/ std::nullopt)",
+        1,
+    )
+    if sfdnsres_text.count("Network::GetAddressInfo(host, service)") != 1:
+        raise RuntimeError("Could not identify GetAddrInfo resolver call")
+    sfdnsres_text = sfdnsres_text.replace(
+        "Network::GetAddressInfo(host, service)",
+        "GetNextendoAwareAddressInfo(host, service)",
+        1,
+    )
+    sfdnsres_cpp.write_text(sfdnsres_text, encoding="utf-8")
 
     # Connect Eden's nn::friends HLE to the NEX-owned read-only cache.
     friend_cpp = eden / "src/core/hle/service/friend/friend.cpp"
