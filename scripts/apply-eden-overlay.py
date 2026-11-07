@@ -499,11 +499,6 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     )
     replace_once(
         friend_cpp,
-        '{20601, &IFriendService::GetUserPresenceView, "GetUserPresenceViewV2"}',
-        '{20601, &IFriendService::GetUserPresenceViewV2, "GetUserPresenceViewV2"}',
-    )
-    replace_once(
-        friend_cpp,
         """    void GetUserPresenceView(HLERequestContext& ctx) {
         IPC::RequestParser rp{ctx};
         const auto uuid = rp.PopRaw<Common::UUID>();
