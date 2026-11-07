@@ -456,12 +456,9 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     helper = """static auto GetNextendoAwareAddressInfo(
     const std::string& host, const std::optional<std::string>& service) {
     const auto redirected = Common::NextendoDnsRedirectCache::Resolve(host);
-    if (!redirected.has_value()) {
-        return Network::GetAddressInfo(host, service);
-    }
-
-    auto result = Network::GetAddressInfo(*redirected, service);
-    if (result.has_value()) {
+    const std::string& lookup_host = redirected.has_value() ? *redirected : host;
+    auto result = Network::GetAddressInfo(lookup_host, service);
+    if (redirected.has_value() && result.has_value()) {
         for (auto& entry : result.value()) {
             entry.canon_name = host;
         }
