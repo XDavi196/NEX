@@ -1,7 +1,7 @@
 #include <cassert>
 #include <string>
 
-#include "nextendo_dns_redirect_cache.h"
+#include "../../main/cpp/nextendo_dns_redirect_cache.h"
 
 int main() {
     using Common::NextendoDnsRedirectCache::Clear;
