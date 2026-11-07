@@ -80,15 +80,17 @@ The C++ host test checks cache bounds, duplicate filtering, explicit-NSA filteri
 
 ## PRUDP, RMC and the SMM2 target
 
-NEX owns strict parsing/serialization primitives for:
+NEX now owns a testable PRUDP-Lite client and WebSocket transport layer:
 
-- PRUDP-Lite frame headers, option blocks, payload lengths, concatenated frames and incomplete stream reads.
-- RMC request, success-response and error-response envelopes.
-- SMM2 DataStore protocol identifier 115 and the publicly documented method identifiers used by the current schema.
+- The HMAC-MD5 CONNECT proof follows the public Nextendo Lite algorithm and accepts the title access key only from runtime configuration.
+- The client state machine handles SYN/SYN-ACK/CONNECT/CONNECT-ACK, reliable DATA, ACK/MULTI-ACK, duplicate suppression, fragment reassembly, PING and DISCONNECT.
+- The OkHttp transport sends and receives binary WebSocket frames over `wss://`; ordinary TLS certificate and hostname verification remain enabled.
+- The RMC envelope codec supports request, success and error messages. Outbound sends are restricted to requests.
+- The SMM2 DataStore protocol identifier 115 and publicly documented method identifiers are recorded in code.
 
-**These are codecs, not a live NEX client.** NEX does not yet perform a PRUDP connection handshake, session authentication, reliability/acknowledgement windows, retransmission, secure-channel negotiation, title-specific RMC parameter serialization or matchmaking.
+Nine Android tests cover the exact CONNECT signature vector, handshake, reliable DATA/ACK, fragment assembly, duplicate suppression, PING and DISCONNECT. These tests validate local protocol behavior; they do not prove acceptance by a live Nextendo service.
 
-Super Mario Maker 2 is the first intended live test target. Nextendo has a dedicated public [SMM2 NEX server repository](https://github.com/NextendoNetwork/super-mario-maker-2), confirming that the service has a title-specific server implementation. That repository is server-side code; it does not by itself provide a verified client hostname/port, NEX access key, deployment mapping or complete client login/matchmaking contract for NEX.
+**Not yet connected to a live title:** NEX still needs the NEX-specific BAAS CONNECT payload, a verified SMM2 WSS endpoint and title access key. It also lacks complete SMM2 RMC argument serialization, a timed retry policy, title matchmaking and NAT/P2P socket lifecycle. No host, port, key or token is hardcoded.
 
 ## NAT and P2P
 
@@ -131,7 +133,7 @@ When title routing is implemented, it must preserve the original hostname for SN
 
 ## NEX visual layer
 
-The Android launcher icon and Games header use the NEX logo supplied by the project owner. The fragment-wide glass treatment has been removed. Buttons, bars, switches and panels keep Eden's original Material styling without an extra translucent overlay.
+The launcher uses NEX adaptive-icon resources with the original artwork inset in the Android safe area; Android applies its launcher mask. The Games header uses Eden's original MaterialTextView title and displays the text `NEX`, not a large image. The fragment-wide glass treatment has been removed. Buttons, bars, switches and panels keep Eden's original Material styling.
 
 
 ## BAAS signing boundary

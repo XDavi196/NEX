@@ -9,6 +9,9 @@ This folder contains the NEX-owned Android integration source:
 - `NextendoAccountApi.kt` — authenticated read-only player profile lookup.
 - `NextendoSocialApi.kt` — OAuth `/api/oauth/userinfo` and read-only friends list.
 - `NextendoPresencePublisher.kt` — online presence heartbeat every 60 seconds, offline publication on disconnect, and in-game Title ID publication from the Eden lifecycle hook.
+- `NextendoPrudpLiteAuthenticator.kt` — Nextendo published Lite CONNECT HMAC-MD5 proof, using only a runtime-provided title key.
+- `NextendoPrudpLiteSession.kt` — tested PRUDP-Lite handshake, reliable DATA/ACK handling, duplicate suppression, fragmentation and connection state machine.
+- `NextendoPrudpLiteWebSocketTransport.kt` — OkHttp binary WebSocket transport with normal TLS verification.
 
 ## NEX configuration
 
@@ -35,10 +38,12 @@ The Android integration currently has:
 - Separate `nx2.` game-token request.
 
 Still missing:
-- Friend request mutations and in-game `nn::friends` IPC projection.
+- Friend request mutations and final guest-visible `nn::friends` IPC validation.
 - Native game lifecycle callback for real in-game presence/title ID.
-- ACC/BAAS `id_token` generation and `nnex` claim injection.
-- DNS mapping, game TLS/SNI validation, game NEX/PRUDP and NAT/P2P socket handling.
+- NEX-specific ACC/BAAS `id_token` generation and `nnex` claim injection.
+- Verified SMM2 WSS endpoint, runtime access-key source and accepted CONNECT/BAAS payload. The PRUDP-Lite client transport is implemented as a testable module but is not wired to a live title.
+- DNS mapping, title TLS/SNI, complete SMM2 RMC methods and matchmaking.
+- NAT/P2P socket ownership, keepalive, discovery and hole-punching.
 - End-to-end testing with two accounts and a supported game.
 
 A successful OAuth login or retrieval of an `nx2.` token does not by itself prove multiplayer works. See [the online status checklist](../../docs/NEXTENDO_ONLINE_STATUS.md).
@@ -48,7 +53,7 @@ Never print access tokens, refresh tokens, game tokens, callback codes or PKCE v
 
 ## NEX visual identity and online diagnostics
 
-The fragment-wide glass treatment was removed. The launcher and Games header use the original NEX logo, while the app retains Eden's existing Material styling.
+The fragment-wide glass treatment was removed. The launcher uses an adaptive NEX icon based on the original logo, while the Games header keeps Eden's Material title view and displays the text `NEX`. The app retains Eden's existing Material styling.
 
 The account panel distinguishes OAuth connectivity from the separate `nx2.` game credential. It displays the scopes returned by OAuth, the latest token-free HTTP result for the presence and game-token requests, and whether SMM2 is ready. The game-token result is saved inside the encrypted Android Keystore-backed session. qLaunch friend rows are only available when the public API supplies an explicit NSA; a PID is never substituted.
 

@@ -68,12 +68,14 @@ The account panel shows the exact scopes returned in the OAuth token response an
 ### PRUDP, RMC and SMM2 protocol primitives
 
 - A strict PRUDP-Lite frame codec handles the 12-byte header, option blocks, payload lengths, concatenated frames and incomplete stream reads.
-- A strict RMC envelope codec handles request, success-response and error-response headers.
-- The SMM2 DataStore protocol identifier (115) and public method identifiers are recorded from the NintendoClients DataStore_SMM2 schema.
-- The stream decoder clears incomplete frames when closed.
-- Android unit tests cover token parsing, game-friend parsing, OAuth parsing, presence authorization, PRUDP-Lite frames, RMC envelopes, social parsing and NAT probe/state handling.
+- `NextendoPrudpLiteAuthenticator` implements the public Nextendo Lite CONNECT proof (MD5 of the runtime-supplied title access key, then HMAC-MD5 over that digest plus the server 16-byte connection signature). No access key is embedded or guessed.
+- `NextendoPrudpLiteSession` is a deterministic client state machine for SYN, SYN+ACK, CONNECT, CONNECT+ACK, reliable DATA, single/multi ACK, duplicate suppression, fragment assembly, PING and DISCONNECT.
+- `NextendoPrudpLiteWebSocketTransport` adapts the state machine to binary OkHttp WebSocket frames over `wss://`, retaining platform TLS hostname and certificate verification.
+- A strict RMC envelope codec handles request, success-response and error-response headers. Outbound client calls are restricted to RMC requests.
+- The SMM2 DataStore protocol identifier (115) and public method identifiers are recorded from the public schema.
+- Android unit tests cover the exact HMAC proof vector, handshake, reliable DATA acknowledgements, duplicate handling, fragment reassembly, PING/DISCONNECT, PRUDP-Lite frames and RMC envelopes.
 
-These are codecs and parsers only. NEX does not yet establish a live PRUDP session, complete service authentication, reliability/acknowledgement windows, retransmission, secure-channel negotiation, SMM2 method payload serialization or matchmaking.
+This is now a testable client transport implementation, not just a codec. It is **not yet wired into Eden ACC or a live title session**: the NEX-specific BAAS CONNECT payload, accepted SMM2 WSS endpoint, access key and title service configuration are still unverified. The adapter does not invent those values or bypass BAAS/client attestation. It also does not yet implement complete SMM2 RMC payloads, a timed retry policy, title matchmaking or NAT/P2P lifecycle.
 
 ### NAT primitives
 
@@ -149,7 +151,7 @@ The public sources still do not provide a verified SMM2 client hostname/port, de
 
 Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It also requested all six scopes shown in the owner's portal.
 
-Run #103 verifies the logo restoration and glass removal from commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e`. It was still in progress at the time of this update. The request-diagnostic code being added now will be verified by a later run.
+Run #103 successfully built and published the visual cleanup from commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e`. Later diagnostics and PRUDP transport changes are newer source revisions and must pass their own CI build before release.
 
 These are build/test results only. They do not prove live account-service acceptance or in-game multiplayer.
 
@@ -168,8 +170,9 @@ Until those checks pass, NEX in-game multiplayer remains **not implemented / not
 
 ## NEX UI and current device-facing status
 
-- The official NEX logo is used in the Android launcher identity and the Games screen header.
-- The fragment-wide glass treatment was removed. The Android app uses the owner's original NEX logo and Eden's original Material styling for bars, buttons, cards and switches.
+- The launcher uses NEX adaptive-icon resources, with the original logo inset into the system-mask safe area and the original black background. Android applies the user's circular or squircle launcher mask, like Eden's adaptive icon.
+- The Games header keeps Eden's original MaterialTextView title and styling; the app-name resource displays the text `NEX` instead of a large logo image.
+- The fragment-wide glass treatment was removed. The Android app keeps Eden's original Material styling for bars, buttons, cards and switches.
 - The account panel separates account sign-in from game readiness. It displays the scopes actually returned by OAuth, whether `game.matchmaking` was granted, and a token-free diagnostic for the latest presence request (HTTP status, missing scope or network/session failure). A valid `nx2.` token is only a prerequisite; SMM2 remains disconnected until BAAS/nnex signing, title endpoint and PRUDP session are implemented and verified.
 - The friends panel explains that an OAuth-visible friend is not automatically a game-visible friend: qLaunch records still require a confirmed NSA/UUID mapping.
 - OAuth callback state is now mandatory and compared in constant time before exchanging an authorization code.

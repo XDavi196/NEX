@@ -672,6 +672,48 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     logo_destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(logo_source, logo_destination)
 
+    # Use Android's adaptive-icon system, just like Eden's launcher icon. Android
+    # applies the user's circular/squircle mask; the inset keeps the NEX artwork
+    # inside the adaptive-icon safe area without changing the source logo.
+    foreground_xml = app_dir / "src/main/res/drawable-nodpi/nex_launcher_foreground.xml"
+    foreground_xml.write_text(
+        """<?xml version="1.0" encoding="utf-8"?>
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/nex_logo"
+    android:insetLeft="12dp"
+    android:insetTop="12dp"
+    android:insetRight="12dp"
+    android:insetBottom="12dp" />
+""",
+        encoding="utf-8",
+    )
+
+    values_dir = app_dir / "src/main/res/values"
+    values_dir.mkdir(parents=True, exist_ok=True)
+    (values_dir / "nex_launcher_colors.xml").write_text(
+        """<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="nex_launcher_background">#000000</color>
+</resources>
+""",
+        encoding="utf-8",
+    )
+
+    adaptive_dir = app_dir / "src/main/res/mipmap-anydpi-v26"
+    fallback_dir = app_dir / "src/main/res/mipmap-nodpi"
+    adaptive_dir.mkdir(parents=True, exist_ok=True)
+    fallback_dir.mkdir(parents=True, exist_ok=True)
+    adaptive_icon = """<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/nex_launcher_background" />
+    <foreground android:drawable="@drawable/nex_launcher_foreground" />
+</adaptive-icon>
+"""
+    for icon_name in ("ic_launcher_nex", "ic_launcher_nex_round"):
+        (adaptive_dir / f"{icon_name}.xml").write_text(adaptive_icon, encoding="utf-8")
+        # Pre-26 fallback; Android 11 and newer use the adaptive XML above.
+        shutil.copy2(logo_source, fallback_dir / f"{icon_name}.webp")
+
     manifest = app_dir / "src/main/AndroidManifest.xml"
     callback_activity = """        <activity
             android:name="com.nex.nx.nextendo.NextendoCallbackActivity"
@@ -702,12 +744,12 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     replace_once(
         manifest,
         'android:icon="@mipmap/ic_launcher"',
-        'android:icon="@drawable/nex_logo"',
+        'android:icon="@mipmap/ic_launcher_nex"',
     )
     replace_once(
         manifest,
         'android:roundIcon="@mipmap/ic_launcher_round"',
-        'android:roundIcon="@drawable/nex_logo"',
+        'android:roundIcon="@mipmap/ic_launcher_nex_round"',
     )
 
     presenter = (
@@ -764,16 +806,10 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
             style="@style/SynthwaveText.Title"
             android:textSize="27sp"
             />"""
-    title_logo = """        <ImageView
-            android:id="@+id/title"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:contentDescription="NEX"
-            android:scaleType="fitCenter"
-            android:src="@drawable/nex_logo"
-            />"""
-    replace_once(games_layout, title_anchor, title_logo)
-    layout_text = games_layout.read_text(encoding="utf-8")
+    if layout_text.count(title_anchor) != 1:
+        raise RuntimeError("Could not identify Eden's original games title")
+    # Keep Eden's original MaterialTextView title. Gradle above sets app_name to
+    # "NEX", so the header shows the wordmark instead of a large logo image.
     header_anchor = """    </LinearLayout>
 
     <FrameLayout
