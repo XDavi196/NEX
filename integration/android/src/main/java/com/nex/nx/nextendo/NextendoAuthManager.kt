@@ -306,7 +306,10 @@ object NextendoAuthManager {
     }
 
     private fun syncNativeIdentity(session: NextendoSessionStore.Session) {
-        if (hasValidGameToken(session)) {
+        // The HOME Menu needs the linked account identity even when the game-token
+        // endpoint is not yet enabled for this public client. Game authentication
+        // still checks the separate nx2. token in its own path.
+        if (session.pid > 0L) {
             NextendoNativeBridge.updateIdentity(session.pid)
         } else {
             NextendoNativeBridge.clearIdentity()
