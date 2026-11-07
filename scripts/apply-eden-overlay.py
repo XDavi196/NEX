@@ -120,12 +120,12 @@ def main() -> None:
         '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n'
         '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n',
     )
-    native_jni_anchor = """JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_emu_NativeLibrary_getAllUsers(
+    native_jni_anchor = """JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getAllUsers(
         JNIEnv* env,
         [[maybe_unused]] jobject obj) {
 """
     native_jni_bridge = r'''JNIEXPORT jboolean JNICALL
-Java_org_yuzu_yuzu_emu_NativeLibrary_updateNextendoDnsRedirect(
+Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoDnsRedirect(
     JNIEnv* env, [[maybe_unused]] jobject obj, jstring hostname, jstring ipv4) {
     if (hostname == nullptr || ipv4 == nullptr) {
         return JNI_FALSE;
@@ -146,7 +146,7 @@ Java_org_yuzu_yuzu_emu_NativeLibrary_updateNextendoDnsRedirect(
 }
 
 JNIEXPORT void JNICALL
-Java_org_yuzu_yuzu_emu_NativeLibrary_clearNextendoDnsRedirects(
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoDnsRedirects(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Common::NextendoDnsRedirectCache::Clear();
 }
