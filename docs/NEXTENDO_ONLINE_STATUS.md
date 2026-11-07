@@ -11,8 +11,10 @@ A successful APK build proves that the configured Android source and native tool
 - Direct APK: [Download alpha.108](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk).
 - APK size: 27,285,737 bytes. The release includes `SHA256SUMS.txt`.
 - Run #108 source commit: `e5c1a235e1ad87551d6e8cc97709713f3a66e0b5`. This build passed the native friend-cache/HLE host test, all then-current Android Nextendo unit tests, the optimized APK build, artifact upload and prerelease publication. It contains PRUDP-Lite transport, WSS adapter and NEX adaptive branding, but predates the BAAS/SMM2 profile additions.
-- Latest BAAS/SMM2 source validation: [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607), triggered for commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. It was still running at the time of this update; no APK or release from #121 is verified yet.
-- The current development branch is `nex/eden-v0.2.0-rc1-nextendo`, head `40f2c6248b00788dccb941cb1d7e95bab90f6a17`. The two commits after #121 are documentation-only.
+- Latest BAAS/SMM2 source validation: [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607), triggered for commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. Its native and Kotlin tests passed and the Android APK build was running at the time of this update; no APK or release from #121 is verified yet.
+- [Actions run #122](https://github.com/XDavi196/NEX/actions/runs/42402908702) was automatically cancelled when the newer source fix was queued; it is not a compile failure.
+- [Actions run #123](https://github.com/XDavi196/NEX/actions/runs/42403049793) contains the stats UI-thread fix and is pending behind #121.
+- The current development branch is `nex/eden-v0.2.0-rc1-nextendo`, head `079d8baa7896aa3dbf27cf0dd066dfe45d0fe806`. The commit after #121 is the stats feature and its UI-thread correction.
 - Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 - Android application ID: `com.nex.nx`.
 - OAuth callback: `com.nex.nx://oauth/callback`.
@@ -42,6 +44,13 @@ The account panel shows the exact scopes returned in the OAuth token response an
 - The response parser accepts only the documented non-negative integer counters: `online_players`, `total_registered` and `games_online`.
 - The optional request uses a short timeout; a stats endpoint failure does not block account sign-in or profile display.
 - Unit tests cover the documented response shape and reject missing, malformed, non-integer or negative counters.
+
+### Client application attestation
+
+- The Nextendo reference-emulator changelog says v1.8.6 began requiring a registered application identity and required application headers for account/network endpoints; v1.8.7 added mandatory cryptographic client attestation and an update gate for older clients.
+- NEX sends its own public OAuth Client ID in the application header, but it does not currently sign requests with a provisioned NEX attestation key.
+- The public third-party Developer Documentation describes public OAuth/PKCE apps but does not publish the attestation signing algorithm, required headers, or whether the same attestation gate applies to third-party public clients such as NEX.
+- Treat protected game-token and emulator endpoints as unverified until the NEX client-attestation contract and any required public-key registration are documented/provisioned. Do not invent a signature scheme or borrow another emulator's private key.
 
 ### ACC and player identity
 
@@ -154,9 +163,9 @@ The public source still does not publish the live deployment's actual SMM2 auth 
 
 ## Test and release gate
 
-Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It also requested all six scopes shown in the owner's portal.
+Run #108 successfully built and published the PRUDP-Lite/WSS transport and adaptive NEX branding. It did not include the later BAAS/SMM2 profile or public network-statistics code.
 
-Run #103 successfully built and published the visual cleanup from commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e`. Later diagnostics and PRUDP transport changes are newer source revisions and must pass their own CI build before release.
+Run #121 has passed its native friend-cache and Android Nextendo unit-test steps and is currently in the Android APK build step. Run #123 is the pending validation for the public network-statistics UI and its off-main-thread implementation. Neither run is a live service or multiplayer test.
 
 These are build/test results only. They do not prove live account-service acceptance or in-game multiplayer.
 
@@ -227,3 +236,8 @@ The development branch now includes the public SMM2 profile, BAAS JWT builder an
 Run #121 is the first CI run that includes these BAAS/SMM2 source changes. Its completion will establish whether the Kotlin and Android project compile; it will not establish a live BAAS login or successful SMM2 matchmaking. The current branch remains a development branch, not a complete online release.
 
 The public [Nextendo Developer Documentation](https://wiki.nextendo.network/developers) describes OAuth PKCE, a separate `nx2.` game token, the `nnex` BAAS claim and public aggregate `/api/stats`. The official [architecture](https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md) and [deployment guide](https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md) show that online play additionally requires title DNS redirection, TLS/SNI, device authentication, a per-game auth/secure server, NNCS NAT checks and P2P. Addresses and signing secrets are runtime configuration; the public deployment guides use placeholders rather than publishing production IPs or private keys.
+
+
+## Client attestation source note
+
+The Nextendo public [Ryujinx-Nextendo changelog](https://wiki.nextendo.network/changelog) records a closed-API/application-identity update in v1.8.6 and a mandatory cryptographic client-attestation update in v1.8.7. The reference emulator's README says its official build signs API requests with a private key baked in at build time. Those notes establish that attestation exists for the official emulator client; they do not publish the signing contract for third-party OAuth public clients. NEX therefore keeps the standard public PKCE flow and its own Client ID, but must not claim that protected game endpoints accept the NEX client until this distinction is resolved and any required attestation is provisioned.
