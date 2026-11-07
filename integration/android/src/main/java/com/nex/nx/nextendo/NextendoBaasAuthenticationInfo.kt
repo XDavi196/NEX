@@ -41,7 +41,9 @@ internal object NextendoBaasAuthenticationInfo {
             val decoded = Base64.getUrlDecoder().decode(jwtParts[1])
             Json.parseToJsonElement(String(decoded, StandardCharsets.UTF_8)).jsonObject
         }.getOrNull() ?: throw IllegalArgumentException("BAAS id_token payload is invalid.")
-        val boundGameToken = payload["nnex"]?.jsonPrimitive?.content
+        val boundGameToken = runCatching {
+            payload["nnex"]?.jsonPrimitive?.content
+        }.getOrNull()
         require(boundGameToken == expectedGameToken) {
             "BAAS id_token nnex claim does not match the current Nextendo game token."
         }
