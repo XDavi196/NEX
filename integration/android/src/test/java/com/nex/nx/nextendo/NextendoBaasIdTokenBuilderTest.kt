@@ -6,12 +6,14 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.fail
 import org.junit.Test
 
 class NextendoBaasIdTokenBuilderTest {
     private class TestSigner : NextendoBaasSigner {
         override val keyId = "nex-test-key-only"
+        override val jwksUrl = "https://baas.test.invalid/1.0.0/certificates"
         var lastSigningInput: ByteArray? = null
 
         override fun signRs256(signingInput: ByteArray): ByteArray {
@@ -24,13 +26,12 @@ class NextendoBaasIdTokenBuilderTest {
         "iss" to JsonPrimitive("https://baas.test.invalid/issuer"),
         "aud" to JsonPrimitive("nex-test-audience"),
         "sub" to JsonPrimitive("test-subject"),
-        "jku" to JsonPrimitive("https://baas.test.invalid/1.0.0/certificates"),
         "jti" to JsonPrimitive("test-jti"),
         "hm" to JsonPrimitive(true)
     )
 
     @Test
-    fun insertsOnlyTheProvidedNx2TokenIntoNnexAndUsesRs256Header() {
+    fun insertsOnlyTheProvidedNx2TokenIntoNnexAndUsesProvisionedRs256Header() {
         val signer = TestSigner()
         val token = NextendoBaasIdTokenBuilder.build(
             claims = claims(),
@@ -50,8 +51,14 @@ class NextendoBaasIdTokenBuilderTest {
         assertEquals("RS256", header["alg"].toString().trim('"'))
         assertEquals("nex-test-key-only", header["kid"].toString().trim('"'))
         assertEquals("id_token", header["typ"].toString().trim('"'))
+        assertEquals(
+            "https://baas.test.invalid/1.0.0/certificates",
+            header["jku"].toString().trim('"')
+        )
         assertEquals("nx2.test-server-issued-token", payload["nnex"].toString().trim('"'))
         assertEquals("https://baas.test.invalid/issuer", payload["iss"].toString().trim('"'))
+        assertEquals("true", payload["hm"].toString())
+        assertFalse("jku must be a JOSE header parameter, not a payload claim", "jku" in payload)
         assertEquals(
             parts[0] + "." + parts[1],
             String(signer.lastSigningInput!!, StandardCharsets.US_ASCII)
@@ -71,7 +78,7 @@ class NextendoBaasIdTokenBuilderTest {
     }
 
     @Test
-    fun rejectsUnprovisionedClaimsAndNonHttpsUrls() {
+    fun rejectsUnprovisionedClaimsAndInvalidProvisionedUrls() {
         invalid {
             NextendoBaasIdTokenBuilder.build(
                 claims() - "aud",
@@ -81,7 +88,26 @@ class NextendoBaasIdTokenBuilderTest {
         }
         invalid {
             NextendoBaasIdTokenBuilder.build(
-                claims() + ("jku" to JsonPrimitive("http://baas.test.invalid/jwks")),
+                claims() - "hm",
+                "nx2.test-server-issued-token",
+                TestSigner()
+            )
+        }
+        val invalidJwksSigner = object : NextendoBaasSigner {
+            override val keyId = "nex-test-key-only"
+            override val jwksUrl = "http://baas.test.invalid/jwks"
+            override fun signRs256(signingInput: ByteArray) = byteArrayOf(1)
+        }
+        invalid {
+            NextendoBaasIdTokenBuilder.build(
+                claims(),
+                "nx2.test-server-issued-token",
+                invalidJwksSigner
+            )
+        }
+        invalid {
+            NextendoBaasIdTokenBuilder.build(
+                claims() + ("iss" to JsonPrimitive("http://baas.test.invalid/issuer")),
                 "nx2.test-server-issued-token",
                 TestSigner()
             )
@@ -89,7 +115,7 @@ class NextendoBaasIdTokenBuilderTest {
     }
 
     @Test
-    fun rejectsCallerSuppliedNnexClaimAndMissingKeyId() {
+    fun rejectsCallerSuppliedNnexClaimAndMissingSignerIdentity() {
         invalid {
             NextendoBaasIdTokenBuilder.build(
                 claims() + ("nnex" to JsonPrimitive("nx2.not-the-current-token")),
@@ -99,6 +125,7 @@ class NextendoBaasIdTokenBuilderTest {
         }
         val signer = object : NextendoBaasSigner {
             override val keyId = ""
+            override val jwksUrl = "https://baas.test.invalid/jwks"
             override fun signRs256(signingInput: ByteArray) = byteArrayOf(1)
         }
         invalid { NextendoBaasIdTokenBuilder.build(claims(), "nx2.test-server-issued-token", signer) }
@@ -108,6 +135,7 @@ class NextendoBaasIdTokenBuilderTest {
     fun rejectsSignerThatDoesNotReturnSignature() {
         val signer = object : NextendoBaasSigner {
             override val keyId = "nex-test-key-only"
+            override val jwksUrl = "https://baas.test.invalid/jwks"
             override fun signRs256(signingInput: ByteArray) = byteArrayOf()
         }
         invalid { NextendoBaasIdTokenBuilder.build(claims(), "nx2.test-server-issued-token", signer) }
@@ -118,7 +146,7 @@ class NextendoBaasIdTokenBuilderTest {
             action()
             fail("Expected the BAAS builder to reject unprovisioned or invalid input.")
         } catch (_: IllegalArgumentException) {
-            // Expected: the builder fails closed before producing a token.
+            // Expected validation failure.
         }
     }
 }
