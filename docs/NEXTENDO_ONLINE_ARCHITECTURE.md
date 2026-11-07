@@ -27,7 +27,7 @@ A presença do HOME Menu não inventa AppField. O campo fica vazio até que exis
 
 ## 3. BAAS e ACC
 
-O HLE ACC recebe a identidade NEX disponível, mas isso não equivale à autenticação BAAS do jogo. A emissão de id_token assinado com o token nx2. dentro da claim nnex depende de:
+O HLE ACC recebe o PID NEX através de uma ponte provisória para o getter de account ID; a equivalência entre PID e o identificador de conta esperado pelo jogo ainda não foi confirmada. Isso não equivale à autenticação BAAS do jogo. A emissão de id_token assinado com o token nx2. dentro da claim nnex depende de:
 
 - contrato exato da claim, issuer, audience, kid, jku, algoritmo e validade;
 - chave privada emitida especificamente para o NEX;
@@ -44,7 +44,7 @@ O serviço nn::friends só expõe registros de jogo quando há um NSA explícito
 
 A API pública de amigos atualmente retorna PID e presença, mas não NSA nem UUID. Por isso, com essa resposta pública, a lista HLE fica vazia em vez de enviar IDs incorretos ao jogo. O aplicativo ainda pode mostrar os dados sociais que a API disponibilizar, mas isso não significa que o jogo consiga resolver esses amigos.
 
-Os comandos modernos de qLaunch foram registrados no overlay, mas os buffers V2 ainda precisam de validação dentro do qLaunch real. Os testes nativos do cache não substituem testes IPC visíveis ao jogo.
+Os comandos modernos de qLaunch foram registrados no overlay e os serializers V2 têm testes nativos de host. Os buffers e comandos ainda precisam de validação dentro do qLaunch real. Os testes nativos do cache não substituem testes IPC visíveis ao jogo.
 
 ## 5. PRUDP-Lite, RMC e Super Mario Maker 2
 
@@ -55,6 +55,8 @@ Foi implementado um codec NEX-owned para o envelope PRUDP-Lite e um codec para o
 - DataStore_SMM2: protocolo 115, com IDs de métodos transcritos do schema público.
 
 Esses codecs não implementam o handshake completo, assinatura de pacotes, chave de acesso do jogo, janela de confiabilidade, retransmissão, sessão RMC, serialização dos parâmetros específicos do SMM2 ou matchmaking. Eles também não abrem conexão de rede.
+
+O SMM2 é o primeiro alvo de teste. A organização oficial Nextendo publica um servidor NEX dedicado para o jogo: https://github.com/NextendoNetwork/super-mario-maker-2. Isso confirma que existe implementação de servidor para o título, mas o repositório de servidor não fornece por si só o endpoint cliente implantado, a chave de acesso, o mapa DNS/SNI nem todo o fluxo de cliente necessário ao NEX.
 
 Referências de protocolo usadas para a implementação independente:
 - NintendoClients, licença MIT: https://github.com/kinnay/NintendoClients

@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.jpg" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.97">Get the latest verified experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.99">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
- > **Please read before installing:** NEX is an experimental preview. Build #97 produced a verified APK after native friend-cache and Android unit tests, but this does not prove that account endpoints or in-game online play work against the live Nextendo service. In-game online multiplayer is not ready.
+ > **Please read before installing:** NEX is an experimental preview. Build #99 produced a verified APK after native friend-cache and Android unit tests, but this does not prove that account endpoints or in-game online play work against the live Nextendo service. In-game online multiplayer is not ready.
 
 ## What NEX is
 
@@ -37,9 +37,11 @@ The current requested scopes are:
 
 `identity friends presence game.matchmaking`
 
+The first in-game validation target is **Super Mario Maker 2**. Nextendo publishes a dedicated SMM2 NEX server, but NEX still needs the title's confirmed client endpoint, authentication and network configuration before it can connect. The account screen and a successful APK build do not mean SMM2 multiplayer is ready.
+
 ### Where to find it
 
-The verified `v0.1.0-alpha.97` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
+The verified `v0.1.0-alpha.99` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
 
 ### Connecting your account
 
@@ -74,7 +76,7 @@ Until those pieces work together and have been tested, please do not expect onli
 
 The latest verified Android baseline is available as an experimental GitHub prerelease:
 
-**[NEX v0.1.0-alpha.97 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.97)**
+**[NEX v0.1.0-alpha.99 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.99)**
 
 The APK asset is named `NEX-Android-v0.2.0-rc1-optimized.apk`. The release also includes `SHA256SUMS.txt`, which can be used to verify the file's SHA-256 checksum.
 
