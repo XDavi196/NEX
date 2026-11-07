@@ -485,6 +485,11 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     )
     replace_once(
         friend_cpp,
+        '{20601, &IFriendService::GetUserPresenceView, "GetUserPresenceViewV2"}',
+        '{20601, &IFriendService::GetUserPresenceViewV2, "GetUserPresenceViewV2"}',
+    )
+    replace_once(
+        friend_cpp,
         '{20102, nullptr, "GetFriendDetailedInfo"}',
         '{20102, &IFriendService::GetFriendDetailedInfo, "GetFriendDetailedInfo"},\n'
         '            {20107, &IFriendService::GetFriendDetailedInfoV2, "GetFriendDetailedInfoV2"},\n'
