@@ -6,15 +6,13 @@ A successful APK build proves that the configured Android source and native tool
 
 ## Verified build evidence
 
-- Latest verified Android build: [Actions run #108](https://github.com/XDavi196/NEX/actions/runs/42399598481), successful.
-- Published prerelease: [NEX v0.1.0-alpha.108](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108).
-- Direct APK: [Download alpha.108](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk).
-- APK size: 27,285,737 bytes. The release includes `SHA256SUMS.txt`.
-- Run #108 source commit: `e5c1a235e1ad87551d6e8cc97709713f3a66e0b5`. This build passed the native friend-cache/HLE host test, all then-current Android Nextendo unit tests, the optimized APK build, artifact upload and prerelease publication. It contains PRUDP-Lite transport, WSS adapter and NEX adaptive branding, but predates the BAAS/SMM2 profile additions.
-- Latest BAAS/SMM2 source validation: [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607), triggered for commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. Its native and Kotlin tests passed; the Android APK build is still in progress and no #121 APK/release is verified.
-- [Runs #122](https://github.com/XDavi196/NEX/actions/runs/42402908702), [#123](https://github.com/XDavi196/NEX/actions/runs/42403049793) and [#124](https://github.com/XDavi196/NEX/actions/runs/42403368156) were superseded/cancelled or remain queued as newer changes were pushed; these are concurrency effects, not confirmed source failures.
-- [Run #125](https://github.com/XDavi196/NEX/actions/runs/42403418659) is the newest queued validation. It includes public network stats on a background executor, Kotlin visibility correction, and strict numeric response parsing tests.
-- The current development branch is `nex/eden-v0.2.0-rc1-nextendo`, head `e4da3cef4c1a27b46507f1cf1d808012f54e70d1`.
+- Latest verified Android APK: [NEX v0.1.0-alpha.108](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.108), from successful [Actions run #108](https://github.com/XDavi196/NEX/actions/runs/42399598481).
+- Direct APK: [Download alpha.108](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.108/NEX-Android-v0.2.0-rc1-optimized.apk). APK size 27,285,737 bytes; release includes `SHA256SUMS.txt`.
+- Alpha.108 predates the ACC BAAS bridge, LoginEx/ticket codecs and SMM2 session coordinator described below. It is not an online-ready release.
+- [Actions run #131](https://github.com/XDavi196/NEX/actions/runs/42405238518) is the first queued run for the ACC/BAAS, LoginEx and secure-ticket code, commit `9d5c6e02ca6999e7bb912b6f4a6d6e475065b60c`. It is pending; it has not produced an APK.
+- [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607) passed its native and Kotlin test steps but remains stuck in the Android APK build step, last updated 7 November 2026 at 18:42 UTC. No #121 artifact/release is verified.
+- Runs #122–#130 were superseded/cancelled in the single-branch concurrency queue; that is not a test-failure result.
+- Current branch: `nex/eden-v0.2.0-rc1-nextendo`, source head `9d5c6e02ca6999e7bb912b6f4a6d6e475065b60c`.
 - Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 - Android application ID: `com.nex.nx`.
 - OAuth callback: `com.nex.nx://oauth/callback`.
@@ -52,11 +50,14 @@ The account panel shows the exact scopes returned in the OAuth token response an
 - The public third-party Developer Documentation describes public OAuth/PKCE apps but does not publish the attestation signing algorithm, required headers, or whether the same attestation gate applies to third-party public clients such as NEX.
 - Treat protected game-token and emulator endpoints as unverified until the NEX client-attestation contract and any required public-key registration are documented/provisioned. Do not invent a signature scheme or borrow another emulator's private key.
 
-### ACC and player identity
+### ACC / BAAS id_token path
 
-- Eden retains its original local ACC account ID. The NEX PID is not substituted for Eden's account ID, NSA or Switch account UUID.
-- The NEX PID remains available to the NEX-owned social/account context; this does not create a BAAS `id_token` or authenticate a NEX game session.
-- The exact BAAS/ACC game-auth contract and guest-level validation remain blockers.
+- A bounded native `NextendoBaasTokenCache` stores only a three-segment compact-JWS-shaped token (maximum 8 KiB); malformed input clears the cache. The cache is mutex-protected and returns defensive copies.
+- The Eden overlay injects matching JNI methods and copies the cache header into Eden's ACC service.
+- `IManagerForApplication::CheckAvailability` now reports whether the cache contains a token. `LoadIdTokenCache` and the deprecated async interface return the exact compact-JWT bytes. They return a zero byte-count if no token exists or the guest output buffer is too small; the previous fake 0x100-byte zero-filled result is removed.
+- `NextendoBaasRuntime` connects the RS256 builder and `AuthenticationInfo` DataHolder serializer to the ACC cache only when a NEX-specific provisioned signing provider exists and the current `nx2.` game token is valid. It clears ACC state on logout, absent/expired token, missing signer or invalid claims.
+- No production signer/provider is installed in this branch. The bridge is implemented and fail-closed, but the guest receives no BAAS token until the NEX key/JWKS, `kid`, `iss`, `aud`, `sub`/PID and any required attestation are provisioned.
+- Eden's local account ID, Switch UUID and NSA remain separate from the Nextendo PID. NEX does not substitute one identifier for another.
 
 ### Native friend cache and nn::friends HLE
 
@@ -72,16 +73,20 @@ The account panel shows the exact scopes returned in the OAuth token response an
 ### PRUDP, RMC and SMM2 protocol primitives
 
 - A strict PRUDP-Lite frame codec handles the 12-byte header, option blocks, payload lengths, concatenated frames and incomplete stream reads.
-- `NextendoPrudpLiteAuthenticator` implements the public Nextendo Lite CONNECT proof (MD5 of the runtime-supplied title access key, then HMAC-MD5 over that digest plus the server 16-byte connection signature). No access key is embedded or guessed.
+- `NextendoPrudpLiteAuthenticator` implements the public Nextendo Lite CONNECT proof (MD5 of the runtime-supplied title access key, then HMAC-MD5 over that digest plus the server 16-byte connection signature).
 - `NextendoPrudpLiteSession` is a deterministic client state machine for SYN, SYN+ACK, CONNECT, CONNECT+ACK, reliable DATA, single/multi ACK, duplicate suppression, fragment assembly, PING and DISCONNECT.
-- `NextendoPrudpLiteWebSocketTransport` adapts the state machine to binary OkHttp WebSocket frames over `wss://`, retaining platform TLS hostname and certificate verification.
-- A strict RMC envelope codec handles request, success-response and error-response headers. Outbound client calls are restricted to RMC requests.
+- `NextendoPrudpLiteWebSocketTransport` adapts the state machine to binary OkHttp WSS frames, retaining platform TLS hostname and certificate verification.
+- The RMC envelope codec handles request, success-response and error-response headers. Outbound client calls are restricted to RMC requests.
 - The SMM2 DataStore protocol identifier (115) and public method identifiers are recorded from the public schema.
-- Android unit tests cover the exact HMAC proof vector, handshake, reliable DATA acknowledgements, duplicate handling, fragment reassembly, PING/DISCONNECT, PRUDP-Lite frames and RMC envelopes.
+- Unit tests cover the HMAC proof vector, PRUDP handshake/reliability, fragmentation, RMC framing, LoginEx extraData framing, LoginEx response decoding, client-ticket decryption, secure CONNECT payload construction and the secure server check response.
 
-This is now a testable client transport implementation, not just a codec. The public SMM2 client profile has been added: title key \`fdf6617f\`, NEX version \`40000\`, auth WSS \`:443\`, secure-port default \`:60007\`, auth PRUDP minor \`5\`, secure minor \`0\`, and a dynamic secure StationURL parser. The title key is public per-title material from the SMM2 server source, not a private server password.
+The public SMM2 profile records title key `fdf6617f`, NEX version `40000`, auth WSS `:443`, secure default `:60007`, auth PRUDP minor `5`, secure minor `0` and runtime StationURL parsing. The title key is public per-title material, not a private server credential.
 
-The NEX BAAS helper now builds the RS256 JWT with the string \`nnex\` claim and serializes the \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\`. These pieces are covered by local tests but are **not yet wired into Eden ACC or a live title session**. The production signer/JWKS, identity claims, SMM2 auth hostname/service IP and DNS/TLS mapping remain unprovisioned. The secure CONNECT ticket/check payload must be built from the actual LoginEx response; a public title key alone cannot authenticate a player. Complete SMM2 RMC payloads, retry policy, matchmaking and NAT/P2P lifecycle remain unfinished. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
+`NextendoSmm2LoginCodec` builds TicketGranting protocol `0x0A`, method `2` requests with the username NEX String followed by the raw `AuthenticationInfo` DataHolder. `NextendoSmm2TicketCodec` parses the LoginEx response, decrypts the outer ClientTicket using the one-time source key, keeps the inner server ticket opaque, constructs the secure CONNECT buffers containing the encrypted PID/CID/check tuple and verifies the `check + 1` reply. `NextendoSmm2SessionClient` coordinates auth WSS → LoginEx → secure StationURL WSS with explicit runtime host and station parameters.
+
+The session coordinator is an explicit protocol client/test harness. It is **not yet called by the guest game's native socket lifecycle**; the guest should use Eden's ordinary emulated socket/NEX path and receive its BAAS token through ACC once provisioned. The original SMM2 auth hostname, DNS destination, TLS certificate/SNI route and virtual station parameters are not confirmed, so none are guessed.
+
+The BAAS builder is connected through `NextendoBaasRuntime` to Eden's ACC token cache, but it has no production signer/provider. As a result, ACC currently reports no BAAS token and the guest cannot complete BAAS-backed LoginEx. Complete title-specific RMC methods, matchmaking and live NAT/P2P are still unfinished. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
 
 ### NAT primitives
 
@@ -241,3 +246,12 @@ The public [Nextendo Developer Documentation](https://wiki.nextendo.network/deve
 ## Client attestation source note
 
 The Nextendo public [Ryujinx-Nextendo changelog](https://wiki.nextendo.network/changelog) records a closed-API/application-identity update in v1.8.6 and a mandatory cryptographic client-attestation update in v1.8.7. The reference emulator's README says its official build signs API requests with a private key baked in at build time. Those notes establish that attestation exists for the official emulator client; they do not publish the signing contract for third-party OAuth public clients. NEX therefore keeps the standard public PKCE flow and its own Client ID, but must not claim that protected game endpoints accept the NEX client until this distinction is resolved and any required attestation is provisioned.
+
+
+## Latest ACC and LoginEx wiring — 7 November 2026
+
+The source overlay now adds the native BAAS cache to Eden, exposes JNI update/clear methods and patches application ACC. The cache accepts bounded compact-JWS-shaped bytes; it does not itself verify the RSA signature. The signing provider and Nextendo's live BAAS server/JWKS perform that trust function.
+
+The Android session manager refreshes the ACC cache through `NextendoBaasRuntime`. The runtime clears the cache when there is no valid `nx2.` game token, no installed NEX signing provider or invalid provisioned claims. Since the NEX production signer/JWKS has not been provisioned, the expected diagnostic remains `signer_not_provisioned` and no JWT is currently exposed to the guest.
+
+The LoginEx and secure ticket codecs have independent unit tests. The auth/secure WSS coordinator requires the original auth hostname and PRUDP station values from a real client/server negotiation; it is not automatically invoked by SMM2's guest socket lifecycle.

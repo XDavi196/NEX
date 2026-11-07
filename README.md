@@ -63,11 +63,11 @@ The documented API and the inspected public account-server source still disagree
 
 ### Current online readiness
 
-The development branch now contains protocol components for PRUDP-Lite, a WSS transport, an RMC envelope codec, a BAAS RS256 JWT/AuthenticationInfo builder, a public SMM2 profile, partial `nn::friends`/qLaunch HLE handlers, and NAT probe parsing/classification. These are meaningful implementation steps, but they are not yet connected into one working game-login and multiplayer path.
+The development branch now includes a native Eden ACC BAAS-token cache bridge, a fail-closed Android signing-provider boundary, SMM2 LoginEx request/response codecs, client-ticket decryption, secure CONNECT proof construction and an explicit auth/secure WSS coordinator. The ACC stubs no longer return a dummy zero-filled token buffer: they serve compact JWT bytes only when a provisioned NEX signer has populated the cache.
 
-Still required are the NEX-provisioned BAAS signer/JWKS and identity/attestation contract, Eden ACC/LoginEx integration, the live SMM2 auth hostname and DNS/TLS routing, the secure Kerberos ticket/check payload, complete title RMC calls, actual matchmaking, live NAT sockets and P2P hole-punching, and validation with two NEX accounts on two devices.
+The new path is not live yet. There is no NEX production BAAS signer/JWKS/attestation provider, no confirmed SMM2 production hostname or DNS/SNI route, and the WSS coordinator is not wired into the guest game's native socket lifecycle. Complete game RMC methods, matchmaking, live NAT sockets, peer discovery/P2P and two-device testing are still outstanding.
 
-The Nextendo compatibility page currently lists Super Mario Maker 2 as **Experimental / In preparation (70%)**, with matchmaking and presence untested. Even a completed NEX client integration therefore needs a live SMM2 service test before it can be announced as working. See [the online implementation status](docs/NEXTENDO_ONLINE_STATUS.md).
+The Nextendo compatibility page lists Super Mario Maker 2 as **Experimental / In preparation (70%)**, with matchmaking and presence untested. Even a completed NEX client integration therefore needs a live SMM2 service test before it can be announced as working. See [the online implementation status](docs/NEXTENDO_ONLINE_STATUS.md).
 
 ## Downloads
 
@@ -107,7 +107,7 @@ For sign-in problems, first check that the Nextendo Developer Portal registratio
 
 ## Development notes
 
-The repository contains the Android Nextendo OAuth client, encrypted session handling, public network statistics, account/friends UI, app-presence publisher, partial game-facing friend HLE, PRUDP-Lite and RMC protocol components, BAAS/SMM2 payload builders, the original NEX logo, and the repeatable overlay for the pinned Eden source. The [online status document](docs/NEXTENDO_ONLINE_STATUS.md) separates tested code from features that are not yet connected to the live service.
+The repository contains the Android Nextendo OAuth client, encrypted session handling, public network statistics, account/friends UI, app-presence publisher, partial game-facing friend HLE, PRUDP-Lite and RMC transport, the native Eden ACC BAAS-token cache bridge, SMM2 LoginEx/ticket/secure-CONNECT codecs, an explicit SMM2 WSS coordinator, the original NEX logo, and the repeatable overlay for the pinned Eden source. The [online status document](docs/NEXTENDO_ONLINE_STATUS.md) separates tested code from features that are not yet connected to the live service.
 
 Useful technical documents:
 

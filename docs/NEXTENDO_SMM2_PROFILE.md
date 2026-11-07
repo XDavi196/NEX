@@ -8,20 +8,22 @@ This document separates values confirmed in the public SMM2 server source from d
 
 The public Nextendo core confirms the login placement:
 
-1. NEX obtains a fresh \`nx2.\` game token from the documented game-token endpoint. The OAuth access token is not a game token.
-2. NEX signs a compact BAAS \`id_token\` with RS256.
-3. The JWT payload contains the string claim \`nnex\`, whose value is the exact server-issued \`nx2.\` token. The public server also recognizes an optional \`tv\` claim for the installed title-update version.
-4. The public BAAS-JWKS contract uses the JWS \`jku\` header to locate the public key set and the \`kid\` header to select the matching RSA key.
-5. The JWT is the \`Token\` field in a NEX \`AuthenticationInfo\` DataHolder. The DataHolder is sent in the \`extraData\` of TicketGranting \`LoginEx\`.
+1. NEX obtains a fresh `nx2.` game token from the documented game-token endpoint. The OAuth access token is not a game token.
+2. NEX signs a compact BAAS `id_token` with RS256.
+3. The JWT payload contains the string claim `nnex`, whose value is the exact server-issued `nx2.` token.
+4. The JWS header carries the provisioned `kid` and HTTPS `jku`; the matching public JWK must be registered with the BAAS verification service.
+5. The JWT is the `Token` field in a NEX `AuthenticationInfo` DataHolder. The DataHolder is sent as the raw `extraData` after the LoginEx username NEX String.
 
 The current NEX implementation now has:
-- \`NextendoBaasIdTokenBuilder\`: RS256 compact-JWT construction using a runtime signer, registered \`kid\`, HTTPS \`jku\`, and externally provisioned \`iss\`, \`aud\` and \`sub\`. It sets \`hm=true\` and reserves \`nnex\` for the current \`nx2.\` token.
-- \`NextendoBaasAuthenticationInfo\`: NEX DataHolder serialization for \`AuthenticationInfo\`, including the NEX String token and SMM2 server profile fields (\`NGSVersion=3\`, \`TokenType=1\`, \`ServerVersion=40000\`).
-- Unit tests for JWT construction, the \`nnex\` token binding, and the encoded LoginEx extraData structure.
+- `NextendoBaasIdTokenBuilder`: RS256 compact-JWT construction using a runtime signer, registered `kid`, HTTPS `jku`, and externally provisioned `iss`, `aud` and `sub`.
+- `NextendoBaasAuthenticationInfo`: NEX DataHolder serialization for `AuthenticationInfo`, including NGSVersion 3, TokenType 1 and ServerVersion 40000.
+- `NextendoBaasRuntime`: connects the builder to Eden's ACC cache only when a NEX-specific signing provider is installed; it clears the cache for missing/expired tokens, absent provider, logout or invalid claims.
+- The Eden overlay adds a bounded native cache, JNI methods and application ACC handlers. ACC serves the actual compact JWT or returns a byte-count of zero. It no longer returns a dummy 256-byte zero buffer.
+- Unit tests cover JWT shape, the `nnex` binding and AuthenticationInfo serialization.
 
-**Not yet live:** the NEX-specific RSA private key, public JWK registration, key ID, JKU URL, issuer/audience/subject mapping and any required client-attestation signer have not been provisioned for NEX. The builder has no production signer and the result is not wired into Eden ACC or the real LoginEx path.
+**Still not live:** the NEX-specific RSA private key or approved signing provider, public JWK registration, `kid`, JKU, issuer/audience/subject mapping and any required client attestation have not been provisioned. No provider is installed in the current branch, so no production BAAS JWT is sent to ACC.
 
-Do not put the BAAS JWT in the PRUDP CONNECT payload. The JWT belongs in \`LoginEx.extraData\`. The later secure PRUDP CONNECT carries a Kerberos server ticket and encrypted check request, which NEX does not yet derive from a completed LoginEx response.
+Do not put the BAAS JWT in the PRUDP CONNECT payload. The JWT belongs in `LoginEx.extraData`. The later secure PRUDP CONNECT carries the server ticket and encrypted check request returned from LoginEx.
 
 ## Public SMM2 client profile
 
@@ -45,11 +47,19 @@ The auth connection uses WSS on port 443. The secure endpoint is advertised to t
 
 ## What remains before an SMM2 session can start
 
-- Provision the NEX BAAS RSA key and register its matching public JWK at the HTTPS \`jku\` URL with the same \`kid\`.
-- Supply the exact NEX BAAS issuer, audience, subject/PID mapping and any device/client-attestation configuration.
-- Identify the original SMM2 auth hostname and the service IP/DNS routing; preserve the title hostname for TLS SNI and certificate validation.
-- Connect Eden ACC to the BAAS builder and \`AuthenticationInfo\` DataHolder encoder, then validate the actual \`LoginEx\` request.
-- Consume the live secure \`StationURL\` from the LoginEx response and derive the secure CONNECT payload from the server ticket plus the encrypted check request.
-- Wire the SMM2-specific auth/secure PRUDP sessions into Eden's title lifecycle, then implement and validate the required RMC methods, matchmaking and NAT/P2P lifecycle.
+- Provision the NEX BAAS signer, matching public JWK/JWKS URL, key ID, issuer, audience, subject/PID mapping and any required client-attestation material, then install the provider in the NEX runtime.
+- Confirm the live SMM2 auth hostname, DNS destination, TLS certificate coverage/SNI and negotiated virtual PRUDP station parameters.
+- Connect the guest's actual DNS/socket path to those runtime values; validate ACC cache delivery and guest LoginEx with the provisioned token.
+- Validate the parsed LoginEx ticket and secure CONNECT against the live service. The local codecs already have synthetic wire-format tests.
+- Integrate the session lifecycle into the guest's network path, implement title-specific RMC methods and verify matchmaking.
+- Implement live NNCS/NAT sockets, UDP mapping preservation/keepalives, peer discovery, P2P hole-punch and cleanup.
+- Test using two NEX accounts on two Android devices in a game whose live service reports matchmaking as supported.
 
 The profile and serializers are code-level progress. They do not establish that the production endpoint accepts NEX or that Super Mario Maker 2 multiplayer works. A complete test still requires two NEX accounts, two devices and an actual in-game match/session.
+
+
+## Protocol implementation boundary
+
+The ticket codec consumes the one-time source key returned by the LoginEx response to decrypt the outer ClientTicket and recover the session key plus opaque inner server ticket. It does not derive or contain the secure server's Kerberos password. The secure CONNECT payload encrypts the PID/CID/check tuple with the recovered session key and validates the server's incremented check reply.
+
+The auth/secure WSS coordinator takes an explicit original auth hostname and negotiated PRUDP station values. It preserves TLS hostname verification and follows the actual secure StationURL returned by LoginEx; it contains no guessed production host/IP, server password or attestation key. It is protocol code and is not yet wired into the guest game's own socket lifecycle.
