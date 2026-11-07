@@ -127,7 +127,8 @@ def main() -> None:
         '#include "core/hle/service/filesystem/filesystem.h"\n'
         '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
         '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n'
-        '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n',
+        '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n'
+        '#include "core/internal_network/network.h"\n',
     )
     native_jni_anchor = """JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getAllUsers(
         JNIEnv* env,
@@ -258,9 +259,14 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoFriendCache(
 JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoIdentity(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj, jlong pid) {
+    const auto current_pid = Common::NextendoFriendCache::GetPlayerPid();
     if (pid > 0) {
+        if (current_pid != static_cast<std::uint64_t>(pid)) {
+            Network::ClearNextendoUdpSocketCache();
+        }
         Common::NextendoFriendCache::SetPlayerPid(static_cast<std::uint64_t>(pid));
     } else {
+        Network::ClearNextendoUdpSocketCache();
         Common::NextendoFriendCache::ClearPlayerPid();
     }
 }
@@ -268,6 +274,7 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoIdentity(
 JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
+    Network::ClearNextendoUdpSocketCache();
     Common::NextendoFriendCache::ClearPlayerPid();
 }
 
