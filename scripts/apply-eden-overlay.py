@@ -533,14 +533,14 @@ NextendoUdpSocketCache& GetNextendoUdpSocketCache() {
 
 void CloseNextendoUdpSockets(const std::vector<SOCKET>& sockets) {
     for (const SOCKET socket : sockets) {
-        if (socket != INVALID_SOCKET) {
+        if (socket != static_cast<SOCKET>(-1)) {
             (void)closesocket(socket);
         }
     }
 }
 
 bool IsNextendoUnconnectedUdpSocket(SOCKET socket, sockaddr_in* local_address) {
-    if (socket == INVALID_SOCKET) {
+    if (socket == static_cast<SOCKET>(-1)) {
         return false;
     }
 
@@ -592,7 +592,7 @@ bool TryParkNextendoUdpSocket(SOCKET socket, bool non_blocking) {
 
 bool TryAdoptNextendoUdpSocket(SOCKET& socket, const SockAddrIn& bind_address,
                                bool& non_blocking) {
-    if (Common::NextendoFriendCache::GetPlayerPid() == 0 || socket == INVALID_SOCKET ||
+    if (Common::NextendoFriendCache::GetPlayerPid() == 0 || socket == static_cast<SOCKET>(-1) ||
         bind_address.portno == 0) {
         return false;
     }
