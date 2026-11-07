@@ -12,7 +12,7 @@ A successful APK build proves that the configured Android source and native tool
 - [Run #132](https://github.com/XDavi196/NEX/actions/runs/42405574408) passed the native friend-cache/BAAS-cache test and all Kotlin/Nextendo unit tests, and is still building the Android Optimized APK from commit `3359151b51fd88632fc642f2ead204ef669acac0`. It predates the AuthenticationInfo framing correction and account-switch cache clear; no APK from this run is verified.
 - Runs #133 and #134 were automatically cancelled/superseded as newer commits entered the single-branch concurrency queue; these are not test failures.
 - [Run #135](https://github.com/XDavi196/NEX/actions/runs/42406074897) is pending. It includes the corrected single-Buffer AuthenticationInfo DataHolder framing, explicit native `<algorithm>` include and immediate BAAS cache clearing on account switch.
-- Current branch: `nex/eden-v0.2.0-rc1-nextendo`, head `9cc4e677cd19b983e693eddf348597f0d42484e1`.
+- Current branch: `nex/eden-v0.2.0-rc1-nextendo`, head `4e21ddcf3f4aa7a29235b75ec49971bee4c8fa76`.
 - Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
 - Android application ID: `com.nex.nx`.
 - OAuth callback: `com.nex.nx://oauth/callback`.
