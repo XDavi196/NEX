@@ -636,36 +636,6 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     }""",
     )
 
-    # Apply the NEX glass treatment to every fragment screen, including settings.
-    main_activity = app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/main/MainActivity.kt"
-    native_import = "import org.yuzu.yuzu_emu.NativeLibrary\n"
-    replace_once(
-        main_activity,
-        native_import,
-        native_import + "import com.nex.nx.nextendo.NexGlassEffect\n",
-    )
-    replace_once(
-        main_activity,
-        "        setContentView(binding.root)\n",
-        """        setContentView(binding.root)
-
-        supportFragmentManager.registerFragmentLifecycleCallbacks(
-            object : androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks() {
-                override fun onFragmentViewCreated(
-                    fragmentManager: androidx.fragment.app.FragmentManager,
-                    fragment: androidx.fragment.app.Fragment,
-                    view: android.view.View,
-                    savedInstanceState: Bundle?
-                ) {
-                    view.post { NexGlassEffect.apply(view) }
-                }
-            },
-            true
-        )
-        binding.root.post { NexGlassEffect.apply(binding.root) }
-""",
-    )
-
     gradle = app_dir / "build.gradle.kts"
     replace_once(
         gradle,
@@ -695,10 +665,10 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         '    testImplementation("junit:junit:4.13.2")',
     )
 
-    logo_source = NEX_SOURCE / "assets/nex-logo.jpg"
+    logo_source = NEX_SOURCE / "assets/nex-logo.webp"
     if not logo_source.is_file():
         raise RuntimeError(f"Missing NEX logo asset: {logo_source}")
-    logo_destination = app_dir / "src/main/res/drawable-nodpi/nex_logo.jpg"
+    logo_destination = app_dir / "src/main/res/drawable-nodpi/nex_logo.webp"
     logo_destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(logo_source, logo_destination)
 
@@ -796,8 +766,8 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
             />"""
     title_logo = """        <ImageView
             android:id="@+id/title"
-            android:layout_width="88dp"
-            android:layout_height="48dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
             android:contentDescription="NEX"
             android:scaleType="fitCenter"
             android:src="@drawable/nex_logo"

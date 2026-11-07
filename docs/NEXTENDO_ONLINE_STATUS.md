@@ -9,20 +9,21 @@ A successful APK build proves that the configured Android source and native tool
 - Original requested baseline: [Actions run #54](https://github.com/XDavi196/NEX/actions/runs/42193366726), successful.
 - Original baseline release: [NEX v0.1.0-alpha.54](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.54).
 - Intermediate verified build: [Actions run #97](https://github.com/XDavi196/NEX/actions/runs/42321531501), successful.
-- Latest verified code build: [Actions run #99](https://github.com/XDavi196/NEX/actions/runs/42372579576), successful.
-- Run #99 code commit: \`8693ace0fb48e572283cecf9d9dbb1b1cfe07c1e\`.
-- Release: [NEX v0.1.0-alpha.99](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.99).
-- APK: \`NEX-Android-v0.2.0-rc1-optimized.apk\`, 27,280,674 bytes.
-- GitHub release asset SHA-256: \`f4f86a675fd0cd67510785c041125ff45cc0a9e057af9ff1f40c723dd65308ec\`.
+- Last verified baseline before this visual cleanup: [Actions run #102](https://github.com/XDavi196/NEX/actions/runs/42382244088), successful.
+- Run #102 source commit: \`1eeaef07c96ae9d365c9739c22eb523c857937c2\`.
+- Release: [NEX v0.1.0-alpha.102](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.102).
+- APK: \`NEX-Android-v0.2.0-rc1-optimized.apk\`, 27,281,806 bytes.
+- GitHub release asset SHA-256: \`2ae9258b771204107e5aad879122d1ab77ae83f27517b292458207c96fda2cc4\`.
 - Release also includes \`SHA256SUMS.txt\`.
-- Run #99 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and release publication.
+- Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It requested all six portal scopes.
+- The current branch now includes logo restoration and glass-effect removal; those visual changes require the next CI build before they are considered verified.
 - Pinned Eden source: \`v0.2.0-rc1\`, commit \`8e373eb714aa01117ec885680477501cdb572112\`.
 - Android application ID: \`com.nex.nx\`.
 - OAuth callback: \`com.nex.nx://oauth/callback\`.
 - NEX public OAuth Client ID: \`nxc_yAdR-14bOEq7\`.
 - Development branch: \`nex/eden-v0.2.0-rc1-nextendo\`.
 
-The documentation update following run #99 does not change compiled sources. The APK and test result above apply to code commit \`8693ace0fb48e572283cecf9d9dbb1b1cfe07c1e\`.
+Run #102 verified code commit \`1eeaef07c96ae9d365c9739c22eb523c857937c2\`. The logo and visual cleanup in the current branch are newer source changes and are not covered by that APK until the next build completes.
 
 ## Implemented in NEX
 
@@ -38,8 +39,8 @@ The documentation update following run #99 does not change compiled sources. The
 
 ### ACC and player identity
 
-- The overlay connects the signed-in NEX PID to Eden's account-ID getter as a provisional bridge.
-- This does not create a BAAS \`id_token\`, prove the game's expected account-ID/NSA mapping or authenticate a NEX game session.
+- Eden retains its original local ACC account ID. The NEX PID is not substituted for Eden's account ID, NSA or Switch account UUID.
+- The NEX PID remains available to the NEX-owned social/account context; this does not create a BAAS `id_token` or authenticate a NEX game session.
 - The exact BAAS/ACC game-auth contract and guest-level validation remain blockers.
 
 ### Native friend cache and nn::friends HLE

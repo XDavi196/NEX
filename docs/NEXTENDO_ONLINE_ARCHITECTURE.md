@@ -15,7 +15,7 @@ Este documento separa o que já existe no cliente Android do que ainda depende d
 
 O login usa Authorization Code + PKCE (S256). O APK não contém client secret. O access token OAuth, usado nas rotas de conta documentadas, é diferente do token de jogo nx2. O token nx2. é tratado como opaco; não é um JWT BAAS e não é usado como substituto do OAuth access token.
 
-Escopos solicitados: identity, friends, presence e game.matchmaking. Escopos não usados foram removidos.
+Escopos solicitados conforme o portal do proprietário: identity, friends, presence, profil, game.matchmaking e emulator.status. Escopos não usados foram removidos.
 
 ## 2. Contrato de conta e presença
 
@@ -27,7 +27,7 @@ A presença do HOME Menu não inventa AppField. O campo fica vazio até que exis
 
 ## 3. BAAS e ACC
 
-O HLE ACC recebe o PID NEX através de uma ponte provisória para o getter de account ID; a equivalência entre PID e o identificador de conta esperado pelo jogo ainda não foi confirmada. Isso não equivale à autenticação BAAS do jogo. A emissão de id_token assinado com o token nx2. dentro da claim nnex depende de:
+O NEX mantém a identidade ACC local original do Eden. O PID Nextendo fica no contexto próprio do NEX e no cache social; não é convertido em NSA, UUID de Switch nem em identidade ACC do jogo. Isso não equivale à autenticação BAAS do jogo. A emissão de id_token assinado com o token nx2. dentro da claim nnex depende de:
 
 - contrato exato da claim, issuer, audience, kid, jku, algoritmo e validade;
 - chave privada emitida especificamente para o NEX;

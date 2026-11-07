@@ -131,7 +131,7 @@ When title routing is implemented, it must preserve the original hostname for SN
 
 ## NEX visual layer
 
-The NEX Android overlay uses the official NEX logo in the app icon and the Games screen header. A NEX-owned \`NexGlassEffect\` Kotlin helper applies translucent gradients, accent outlines, glass-style buttons/bars and checked/unchecked switch tints across fragment screens. It is an Android-native visual treatment compatible with Android 11; it does not claim to provide system backdrop blur. The Expo \`expo-glass-effect\` package is not installed because it is an Expo/React Native component and currently renders the native effect only on iOS 26+, falling back to a regular View on Android.
+The Android launcher icon and Games header use the NEX logo supplied by the project owner. The fragment-wide glass treatment has been removed. Buttons, bars, switches and panels keep Eden's original Material styling without an extra translucent overlay.
 
 
 ## BAAS signing boundary
