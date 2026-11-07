@@ -75,7 +75,9 @@ The account panel shows the exact scopes returned in the OAuth token response an
 - The SMM2 DataStore protocol identifier (115) and public method identifiers are recorded from the public schema.
 - Android unit tests cover the exact HMAC proof vector, handshake, reliable DATA acknowledgements, duplicate handling, fragment reassembly, PING/DISCONNECT, PRUDP-Lite frames and RMC envelopes.
 
-This is now a testable client transport implementation, not just a codec. It is **not yet wired into Eden ACC or a live title session**: the NEX-specific BAAS CONNECT payload, accepted SMM2 WSS endpoint, access key and title service configuration are still unverified. The adapter does not invent those values or bypass BAAS/client attestation. It also does not yet implement complete SMM2 RMC payloads, a timed retry policy, title matchmaking or NAT/P2P lifecycle.
+This is now a testable client transport implementation, not just a codec. The public SMM2 client profile has been added: title key \`fdf6617f\`, NEX version \`40000\`, auth WSS \`:443\`, secure-port default \`:60007\`, auth PRUDP minor \`5\`, secure minor \`0\`, and a dynamic secure StationURL parser. The title key is public per-title material from the SMM2 server source, not a private server password.
+
+The NEX BAAS helper now builds the RS256 JWT with the string \`nnex\` claim and serializes the \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\`. These pieces are covered by local tests but are **not yet wired into Eden ACC or a live title session**. The production signer/JWKS, identity claims, SMM2 auth hostname/service IP and DNS/TLS mapping remain unprovisioned. The secure CONNECT ticket/check payload must be built from the actual LoginEx response; a public title key alone cannot authenticate a player. Complete SMM2 RMC payloads, retry policy, matchmaking and NAT/P2P lifecycle remain unfinished. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
 
 ### NAT primitives
 
@@ -110,13 +112,14 @@ NEX follows the published Developer Documentation where a public contract exists
 
 ### BAAS, nnex claim and client attestation
 
-- The Developer Documentation requires the \`nx2.\` game token in the BAAS \`nnex\` claim and points to the official emulator's \`ManagerServer.cs\` for the exact construction.
-- The public documentation page does not enumerate the complete NEX-specific JWT contract: exact claim shape/value, issuer, audience, key identifier, key URL, signing algorithm and time-claim rules.
-- The NEX-owned private signing key and registration of its corresponding public key with the Nextendo JWKS service have not been issued to this project.
-- The Nextendo changelog describes mandatory cryptographic client attestation for emulator API requests. NEX has its own public Client ID but no NEX-issued attestation signing material or confirmed signing procedure.
+- The public \`nextendo-nex/authbinding.go\` extracts \`nnex\` from the BAAS JWT inside the \`AuthenticationInfo\` DataHolder carried by \`LoginEx.extraData\`.
+- The public server test confirms the token payload's \`nnex\` string claim, \`hm=true\`, and the \`AuthenticationInfo\` fields \`NGSVersion=3\`, \`TokenType=1\`, \`ServerVersion=40000\`. Optional \`tv\` identifies the installed title-update version.
+- The public BAAS-JWKS source uses RS256, a matching \`kid\`, and the JWS \`jku\` URL to publish the corresponding public key.
+- NEX now builds this compact JWT shape and encodes the AuthenticationInfo DataHolder; its unit tests use a fake signer and do not validate a live BAAS login.
+- NEX still has no production RSA key/JWKS registration, provisioned \`iss\`, \`aud\`, \`sub\`/PID mapping or required client-attestation material. The builder is not connected to Eden ACC/LoginEx.
 - No Den2 or other emulator key, attestation, token or session is used.
 
-**Blocker:** Nextendo must issue NEX-specific signing/attestation material and confirm the exact BAAS claim, JWT, JWKS and API request-signature contract. No JWT or attestation is fabricated or shipped.
+**Blocker:** NEX needs its own BAAS signer/key registration, exact identity claims and client attestation contract provisioned, then the tested payload must be wired to the game's actual ACC/LoginEx flow. No production JWT or attestation is fabricated or shipped.
 
 ### Super Mario Maker 2 NEX service
 
@@ -124,18 +127,21 @@ Super Mario Maker 2 is the first intended live test target. The [Nextendo game-c
 
 The organization publishes a dedicated [SMM2 NEX server repository](https://github.com/NextendoNetwork/super-mario-maker-2). Its public server-side DataStore layer and the `nextendo-nex` core document selected SMM2 methods (RegisterUser 47, GetUsers 48, SyncUserProfile 49, CanPostCourse 60, GetMiiClothes 63, SearchCoursesPostedBy 74 and GetEventCourseStatus 154). The handler returns an explicit not-implemented response for other DataStore methods. That is useful protocol evidence, but it is not a complete SMM2 client handshake specification or proof of end-to-end Course World/matchmaking.
 
-The public sources still do not provide a verified SMM2 client hostname/port, deployed NEX access-key configuration, complete title login/session contract, all RMC payloads needed by the game or the mapping for this NEX registration. NEX does not guess server addresses or keys.
+The public server source does provide the public per-title PRUDP access key \`fdf6617f\`, NEX version \`40000\`, auth WSS port \`:443\`, secure server default port \`:60007\`, auth PRUDP minor \`5\` and secure minor \`0\`. The secure server can override its port and advertises the actual destination in a \`prudps:/address=...;port=...\` StationURL returned by LoginEx. The NEX profile now records these values and follows that StationURL rather than assuming a deployment endpoint.
+
+The public source still does not provide the live deployment's original SMM2 auth hostname, service IP/DNS mapping, BAAS registration for this NEX application, or a completed client login/session contract. It also lacks all RMC payloads needed by the game. NEX does not guess the host, invent a ticket or use server-only Kerberos passwords.
 
 **Current split:** the NEX client can continue implementing generic DNS/TLS, PRUDP/RMC, account and friend integration where contracts are known. End-to-end SMM2 matchmaking remains unverified while the public service itself lists those features as untested.
 
 ### Title DNS and TLS/SNI
 
-- The Nextendo deployment guide describes title-scoped hostname routing, SNI passthrough and certificates valid for the original retail hostnames.
-- Its published port table lists examples for Mario Kart 8 Deluxe, Splatoon 2 and Super Smash Bros. Ultimate, but not a complete SMM2 mapping.
-- It uses deployment placeholders and does not publish the NEX deployment's server addresses.
+- The Nextendo deployment guide describes title-scoped hostname routing, SNI passthrough and certificates valid for the original title hostnames.
+- The public SMM2 source supplies an auth endpoint port and a secure StationURL format, but not the original production hostname or deployed service IP.
+- The secure port can be overridden by server deployment configuration; the runtime StationURL is authoritative.
+- NEX preserves the hostname supplied to the WSS URI so normal TLS hostname verification and SNI can work; DNS must route that hostname to the correct service IP.
 - NEX does not add guessed hostnames, IP addresses, wildcard redirects or disabled certificate checks.
 
-**Blocker:** obtain the SMM2 hostname matrix, destination routing, certificate trust requirements and NEX service addresses. Platform TLS certificate validation remains enabled.
+**Blocker:** the SMM2 auth hostname, its deployment target IP/DNS mapping, certificate coverage and live StationURL values remain unconfirmed. Platform TLS certificate validation remains enabled.
 
 ### NAT, UDP mapping, discovery and P2P
 
@@ -212,4 +218,4 @@ The public \`nextendo-account\` source currently differs from the Developer Docu
 
 ### BAAS builder boundary
 
-\`NextendoBaasIdTokenBuilder\` now defines the compact-JWT boundary: RS256 header, NEX-provisioned \`kid\`, HTTPS issuer/JWKS values supplied by the contract provider, and the server-issued \`nx2.\` token inserted into the \`nnex\` claim. The signing key is behind \`NextendoBaasSigner\`; no private key or fallback signer is included. The builder is not yet connected to Eden ACC and must stay disabled until Nextendo provisions the NEX-specific contract and signer. Unit tests use a fake signer only to test serialization and rejection behavior.
+\`NextendoBaasIdTokenBuilder\` builds the RS256 compact JWT with the NEX-provisioned \`kid\` and JWS \`jku\` header, externally supplied \`iss\`, \`aud\` and \`sub\`, \`hm=true\`, and the current server-issued \`nx2.\` token in the \`nnex\` claim. \`NextendoBaasAuthenticationInfo\` wraps that JWT as the \`Token\` field in an \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\` (SMM2 server version \`40000\`). The signer exposes only an interface; no private key or production fallback is included. The payload builder and DataHolder encoder are not yet connected to Eden ACC. Unit tests use a fake signer solely for local serialization and rejection checks. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
