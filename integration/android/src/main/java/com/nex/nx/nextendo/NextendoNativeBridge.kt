@@ -17,6 +17,7 @@ internal object NextendoNativeBridge {
         NativeLibrary.updateNextendoFriendCache(
             normalized.map { it.pid }.toLongArray(),
             normalized.map { it.networkServiceAccountId }.toLongArray(),
+            normalized.map { it.appIdValue }.toLongArray(),
             normalized.map { it.username }.toTypedArray(),
             normalized.map { it.presenceStatus }.toIntArray(),
             normalized.map { it.appField }.toTypedArray()
