@@ -65,6 +65,20 @@ The Developer Portal describes a broader OAuth contract than the public account-
 
 The NexWiki is the intended developer contract. NEX keeps OAuth and `nx2.` credentials separate, but the current publisher has been temporarily aligned with the inspected public server code while the mismatch is confirmed. The older public account-server source may lag production; until Nextendo confirms the deployed contract and a live NEX OAuth session is tested, NEX cannot treat game-token issuance, refresh rotation, presence publishing or multiplayer authentication as verified. Do not switch to the special `nextendo-emulator` built-in client identity: NEX must use its own registered Client ID.
 
+## First game test target: Super Mario Maker 2
+
+The first end-to-end title selected for NEX testing is **Super Mario Maker 2 v3.0.3**.
+
+- Title ID: `01009B90006DC000`.
+- Required game version: `3.0.3`; this matches the installed version confirmed for the first test.
+- Account prerequisites reported by the tester: email confirmed and Nextendo Discord linked/verified. Do not persist account credentials or tokens in this repository.
+- The public Nextendo compatibility tracker currently labels SMM2 **Experimental / In preparation**, at 70%, with matchmaking and presence marked **Untested**. A public per-title server repository exists and is built on `nextendo-nex`; the existence of that server source is not proof that the production title flow or the NEX Android client has passed an end-to-end test.
+- SMM2 has a title-specific DataStore protocol (protocol ID `0x73`) with its own methods, including `RegisterUser` (47), `GetUsers` (48), `SyncUserProfile` (49) and course/user search, upload, comments and play-result methods. Implement only methods whose request/response contracts are established; never answer unknown calls with guessed binary structures.
+- Course World validation and multiplayer validation are separate gates. First verify authenticated profile initialization and read-only course browsing/download. Then validate uploads/comments/results against the service. Only after that test the game's matchmaking and any peer/NAT path it actually invokes.
+- SMM2 presence must use its real title ID when the game is running; qLaunch presence remains the HOME Menu title while the menu is active.
+
+**Current status:** title/version selected and account verification prerequisites reported complete. This does not yet unblock NEX BAAS/DAUTH attestation, client-side NEX/PRUDP, SMM2 DataStore initialization, TLS/SNI/DNS routing or matchmaking. Do not publish an APK as SMM2-online-ready until the relevant end-to-end tests pass.
+
 ## Blocking requirements for real in-game online play
 
 ### 1. BAAS/ACC game authentication
