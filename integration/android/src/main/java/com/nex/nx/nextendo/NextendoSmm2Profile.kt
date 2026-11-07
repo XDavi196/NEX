@@ -34,6 +34,55 @@ internal object NextendoSmm2Profile {
     const val AUTHENTICATION_INFO_TOKEN_TYPE = 1
 
     /**
+     * PRUDP station identifiers/ports belong to the NEX packet header, not to the
+     * outer WSS TCP port. Eden must supply the values negotiated for this session.
+     */
+    data class PrudpStationParameters(
+        val clientSourceType: Int,
+        val clientSourcePort: Int,
+        val serverDestinationType: Int,
+        val serverDestinationPort: Int,
+        val supportedFunctions: Int
+    )
+
+    fun authSessionConfig(station: PrudpStationParameters): NextendoPrudpLiteSession.Config =
+        sessionConfig(
+            station = station,
+            minorVersion = AUTH_PRUDP_MINOR_VERSION,
+            connectPayload = byteArrayOf()
+        )
+
+    fun secureSessionConfig(
+        station: PrudpStationParameters,
+        ticketAndCheckPayload: ByteArray
+    ): NextendoPrudpLiteSession.Config {
+        require(ticketAndCheckPayload.isNotEmpty()) {
+            "SMM2 secure CONNECT requires the LoginEx ticket and encrypted check payload."
+        }
+        return sessionConfig(
+            station = station,
+            minorVersion = SECURE_PRUDP_MINOR_VERSION,
+            connectPayload = ticketAndCheckPayload
+        )
+    }
+
+    private fun sessionConfig(
+        station: PrudpStationParameters,
+        minorVersion: Int,
+        connectPayload: ByteArray
+    ) = NextendoPrudpLiteSession.Config(
+        accessKey = PRUDP_ACCESS_KEY,
+        clientSourceType = station.clientSourceType,
+        clientSourcePort = station.clientSourcePort,
+        serverDestinationType = station.serverDestinationType,
+        serverDestinationPort = station.serverDestinationPort,
+        minorVersion = minorVersion,
+        supportedFunctions = station.supportedFunctions,
+        connectPayload = connectPayload,
+        fragmentSize = DEFAULT_FRAGMENT_SIZE
+    )
+
+    /**
      * Builds the auth WebSocket URI while preserving the original title hostname.
      * DNS routing must redirect that hostname to the configured service IP; do
      * not replace it with an IP in this URI or TLS hostname verification will differ.
@@ -91,8 +140,8 @@ internal object NextendoSmm2Profile {
             URI("wss", null, host, port, "/", null, null)
         }.getOrNull()
             ?: throw IllegalArgumentException("SMM2 WSS endpoint could not be constructed.")
-        require(uri.host == host || uri.host.equals(host, ignoreCase = true)) {
-            "SMM2 WSS endpoint host was not preserved."
+        require(!uri.host.isNullOrBlank() && uri.port == port && uri.scheme == "wss") {
+            "SMM2 WSS endpoint host or port was not preserved."
         }
         return uri
     }
