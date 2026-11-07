@@ -1117,7 +1117,18 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         raise RuntimeError("Could not identify EmulationActivity NativeLibrary import")
     activity_text = activity_text.replace(
         activity_import,
-        activity_import + "import com.nex.nx.nextendo.NextendoPresencePublisher\n",
+        activity_import
+        + "import com.nex.nx.nextendo.NextendoPresencePublisher\n"
+        + "import com.nex.nx.nextendo.NextendoAuthManager\n",
+        1,
+    )
+    activity_on_create_anchor = "        super.onCreate(savedInstanceState)\n"
+    if activity_text.count(activity_on_create_anchor) != 1:
+        raise RuntimeError("Could not identify EmulationActivity startup callback")
+    activity_text = activity_text.replace(
+        activity_on_create_anchor,
+        activity_on_create_anchor
+        + "        NextendoAuthManager.restoreCachedIdentity(this)\n",
         1,
     )
 
