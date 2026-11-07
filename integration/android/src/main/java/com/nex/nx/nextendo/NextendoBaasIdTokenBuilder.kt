@@ -47,6 +47,9 @@ internal object NextendoBaasIdTokenBuilder {
         require("nnex" !in claims) {
             "The nnex claim is reserved for the validated Nextendo game token."
         }
+        require("jku" !in claims) {
+            "The jku claim is reserved for the NEX-provisioned BAAS JWKS URL."
+        }
 
         requireHttpsUrl(jsonString(claims["iss"]), "iss")
         requireHttpsUrl(signer.jwksUrl, "jku")
@@ -64,8 +67,11 @@ internal object NextendoBaasIdTokenBuilder {
                 "jku" to JsonPrimitive(signer.jwksUrl)
             )
         )
+        // Keep jku in the signed payload as used by the Nextendo reference
+        // emulator, and in the JOSE header as defined by the JWS specification.
         val payload = JsonObject(
             LinkedHashMap(claims).apply {
+                put("jku", JsonPrimitive(signer.jwksUrl))
                 put("nnex", JsonPrimitive(gameToken))
             }
         )
