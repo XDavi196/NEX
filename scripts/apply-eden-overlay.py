@@ -99,6 +99,11 @@ def main() -> None:
     native_cpp = app_dir / "src/main/jni/native.cpp"
     replace_once(
         native_cpp,
+        "#include <codecvt>\n",
+        "#include <algorithm>\n#include <codecvt>\n",
+    )
+    replace_once(
+        native_cpp,
         '#include "core/hle/service/filesystem/filesystem.h"\n',
         '#include "core/hle/service/filesystem/filesystem.h"\n'
         '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
