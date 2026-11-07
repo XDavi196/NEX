@@ -1,7 +1,6 @@
 package com.nex.nx.nextendo
 
 import java.io.ByteArrayOutputStream
-import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertEquals
@@ -114,7 +113,7 @@ class NextendoSmm2TicketCodecTest {
         }.toByteArray()
 
         return ByteArrayOutputStream().apply {
-            writeUInt32LE(0) // ResultCoreUnknown (success).
+            writeUInt32LE(0x00010001L) // ResultCoreUnknown (success).
             writeUInt64LE(playerPid)
             writeBuffer(encryptedClientTicket)
             write(1) // RVConnectionData structure version.

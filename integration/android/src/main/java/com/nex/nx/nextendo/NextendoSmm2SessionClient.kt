@@ -15,7 +15,7 @@ import okhttp3.OkHttpClient
  * runtime inputs. This code never guesses or substitutes a production endpoint.
  */
 internal class NextendoSmm2SessionClient(
-    private val config: Config,
+    suppliedConfig: Config,
     private val events: Events,
     private val httpClient: OkHttpClient = OkHttpClient()
 ) : AutoCloseable {
@@ -43,6 +43,10 @@ internal class NextendoSmm2SessionClient(
         fun onFailure(error: Throwable)
         fun onDisconnected()
     }
+
+    private val config = suppliedConfig.copy(
+        authenticationInfoData = suppliedConfig.authenticationInfoData.copyOf()
+    )
 
     @Volatile
     private var closed = false
@@ -124,8 +128,14 @@ internal class NextendoSmm2SessionClient(
                 fail(it)
                 return
             }
-            runCatching { authTransport?.sendRmc(request) }
-                .onFailure(::fail)
+            try {
+                authTransport?.sendRmc(request)
+            } catch (error: Throwable) {
+                fail(error)
+            } finally {
+                request.fill(0)
+                config.authenticationInfoData.fill(0)
+            }
         }
 
         override fun onRmcMessage(message: NextendoRmcCodec.Message) {
@@ -235,6 +245,8 @@ internal class NextendoSmm2SessionClient(
             closed = true
             secureConnected = false
             secureTransport = null
+            clearLoginMaterial()
+            config.authenticationInfoData.fill(0)
             events.onDisconnected()
         }
 

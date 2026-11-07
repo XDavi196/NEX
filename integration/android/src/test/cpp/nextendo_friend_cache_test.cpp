@@ -160,6 +160,13 @@ int main() {
         reinterpret_cast<const std::uint8_t*>(invalid_jws.data()), invalid_jws.size()));
     assert(!baas::HasToken());
     assert(!baas::Set(nullptr, 0));
+    std::vector<std::uint8_t> oversized(baas::MaxTokenBytes + 1, 'a');
+    assert(!baas::Set(oversized.data(), oversized.size()));
+    assert(!baas::HasToken());
+    const std::string invalid_character = "eyJhbGciOiJSUzI1NiJ9.eyJubmV4IjoibngyLnRlc3QifQ.sig=";
+    assert(!baas::Set(
+        reinterpret_cast<const std::uint8_t*>(invalid_character.data()),
+        invalid_character.size()));
     baas::Clear();
     assert(baas::Get().empty());
 
