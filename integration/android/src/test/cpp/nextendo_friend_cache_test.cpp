@@ -139,6 +139,30 @@ int main() {
     assert(bounded.back().pid == 2000000000ULL + cache::MaxFriends - 1);
     assert(cache::GetNetworkFriends().empty());
 
+    namespace baas = Common::NextendoBaasTokenCache;
+    baas::Clear();
+    assert(!baas::HasToken());
+    assert(baas::Get().empty());
+
+    const std::string valid_jws =
+        "eyJhbGciOiJSUzI1NiJ9.eyJubmV4IjoibngyLnRlc3QifQ.c2lnbmF0dXJl";
+    assert(baas::Set(
+        reinterpret_cast<const std::uint8_t*>(valid_jws.data()), valid_jws.size()));
+    assert(baas::HasToken());
+    const auto copied_jws = baas::Get();
+    assert(std::string(copied_jws.begin(), copied_jws.end()) == valid_jws);
+    auto mutable_copy = baas::Get();
+    mutable_copy.front() = 'X';
+    assert(baas::Get().front() == static_cast<std::uint8_t>('e'));
+
+    const std::string invalid_jws = "not-a-compact-jwt";
+    assert(!baas::Set(
+        reinterpret_cast<const std::uint8_t*>(invalid_jws.data()), invalid_jws.size()));
+    assert(!baas::HasToken());
+    assert(!baas::Set(nullptr, 0));
+    baas::Clear();
+    assert(baas::Get().empty());
+
     cache::Clear();
     assert(cache::Get().empty());
     // Clearing the friend snapshot and clearing the signed-in identity are separate operations.

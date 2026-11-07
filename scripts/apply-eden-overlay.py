@@ -65,6 +65,8 @@ def main() -> None:
         "    external fun clearNextendoFriendCache()\n"
         "    external fun updateNextendoIdentity(pid: Long)\n"
         "    external fun clearNextendoIdentity()\n"
+        "    external fun updateNextendoBaasIdToken(idToken: ByteArray)\n"
+        "    external fun clearNextendoBaasIdToken()\n"
         "    external fun getAllUsers(): Array<String>?\n",
     )
 
@@ -86,12 +88,21 @@ def main() -> None:
         raise RuntimeError(f"Missing NEX friend HLE serializer header: {friend_hle_header_source}")
     shutil.copy2(friend_hle_header_source, friend_hle_header_destination)
 
+    # Copy the NEX BAAS id_token cache used by Eden ACC.
+    baas_cache_source = NEX_SOURCE / "integration/android/src/main/cpp/nextendo_baas_token_cache.h"
+    baas_cache_destination = eden / "src/core/hle/service/acc/nextendo_baas_token_cache.h"
+    if not baas_cache_source.is_file():
+        raise RuntimeError(f"Missing NEX BAAS token cache header: {baas_cache_source}")
+    baas_cache_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(baas_cache_source, baas_cache_destination)
+
     native_cpp = app_dir / "src/main/jni/native.cpp"
     replace_once(
         native_cpp,
         '#include "core/hle/service/filesystem/filesystem.h"\n',
         '#include "core/hle/service/filesystem/filesystem.h"\n'
-        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n',
+        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
+        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n',
     )
     native_jni_anchor = """JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getAllUsers(
         JNIEnv* env,
@@ -208,9 +219,134 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
     Common::NextendoFriendCache::ClearPlayerPid();
 }
 
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_emu_NativeLibrary_updateNextendoBaasIdToken(
+    JNIEnv* env, [[maybe_unused]] jobject obj, jbyteArray token) {
+    constexpr jsize MaxTokenBytes = 8192;
+    if (token == nullptr) {
+        Common::NextendoBaasTokenCache::Clear();
+        return;
+    }
+    const jsize length = env->GetArrayLength(token);
+    if (length <= 0 || length > MaxTokenBytes) {
+        Common::NextendoBaasTokenCache::Clear();
+        return;
+    }
+    std::vector<jbyte> bytes(static_cast<std::size_t>(length));
+    env->GetByteArrayRegion(token, 0, length, bytes.data());
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        Common::NextendoBaasTokenCache::Clear();
+        return;
+    }
+    Common::NextendoBaasTokenCache::Set(
+        reinterpret_cast<const std::uint8_t*>(bytes.data()),
+        static_cast<std::size_t>(bytes.size()));
+    std::fill(bytes.begin(), bytes.end(), 0);
+}
+
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_emu_NativeLibrary_clearNextendoBaasIdToken(
+    JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
+    Common::NextendoBaasTokenCache::Clear();
+}
+
 '''
     replace_once(native_cpp, native_jni_anchor, native_jni_bridge + native_jni_anchor)
 
+    # Expose the provisioned NEX BAAS id_token through Eden's application ACC service.
+    acc_cpp = eden / "src/core/hle/service/acc/acc.cpp"
+    replace_once(
+        acc_cpp,
+        '#include "core/hle/service/acc/acc.h"\\n',
+        '#include "core/hle/service/acc/acc.h"\\n'
+        '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\\n',
+    )
+    replace_once(
+        acc_cpp,
+        """    void LoadIdTokenCache(HLERequestContext& ctx) {
+        LOG_WARNING(Service_ACC, "(STUBBED) called");
+
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+        rb.Push(0);
+    }""",
+        """    void LoadIdTokenCache(HLERequestContext& ctx) {
+        auto token_data = Common::NextendoBaasTokenCache::Get();
+        const auto capacity = ctx.GetWriteBufferSize();
+        if (token_data.empty() || token_data.size() > capacity) {
+            LOG_WARNING(Service_ACC,
+                        "[NEX] BAAS id_token unavailable or output buffer too small (token={}, capacity={})",
+                        token_data.size(), capacity);
+            std::fill(token_data.begin(), token_data.end(), 0);
+            IPC::ResponseBuilder rb{ctx, 3};
+            rb.Push(ResultSuccess);
+            rb.Push<u32>(0);
+            return;
+        }
+
+        ctx.WriteBuffer(token_data);
+        const auto token_size = static_cast<u32>(token_data.size());
+        std::fill(token_data.begin(), token_data.end(), 0);
+        LOG_INFO(Service_ACC, "[NEX] LoadIdTokenCache returned {} bytes", token_size);
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+        rb.Push(token_size);
+    }""",
+    )
+    replace_once(
+        acc_cpp,
+        """    void CheckAvailability(HLERequestContext& ctx) {
+        LOG_DEBUG(Service_ACC, "(STUBBED) called");
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+        rb.Push(false); // TODO: Check when this is supposed to return true and when not
+    }""",
+        """    void CheckAvailability(HLERequestContext& ctx) {
+        const bool available = Common::NextendoBaasTokenCache::HasToken();
+        LOG_DEBUG(Service_ACC, "[NEX] CheckAvailability -> {}", available);
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+        rb.Push(available);
+    }""",
+    )
+    replace_once(
+        acc_cpp,
+        """    void LoadIdTokenCache(HLERequestContext& ctx) {
+        LOG_WARNING(Service_ACC, "(STUBBED) called");
+
+        std::vector<u8> token_data(0x100);
+        std::fill(token_data.begin(), token_data.end(), u8(0));
+
+        ctx.WriteBuffer(token_data);
+
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+        rb.Push(static_cast<u32>(token_data.size()));
+    }""",
+        """    void LoadIdTokenCache(HLERequestContext& ctx) {
+        auto token_data = Common::NextendoBaasTokenCache::Get();
+        const auto capacity = ctx.GetWriteBufferSize();
+        if (token_data.empty() || token_data.size() > capacity) {
+            LOG_WARNING(Service_ACC,
+                        "[NEX] BAAS id_token unavailable or output buffer too small (token={}, capacity={})",
+                        token_data.size(), capacity);
+            std::fill(token_data.begin(), token_data.end(), 0);
+            IPC::ResponseBuilder rb{ctx, 3};
+            rb.Push(ResultSuccess);
+            rb.Push<u32>(0);
+            return;
+        }
+
+        ctx.WriteBuffer(token_data);
+        const auto token_size = static_cast<u32>(token_data.size());
+        std::fill(token_data.begin(), token_data.end(), 0);
+        LOG_INFO(Service_ACC, "[NEX] LoadIdTokenCache returned {} bytes", token_size);
+        IPC::ResponseBuilder rb{ctx, 3};
+        rb.Push(ResultSuccess);
+        rb.Push(token_size);
+    }""",
+    )
     # Keep Eden's local ACC identity until Nextendo confirms the NEX PID/NSA mapping.
     # A Nextendo PID is not assumed to be a NetworkServiceAccountId.
 
