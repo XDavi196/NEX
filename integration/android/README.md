@@ -10,6 +10,9 @@ This folder contains the NEX-owned Android integration source:
 - `NextendoSocialApi.kt` — OAuth `/api/oauth/userinfo` and read-only friends list.
 - `NextendoPresencePublisher.kt` — online presence heartbeat every 60 seconds, offline publication on disconnect, and in-game Title ID publication from the Eden lifecycle hook.
 - `NextendoPrudpLiteAuthenticator.kt` — Nextendo published Lite CONNECT HMAC-MD5 proof, using only a runtime-provided title key.
+- `NextendoSmm2Profile.kt` — public SMM2 title profile, WSS endpoint construction and dynamic secure StationURL parsing.
+- `NextendoBaasIdTokenBuilder.kt` — RS256 BAAS `id_token` with the provisioned JWKS `jku` header and the `nnex` game-token claim.
+- `NextendoBaasAuthenticationInfo.kt` — wraps the signed JWT in the NEX `AuthenticationInfo` DataHolder for `LoginEx.extraData`.
 - `NextendoPrudpLiteSession.kt` — tested PRUDP-Lite handshake, reliable DATA/ACK handling, duplicate suppression, fragmentation and connection state machine.
 - `NextendoPrudpLiteWebSocketTransport.kt` — OkHttp binary WebSocket transport with normal TLS verification.
 
@@ -40,9 +43,9 @@ The Android integration currently has:
 Still missing:
 - Friend request mutations and final guest-visible `nn::friends` IPC validation.
 - Native game lifecycle callback for real in-game presence/title ID.
-- NEX-specific ACC/BAAS `id_token` generation and `nnex` claim injection.
-- Verified SMM2 WSS endpoint, runtime access-key source and accepted CONNECT/BAAS payload. The PRUDP-Lite client transport is implemented as a testable module but is not wired to a live title.
-- DNS mapping, title TLS/SNI, complete SMM2 RMC methods and matchmaking.
+- Production BAAS signer and NEX JWKS registration, provisioned `kid`/`jku` and issuer/audience/subject values, client-attestation material, and wiring of the JWT + `AuthenticationInfo` DataHolder into Eden ACC/LoginEx.
+- The live SMM2 auth hostname/service IP and DNS/TLS mapping. The public SMM2 profile now supplies the public PRUDP title key and version settings; the secure WSS endpoint must come from the StationURL advertised by LoginEx.
+- The secure PRUDP CONNECT ticket/check payload derived from LoginEx, complete SMM2 RMC methods and matchmaking. The PRUDP-Lite transport remains a tested module, not a live title session.
 - NAT/P2P socket ownership, keepalive, discovery and hole-punching.
 - End-to-end testing with two accounts and a supported game.
 
@@ -60,4 +63,6 @@ The account panel distinguishes OAuth connectivity from the separate `nx2.` game
 
 ## BAAS boundary (not enabled)
 
-\`NextendoBaasIdTokenBuilder.kt\` inserts the server-issued \`nx2.\` token into the \`nnex\` claim and delegates RS256 to \`NextendoBaasSigner\`. The actual signer and claim set must be supplied by an NEX-specific Nextendo provisioning contract. No private key, test key, fallback signature or other emulator credential is shipped. The builder is not wired to Eden ACC yet.
+The NEX BAAS pipeline now builds the RS256 compact JWT, puts the current server-issued \`nx2.\` token in the string-valued \`nnex\` claim, and encodes it as the \`Token\` field of the \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\`. The JWS \`kid\` and \`jku\` are supplied by the NEX runtime signer; \`iss\`, \`aud\` and \`sub\` are supplied by the provisioned claim provider. The serializer and validation tests do not sign with a production key and do not connect this payload to Eden ACC.
+
+See [the SMM2 profile and BAAS/LoginEx contract](../../docs/NEXTENDO_SMM2_PROFILE.md) for the public SMM2 values and the remaining live-provisioning requirements. No private key, server password, fallback signature or other emulator credential is shipped.
