@@ -317,7 +317,7 @@ NextendoFriendInfo MakeNextendoFriendInfo(
     const auto length = std::min(entry.username.size(), out.nickname.size() - 1);
     std::memcpy(out.nickname.data(), entry.username.data(), length);
     out.presence.user_id = out.user_id;
-    out.presence.status = entry.presence_status;
+    out.presence.status = entry.presence_status > 0 ? 2U : 0U;
     out.presence.last_time_online_timestamp = 0x7FFFFFFFFFFFFFFFLL;
     // The OAuth/game cache does not yet retain the current title ID, so do not
     // claim that this friend is in the same application group.
@@ -444,7 +444,16 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     replace_once(
         friend_cpp,
         '{20102, nullptr, "GetFriendDetailedInfo"}',
-        '{20102, &IFriendService::GetFriendDetailedInfo, "GetFriendDetailedInfo"}',
+        '{20102, &IFriendService::GetFriendDetailedInfo, "GetFriendDetailedInfo"},\n'
+        '            {20107, &IFriendService::GetFriendDetailedInfoV2, "GetFriendDetailedInfoV2"},\n'
+        '            {20108, &IFriendService::GetFriendListForViewerV2, "GetFriendListForViewerV2"},\n'
+        '            {20109, &IFriendService::GetFriendDetailListV2, "GetFriendDetailListV2"},\n'
+        '            {20111, &IFriendService::GetFriendPresenceV2, "GetFriendPresenceV2"}',
+    )
+    replace_once(
+        friend_cpp,
+        '{20601, &IFriendService::GetUserPresenceView, "GetUserPresenceViewV2"}',
+        '{20601, &IFriendService::GetUserPresenceViewV2, "GetUserPresenceViewV2"}',
     )
     replace_once(
         friend_cpp,
