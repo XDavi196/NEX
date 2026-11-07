@@ -60,6 +60,15 @@ class NextendoGameFriendParserTest {
     }
 
     @Test
+    fun missingNsaRemainsUnavailableInsteadOfBeingDerivedFromPid() {
+        val friends = NextendoGameFriendParser.parse(
+            """{"friends":[{"pid":1800000002,"username":"Friend","presence":{"status":1}}]}"""
+        )
+        assertEquals(1, friends.size)
+        assertEquals(0L, friends.single().networkServiceAccountId)
+    }
+
+    @Test
     fun rejectsAppFieldLargerThanGuestPresenceStructure() {
         val oversized = Base64.getEncoder().encodeToString(ByteArray(0xC1))
         val friends = NextendoGameFriendParser.parse(

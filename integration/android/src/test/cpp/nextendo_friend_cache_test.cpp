@@ -1,8 +1,12 @@
 // SPDX-FileCopyrightText: Copyright 2026 NEX contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "../../main/cpp/nextendo_friend_cache.h"
+#include "../../main/cpp/nextendo_friend_hle.h"
 
+#include <algorithm>
+#include <array>
 #include <cassert>
+#include <cstring>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -34,6 +38,11 @@ int main() {
     duplicate.username = "Duplicate";
     duplicate.presence_status = 1;
 
+    cache::Entry no_nsa{};
+    no_nsa.pid = 1800000005;
+    no_nsa.username = "Friend without NSA";
+    no_nsa.presence_status = 1;
+
     cache::Entry zero_pid{};
     zero_pid.username = "Zero PID";
     zero_pid.presence_status = 1;
@@ -50,20 +59,68 @@ int main() {
     std::vector<cache::Entry> entries;
     entries.push_back(valid);
     entries.push_back(duplicate);
+    entries.push_back(no_nsa);
     entries.push_back(zero_pid);
     entries.push_back(empty_name);
     entries.push_back(invalid_status);
 
     cache::Replace(std::move(entries));
     const auto snapshot = cache::Get();
-    assert(snapshot.size() == 1);
+    assert(snapshot.size() == 2);
     assert(snapshot.front().pid == valid.pid);
+    const auto network_friends = cache::GetNetworkFriends();
+    assert(network_friends.size() == 1);
+    assert(network_friends.front().network_service_account_id == 0xA1);
     assert(snapshot.front().network_service_account_id == 0xA1);
     assert(snapshot.front().username == "Friend");
     assert(snapshot.front().presence_status == 2);
     assert(snapshot.front().application_id == 0x0100152000022000ULL);
     assert(snapshot.front().app_field_size == cache::MaxAppFieldBytes);
     assert(snapshot.front().app_field.back() == 0x7F);
+
+    const auto friend_info = Common::NextendoFriendHle::MakeNextendoFriendInfo(valid);
+    assert(friend_info.network_user_id == 0xA1);
+    assert(friend_info.presence.status == 2);
+    assert(friend_info.presence.last_time_online_timestamp == 0);
+    assert(std::all_of(friend_info.user_id.begin(), friend_info.user_id.end(),
+                       [](std::uint8_t value) { return value == 0; }));
+    assert(friend_info.presence.app_key_value.back() == 0x7F);
+
+    const auto profile_info = Common::NextendoFriendHle::MakeNextendoProfileInfo(valid);
+    assert(profile_info.network_user_id == 0xA1);
+    assert(std::all_of(profile_info.user_uuid.begin(), profile_info.user_uuid.end(),
+                       [](std::uint8_t value) { return value == 0; }));
+
+    auto online_friend = valid;
+    online_friend.presence_status = 1;
+    online_friend.application_id = 0;
+    const auto online_info =
+        Common::NextendoFriendHle::MakeNextendoFriendInfo(online_friend);
+    assert(online_info.presence.status == 1);
+    assert(online_info.presence.app_key_value.front() == 0);
+    std::array<std::uint8_t, Common::NextendoFriendHle::NextendoFriendRecordV2Size> online_record{};
+    Common::NextendoFriendHle::WriteNextendoFriendRecordV2(
+        online_record.data(), online_friend, online_friend.network_service_account_id);
+    std::uint64_t online_title_id = 1;
+    std::memcpy(&online_title_id, online_record.data() + 0xE0, sizeof(online_title_id));
+    assert(online_title_id == 0);
+    assert(online_record[0x21F] == 1);
+
+    std::array<std::uint8_t, Common::NextendoFriendHle::NextendoFriendRecordV2Size> playing_record{};
+    Common::NextendoFriendHle::WriteNextendoFriendRecordV2(
+        playing_record.data(), valid, valid.network_service_account_id);
+    std::uint64_t playing_title_id = 0;
+    std::memcpy(&playing_title_id, playing_record.data() + 0xE0, sizeof(playing_title_id));
+    assert(playing_title_id == valid.application_id);
+    assert(playing_record[0xE8 + offsetof(Common::NextendoFriendHle::NextendoUserPresence, status)] == 2);
+
+    std::array<std::uint8_t, Common::NextendoFriendHle::NextendoFriendDetailedInfoV2Size> detail{};
+    Common::NextendoFriendHle::WriteNextendoFriendDetailedInfoV2(
+        detail, valid, valid.network_service_account_id);
+    assert(detail[0x608] == 1);
+    std::uint64_t detail_title_id = 0;
+    std::memcpy(&detail_title_id, detail.data() + 0x570, sizeof(detail_title_id));
+    assert(detail_title_id == valid.application_id);
 
     std::vector<cache::Entry> many;
     many.reserve(cache::MaxFriends + 5);
@@ -80,6 +137,7 @@ int main() {
     assert(bounded.size() == cache::MaxFriends);
     assert(bounded.front().pid == 2000000000ULL);
     assert(bounded.back().pid == 2000000000ULL + cache::MaxFriends - 1);
+    assert(cache::GetNetworkFriends().empty());
 
     cache::Clear();
     assert(cache::Get().empty());

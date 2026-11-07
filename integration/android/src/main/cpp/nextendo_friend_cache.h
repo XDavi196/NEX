@@ -72,6 +72,17 @@ inline std::vector<Entry> Get() {
     return cache_entries;
 }
 
+/** Returns only friends with an explicit NetworkServiceAccountId from Nextendo. */
+inline std::vector<Entry> GetNetworkFriends() {
+    auto entries = Get();
+    entries.erase(
+        std::remove_if(entries.begin(), entries.end(), [](const Entry& entry) {
+            return entry.network_service_account_id == 0;
+        }),
+        entries.end());
+    return entries;
+}
+
 inline void Clear() {
     std::lock_guard lock{cache_mutex};
     cache_entries.clear();

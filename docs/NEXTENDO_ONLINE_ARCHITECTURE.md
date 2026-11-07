@@ -1,179 +1,85 @@
-# NEX — arquitetura de integração Nextendo e multiplayer
+# Arquitetura de integração online do NEX
 
-## Objetivo
+Atualizado em 7 de novembro de 2026.
 
-Implementar suporte próprio do NEX à Nextendo Network no fork Android do Eden v0.2.0-rc1 Optimized, com package ID `com.nex.nx`. O NEX mantém sua própria identidade OAuth, sua própria integração Android e suas próprias credenciais emitidas/aprovadas para o aplicativo. Não importa credenciais privadas, chaves de assinatura ou material de atestação de outros emuladores.
+Este documento separa o que já existe no cliente Android do que ainda depende de contrato, credenciais ou infraestrutura fornecidos pela Nextendo.
 
-## Separação de credenciais
+## 1. Identidade NEX
 
-As credenciais abaixo têm finalidades diferentes e não podem ser substituídas umas pelas outras.
+- Repositório: XDavi196/NEX.
+- Branch: nex/eden-v0.2.0-rc1-nextendo.
+- Base: Eden v0.2.0-rc1, commit 8e373eb714aa01117ec885680477501cdb572112.
+- Android application ID: com.nex.nx.
+- OAuth callback: com.nex.nx://oauth/callback.
+- Client ID público NEX: nxc_yAdR-14bOEq7.
 
-| Credencial | Finalidade | Onde deve ser usada |
-|---|---|---|
-| OAuth Client ID `nxc_yAdR-14bOEq7` | Identifica o cliente público NEX no fluxo OAuth | Authorization Code + PKCE |
-| OAuth access token | Chama APIs de conta dentro dos escopos autorizados | APIs de identidade, amigos, perfil e presença, conforme contrato confirmado |
-| OAuth refresh token | Renova a sessão do jogador | Somente endpoint OAuth de renovação |
-| Game token `nx2.` | Prova a identidade Nextendo do jogador no login NEX de cada jogo | Claim `nnex` do BAAS `id_token` |
-| BAAS signing key do NEX | Assina o JWT BAAS emitido localmente pelo emulador | HLE ACC/BAAS, conforme chave pública/JWKS confiada pelo serviço |
-| App identity / client-attestation credential | Demonstra ao gateway que a requisição veio de uma build NEX autorizada | Cabeçalhos e assinatura de cada chamada protegida, conforme o protocolo emitido pelo Nextendo |
+O login usa Authorization Code + PKCE (S256). O APK não contém client secret. O access token OAuth, usado nas rotas de conta documentadas, é diferente do token de jogo nx2. O token nx2. é tratado como opaco; não é um JWT BAAS e não é usado como substituto do OAuth access token.
 
-Um Bot Token `nxt_bot_...` não é necessário no APK e não substitui nenhuma das credenciais acima. Client ID, access token, game token, BAAS signing key e app-attestation key não são intercambiáveis.
+Escopos solicitados: identity, friends, presence e game.matchmaking. Escopos não usados foram removidos.
 
-## 1. Lista de amigos e perfil
+## 2. Contrato de conta e presença
 
-### Camada de conta (Android / REST)
+A documentação de desenvolvedor da Nextendo descreve OAuth com os escopos de presença e matchmaking, emissão de token de jogo e publicação de presença com OAuth. O código público de nextendo-account ainda apresenta diferenças: o allow-list de escopos contém identity/friends, o endpoint /api/nex-token verifica token de sessão web, e /api/presence aceita token de sessão web ou nx2.
 
-A lista do app NEX deve ser consumida fora das threads de emulação e de rede do jogo.
+O NEX segue o contrato documentado e não tenta contornar a divergência com login privado. A publicação de presença agora exige access token OAuth válido e escopo presence. Se a implantação pública ainda seguir o código-fonte aberto, a requisição pode ser recusada. Não há fallback para nx2.
 
-Fluxo proposto:
+A presença do HOME Menu não inventa AppField. O campo fica vazio até que exista um valor binário real e validado para publicar.
 
-1. Obter o PID e a identidade básica do jogador pela resposta OAuth documentada.
-2. Consultar a lista de amigos com o escopo `friends`.
-3. Normalizar cada registro para um modelo NEX próprio: PID, nome exibido, Friend Code, avatar, estado de presença, title ID, detalhe do jogo e favorito, quando fornecidos pelo serviço.
-4. Cache de curta duração, renovação em segundo plano, cancelamento ao desconectar e limpeza dos dados pessoais no logout.
-5. A camada Android consulta `GET /api/oauth/userinfo` com OAuth Bearer e o escopo `friends`, normaliza a lista e mostra uma tela simples de amigos. O cache aceito (máximo 300 entradas PID/nome) é atualizado via JNI na camada nativa e limpo ao trocar/desconectar a conta. A consulta é de leitura; enviar/aceitar/recusar/remover pedidos ainda não está ligado, pois os endpoints de mutação e a autenticação de cada rota precisam ser validados no gateway em produção.
+## 3. BAAS e ACC
 
-O backend público também lista rotas mais completas em `/api/friends`. NEX não as chama até confirmar o contrato OAuth atual.
+O HLE ACC recebe a identidade NEX disponível, mas isso não equivale à autenticação BAAS do jogo. A emissão de id_token assinado com o token nx2. dentro da claim nnex depende de:
 
-### Camada HLE (serviços locais do jogo)
+- contrato exato da claim, issuer, audience, kid, jku, algoritmo e validade;
+- chave privada emitida especificamente para o NEX;
+- chave pública NEX registrada no JWKS oficial;
+- procedimento de client attestation e assinatura das chamadas exigido pela Nextendo.
 
-Os jogos Switch não consultam a tela Android de amigos. Eles chamam serviços locais do Horizon, em especial `nn::friends`. O NEX mantém um cache nativo limitado a 300 entradas PID/nome protegido por mutex. A camada Android busca os amigos via OAuth userinfo e atualiza esse cache pela JNI; logout/troca de conta limpa o cache. O overlay liga handlers básicos de IDs, lista, detalhes, contagem e perfis ao cache. Ainda não preenche presença verdadeira, Friend Code/avatar na struct HLE, pedidos ou AppKeyValueStorage. As respostas IPC não fazem HTTP síncrono na thread PRUDP/online do jogo.
+A documentação pública manda seguir a implementação do emulador oficial, mas não descreve por completo esses campos. Nenhum valor é adivinhado. Sem a chave e o contrato NEX, o ACC não entrega um BAAS id_token de jogo válido.
 
-## 2. Presença online
+## 4. Cache social e nn::friends
 
-Há dois usos distintos de presença:
+O Android mantém um snapshot limitado de amigos e transfere os campos validados para um cache nativo protegido por mutex. Os campos conhecidos são PID, username, presença, application ID, AppField e, quando a API realmente o fornece, NSA.
 
-- **Presença social do aplicativo:** informa que o jogador está conectado ao NEX.
-- **Presença do jogo:** informa o título atual, estado, lobby e, para certos títulos, o campo de aplicação/protocolo que permite entrar na sala de um amigo.
+O serviço nn::friends só expõe registros de jogo quando há um NSA explícito. O PID não é convertido em NSA. O PID também não é transformado em UUID Switch. Campos ausentes, como UUID e último acesso, permanecem zerados.
 
-A NexWiki Developer Documentation define o escopo OAuth `presence` para ler/publicar atividade e exige heartbeat em `POST /api/presence` pelo menos a cada 90 segundos. O modelo documentado usa status 0 (offline), 1 (online) e 2 (em jogo), além de `app_field`, `app_id` e `app_detail`.
+A API pública de amigos atualmente retorna PID e presença, mas não NSA nem UUID. Por isso, com essa resposta pública, a lista HLE fica vazia em vez de enviar IDs incorretos ao jogo. O aplicativo ainda pode mostrar os dados sociais que a API disponibilizar, mas isso não significa que o jogo consiga resolver esses amigos.
 
-Implementação Android alinhada à documentação:
+Os comandos modernos de qLaunch foram registrados no overlay, mas os buffers V2 ainda precisam de validação dentro do qLaunch real. Os testes nativos do cache não substituem testes IPC visíveis ao jogo.
 
-1. O app agenda heartbeat a cada 60 segundos.
-2. O publisher atualmente usa o token `nx2.` porque o código público da conta aceita esse tipo de credencial na rota; isso é provisório e conflita com a NexWiki, que define OAuth access token com escopo `presence`.
-3. O token `nx2.` continua reservado principalmente à autenticação do jogo; não deve ser tratado como substituto universal de consentimento OAuth.
-4. Ao desconectar, NEX tenta status 0 apenas se ainda possuir um OAuth access token válido com o escopo `presence`.
-5. O overlay liga `setGameActivity()` ao ciclo de vida da emulação e ao Title ID real do play-time manager.
-6. `app_field` deve ser o AppKeyValueStorage binário real de 0xC0 bytes produzido pelo HLE; NEX não inventa esse valor.
+## 5. PRUDP-Lite, RMC e Super Mario Maker 2
 
-**Validação pendente:** a wiki exige OAuth Bearer com escopo `presence`, enquanto a cópia pública do serviço de contas aceita sessão web ou `nx2.`. O publisher está provisoriamente alinhado ao código público e deve ser ajustado se a Nextendo confirmar que a produção segue a wiki. O heartbeat ainda não foi validado ao vivo.
-## 3. BAAS e claim nnex
+Foi implementado um codec NEX-owned para o envelope PRUDP-Lite e um codec para o envelope RMC:
 
-O fluxo de login do jogo é independente do login OAuth:
+- PRUDP-Lite: cabeçalho, opções de handshake, tamanho de payload, concatenação de quadros e leituras TCP/WebSocket parciais.
+- RMC: prefixo de tamanho, protocolo, direção, call ID, method ID e respostas de sucesso/erro.
+- DataStore_SMM2: protocolo 115, com IDs de métodos transcritos do schema público.
 
-1. NEX recebe uma sessão OAuth autorizada.
-2. NEX obtém um token de jogo assinado `nx2.` pela rota oficial Nextendo.
-3. O HLE ACC/BAAS constrói o `id_token` JWT solicitado pelo jogo e inclui o token `nx2.` inteiro na claim `nnex`.
-4. O `id_token` é assinado com a chave BAAS específica do NEX, usando algoritmo, `kid`, `iss`, `aud`, `jku`, expiração e demais claims exatamente aprovados pelo Nextendo e pelo título.
-5. O jogo encaminha o token ao serviço de autenticação NEX; o servidor valida a assinatura BAAS e a claim `nnex`, incluindo PID e validade.
+Esses codecs não implementam o handshake completo, assinatura de pacotes, chave de acesso do jogo, janela de confiabilidade, retransmissão, sessão RMC, serialização dos parâmetros específicos do SMM2 ou matchmaking. Eles também não abrem conexão de rede.
 
-Regras obrigatórias:
+Referências de protocolo usadas para a implementação independente:
+- NintendoClients, licença MIT: https://github.com/kinnay/NintendoClients
+- Schema DataStore_SMM2: https://github.com/kinnay/NintendoClients/blob/master/nintendo/files/proto/datastore_smm2.proto
+- Serviço NEX da Nextendo, lado servidor: https://github.com/NextendoNetwork/nextendo-nex
 
-- Nunca inserir o OAuth access token na claim `nnex`.
-- Nunca usar um PID isolado, token vazio, ou token `nx2` inventado.
-- Não gerar uma chave aleatória de BAAS como solução de produção.
-- Não reutilizar o certificado, `kid`, `jku`, audience, issuer ou chave privada de outra build.
-- Se o jogo validar a assinatura localmente por JWKS, a chave pública publicada pelo endpoint/JWKS deve corresponder à chave privada NEX usada para assinar o JWT.
+O código do servidor Nextendo foi consultado como referência pública, não incorporado ao cliente.
 
-## 4. DNS, TLS e SNI
+## 6. DNS, TLS e SNI por título
 
-O jogo continua a resolver os hostnames originais do serviço online. O emulador intercepta apenas os hostnames Nextendo oficialmente mapeados e resolve-os para os endereços Nextendo configurados.
+O NEX ainda não possui o mapa validado de hostnames do SMM2 para os serviços Nextendo. Sem esse mapa, não há redirecionamento de DNS. Quando a rota for implementada, o hostname original deverá ser preservado para validação do certificado e SNI. A validação TLS da plataforma não pode ser desativada.
 
-Camadas previstas:
+## 7. NAT e P2P
 
-- Resolver DNS MITM dentro do subsistema SFDNSRES, com precedência documentada para entradas explícitas de hosts.
-- Tabela de hostnames por jogo/serviço, mantida por configuração e compatibilidade publicada, não por wildcard global.
-- Dois endereços distintos para os caminhos que exigem NAT check: servidor principal e segundo ponto de observação.
-- Preservar TLS normal: validação de certificado, trust store do emulador e SNI coerente com o hostname solicitado.
-- Quando um título abre TLS por IP sem SNI, recuperar o hostname original da resolução DNS e corrigir o ClientHello de forma limitada, sem desativar verificação de certificado.
-- Não implementar SSL bypass, não aceitar certificados arbitrários e não interceptar tráfego que não pertença aos hostnames explicitamente autorizados.
+Foi implementado o parser de um probe NNCS de 16 bytes e um tracker de duas observações para classificar mapeamentos iguais, portas diferentes ou observações inconclusivas. O tracker limpa os dados em close().
 
-O roteamento TLS do lado Nextendo usa SNI para direcionar o tráfego de autenticação para o servidor de jogo adequado.
+Isso não preserva o socket UDP do jogo. Não existe ainda integração com o ciclo de vida do socket BSD do Eden, keepalive, descoberta de jogadores, negociação de sessão, hole-punching ou teardown P2P. Os endpoints e portas NNCS são específicos por título; não foram copiados os ports de Mario Kart 8 para o SMM2.
 
-## 5. NEX / PRUDP, NAT e P2P
+## 8. Segurança e bloqueios
 
-Matchmaking e NAT traversal são fases diferentes:
+- Não copiar Client IDs, tokens, sessões, chaves privadas ou attestations do Den2 ou de qualquer outro emulador.
+- Não inventar hostnames, endereços IP, access keys, claims, formatos de pacote ou regras de aceitação.
+- Não desativar verificação de certificado TLS.
+- Não publicar AppField fictício.
+- Não converter PID em NSA ou UUID.
+- Não declarar multiplayer funcional sem teste com duas contas NEX, dois dispositivos e um jogo Nextendo suportado.
 
-1. O jogo autentica via TLS/SNI e recebe ticket de sessão.
-2. Conecta ao servidor seguro do jogo (NEX/PRUDP).
-3. Matchmaking localiza os participantes e negocia os endpoints.
-4. O jogo executa NAT-check contra os dois pontos de observação Nextendo.
-5. Depois do resultado, os clientes tentam UDP hole-punching e enviam o tráfego da partida diretamente entre peers, quando o título usa P2P.
-
-O HLE BSD precisa preservar corretamente o socket UDP e o mapeamento NAT durante a transição entre NAT-check e sessão P2P. Não se deve fechar/reabrir o socket indiscriminadamente se o jogo espera reutilizar o mesmo mapeamento. A correção precisa ser específica para o padrão de bind/rebind observado e não pode manter sockets indefinidamente.
-
-Também precisamos validar:
-- portas locais e remotas, socket reuse, timeout e limpeza no fim da emulação;
-- NAT simétrico, cone/restricted NAT, Wi-Fi e redes móveis;
-- IPv4/IPv6 conforme suporte do servidor;
-- corrida entre peers e retransmissão PRUDP;
-- fallback/erro quando NAT ou UDP é bloqueado.
-
-## 6. Identidade do cliente pelo Developer Portal
-
-NEX usa um **cliente público próprio registrado no Developer Portal**, com OAuth Authorization Code + PKCE. Essa identidade de cliente é gerenciada pelo portal; não estamos solicitando o selo ou endosso separado de **“Official App”**.
-
-As chamadas REST enviam o cabeçalho:
-
-`X-Nextendo-Client-Id: <NEX Client ID>`
-
-O código usa o Client ID configurado nesta branch. Não há Client Secret nem Bot Token embutido no APK, e nenhuma chave/credencial de outro emulador é reutilizada.
-
-A equipe Nextendo esclareceu que “Official App” é um status separado e que o cliente deve usar o que o Developer Portal já fornece. Portanto, NEX não deve inventar uma chave privada de atestação, nem pedir credenciais que o portal não disponibiliza. A changelog v1.8.6/v1.8.7 descreve identidade de aplicação e attestation para clientes de emulador, mas a integração NEX deve seguir as instruções atuais do Developer Portal e validar as respostas reais do gateway.
-
-Recursos que a documentação reserva a aplicações oficiais, como cloud saves e gestão da conta, ficam fora do escopo atual do NEX.
-
-## 7. Inconsistências de contrato a confirmar
-
-A NexWiki Developer Documentation é a referência funcional para clientes públicos: PKCE sem Client Secret, escopos `identity`, `friends`, `presence`, `game.matchmaking`, `mods.favorites` e `profil`; `GET /api/nex-token` com OAuth Bearer e escopo `game.matchmaking`; token `nx2.` de 24 horas apenas para jogos, usado na claim BAAS `nnex`; access token de uma hora; refresh token de 30 dias com rotação.
-
-O código público do serviço de contas consultado ainda diverge da wiki: limita os escopos a `identity/friends`, não devolve refresh token no grant público, `/api/nex-token` valida token de sessão web e não devolve `expires_in`, e `/api/presence` usa web-session/`nx2.` em vez de OAuth. O código-fonte público pode estar desatualizado em relação ao gateway implantado; o NEX não deve mudar a autenticação até testar a produção com o OAuth concedido e receber confirmação dos mantenedores.
-
-O changelog público também registra identidade de aplicação/closed API na v1.8.6 e atualização obrigatória de client attestation na v1.8.7. A wiki explica o Client ID público, mas não publica o protocolo criptográfico de attestation nem confirma se o Client ID `nxc_` é toda a prova exigida para uma build independente. NEX usa apenas o seu próprio Client ID no cabeçalho `X-Nextendo-Client-Id`; não copia o token de aplicação, segredo, chave ou attestation de outro emulador.
-
-Antes do lançamento, solicitar à equipe Nextendo exemplos reais (sem dados de usuários) de:
-- perfil GET e update de perfil (escopo `profil`);
-- amigos GET, incoming requests e ações de aceitar/recusar;
-- payload de presença e comportamento de logout/offline;
-- `/api/nex-token` com OAuth access token e resposta com `expires_in`;
-- refresh-token rotation de 30 dias;
-- headers e protocolo/credencial de client attestation aplicável a um cliente público independente;
-- JWT BAAS, JWKS e parâmetros NEX.
-
-## 8. Plano de testes e critérios de aceite
-
-**Etapa A — conta**
-- OAuth PKCE Android com callback exato.
-- refresh-token rotation e logout/revogação.
-- userinfo identity e friend code.
-- perfil e amigos com consentimento.
-
-**Etapa B — social**
-- lista de amigos, pedidos, cache e avatar.
-- presença online/in-game/offline, heartbeat e expiração.
-- teste de duas contas NEX em dois dispositivos.
-
-**Etapa C — autenticação de jogo**
-- token `nx2` válido e expirado.
-- BAAS JWT assinado com chave NEX provisionada.
-- claim `nnex` validada pelo jogo/servidor.
-- recusa controlada para app não provisionado ou conta sem autorização.
-
-**Etapa D — rede**
-- DNS mapping por hostname/título.
-- TLS com SNI e certificados validados.
-- NEX auth / PRUDP / secure connection.
-- matchmaking entre duas contas.
-- NAT-check de ambos os lados, hole-punch e tráfego P2P real.
-
-**Critério de release:** só declarar “multiplayer funcional” depois de uma sessão multiplayer real com duas contas NEX, jogo e versão suportados pelo Nextendo, sem erro de autenticação, matchmaking, NAT ou P2P. OAuth login ou obtenção de `nx2` não é evidência suficiente.
-
-## Referências oficiais consultadas
-
-- https://wiki.nextendo.network/developers
-- https://wiki.nextendo.network/changelog
-- https://github.com/NextendoNetwork/nextendo-docs/blob/main/ARCHITECTURE.md
-- https://github.com/NextendoNetwork/nextendo-docs/blob/main/DEPLOYMENT.md
-- https://github.com/NextendoNetwork/nextendo-account
-- https://github.com/NextendoNetwork/Ryujinx-Nextendo
+Bloqueios externos atuais: chave BAAS/attestation específica do NEX; contrato JWT/JWKS; alinhamento das rotas OAuth públicas; NSA/UUID por amigo; endpoint e access key do SMM2; payloads de matchmaking; mapa DNS/TLS/SNI; e fluxo NNCS/P2P do título.

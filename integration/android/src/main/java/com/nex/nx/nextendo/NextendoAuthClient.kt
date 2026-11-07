@@ -32,7 +32,7 @@ object NextendoAuthClient {
     private const val USERINFO_URL = "$BASE_URL/api/oauth/userinfo"
 
     // Exact scopes shown by the current NEX URL generated in the Nextendo portal.
-    const val SCOPES = "identity friends presence profil game.matchmaking mods.favorites"
+    const val SCOPES = "identity friends presence game.matchmaking"
 
     data class PendingAuthorization(
         val codeVerifier: String,
@@ -181,19 +181,6 @@ object NextendoAuthClient {
             headers = mapOf("Authorization" to "Bearer $gameToken")
         )
         return NextendoGameFriendParser.parse(response)
-    }
-
-    /** Reads the account's own NSA from Nextendo /api/me using its game token. */
-    internal fun fetchAccountNsa(gameToken: String): Long {
-        require(gameToken.startsWith("nx2.")) {
-            "A valid Nextendo nx2. game token is required for account NSA."
-        }
-        val response = request(
-            url = "$BASE_URL/api/me",
-            method = "GET",
-            headers = mapOf("Authorization" to "Bearer $gameToken")
-        )
-        return NextendoAccountNsaParser.parse(response)
     }
 
     /**

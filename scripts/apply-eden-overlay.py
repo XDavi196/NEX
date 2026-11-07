@@ -68,7 +68,7 @@ def main() -> None:
         "    external fun getAllUsers(): Array<String>?\n",
     )
 
-    # Copy the NEX-owned bounded cache and expose only PID/name records to JNI.
+    # Copy the NEX-owned bounded friend cache and the serializers used by friend IPC.
     native_header_source = NEX_SOURCE / "integration/android/src/main/cpp/nextendo_friend_cache.h"
     native_header_destination = (
         eden / "src/core/hle/service/friend/nextendo_friend_cache.h"
@@ -77,6 +77,14 @@ def main() -> None:
         raise RuntimeError(f"Missing NEX native friend cache header: {native_header_source}")
     native_header_destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(native_header_source, native_header_destination)
+
+    friend_hle_header_source = NEX_SOURCE / "integration/android/src/main/cpp/nextendo_friend_hle.h"
+    friend_hle_header_destination = (
+        eden / "src/core/hle/service/friend/nextendo_friend_hle.h"
+    )
+    if not friend_hle_header_source.is_file():
+        raise RuntimeError(f"Missing NEX friend HLE serializer header: {friend_hle_header_source}")
+    shutil.copy2(friend_hle_header_source, friend_hle_header_destination)
 
     native_cpp = app_dir / "src/main/jni/native.cpp"
     replace_once(
@@ -258,120 +266,12 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
         "#include <cstring>\n"
         "#include <queue>\n"
         "#include <vector>\n"
-        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n',
+        '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
+        '#include "core/hle/service/friend/nextendo_friend_hle.h"\n',
     )
-    friend_support = r'''// FriendInfo/ProfileInfo ABI layout follows the pinned Eden HLE and the publicly
-// documented Nextendo/Den2 friend-service wire layout. No Den2 identity or secrets
-// are used; NEX supplies its own PID/name cache through the JNI bridge.
+    friend_support = r'''// NEX-owned friend record serializers. Unknown identity fields remain zero.
 namespace {
-#pragma pack(push, 1)
-struct NextendoUserPresence {
-    Common::UUID user_id;
-    s64 last_time_online_timestamp;
-    u32 status;
-    u8 same_presence_group_application;
-    std::array<u8, 3> unknown;
-    std::array<u8, 0xC0> app_key_value;
-};
-static_assert(sizeof(NextendoUserPresence) == 0xE0);
-
-struct NextendoFriendInfo {
-    Common::UUID user_id;
-    u64 network_user_id;
-    std::array<char, 0x21> nickname;
-    std::array<u8, 7> nickname_padding;
-    NextendoUserPresence presence;
-    u8 is_favourite;
-    u8 is_new;
-    std::array<u8, 6> unknown;
-    u8 is_valid;
-    std::array<u8, 0xD7> padding;
-};
-static_assert(sizeof(NextendoFriendInfo) == 0x200);
-static_assert(offsetof(NextendoFriendInfo, presence) == 0x40);
-static_assert(offsetof(NextendoFriendInfo, is_favourite) == 0x120);
-static_assert(offsetof(NextendoFriendInfo, is_valid) == 0x128);
-
-struct NextendoProfileInfo {
-    Common::UUID user_uuid;
-    u64 network_user_id;
-    std::array<char, 0x21> nickname;
-    std::array<u8, 7> padding;
-};
-static_assert(sizeof(NextendoProfileInfo) == 0x40);
-#pragma pack(pop)
-
-Common::UUID NextendoUidForPid(u64 pid) {
-    std::array<u8, 16> raw{};
-    std::memcpy(raw.data(), &pid, sizeof(pid));
-    constexpr u64 uid_namespace = 0x1100000000000000ULL;
-    std::memcpy(raw.data() + sizeof(pid), &uid_namespace, sizeof(uid_namespace));
-    return Common::UUID{raw};
-}
-
-NextendoFriendInfo MakeNextendoFriendInfo(
-    const Common::NextendoFriendCache::Entry& entry, u64 requested_network_id = 0) {
-    NextendoFriendInfo out{};
-    out.user_id = NextendoUidForPid(entry.pid);
-    out.network_user_id = requested_network_id != 0 ? requested_network_id : entry.pid;
-    const auto length = std::min(entry.username.size(), out.nickname.size() - 1);
-    std::memcpy(out.nickname.data(), entry.username.data(), length);
-    out.presence.user_id = out.user_id;
-    out.presence.status = entry.presence_status > 0 ? 2U : 0U;
-    out.presence.last_time_online_timestamp = 0x7FFFFFFFFFFFFFFFLL;
-    // The OAuth/game cache does not yet retain the current title ID, so do not
-    // claim that this friend is in the same application group.
-    out.presence.same_presence_group_application = 0;
-    const auto app_field_size = std::min(
-        entry.app_field_size, out.presence.app_key_value.size());
-    std::copy_n(
-        entry.app_field.begin(), app_field_size,
-        out.presence.app_key_value.begin());
-    out.is_valid = 1;
-    return out;
-}
-
-inline constexpr u64 NextendoHomeMenuTitleId = 0x0100000000001000ULL;
-inline constexpr std::size_t NextendoFriendRecordV2Size = 0x220;
-inline constexpr std::size_t NextendoFriendDetailedInfoV2Size = 0x800;
-inline constexpr std::size_t NextendoFriendPresenceV2Size = 0x80;
-inline constexpr std::size_t NextendoUserPresenceViewV2Size = 0xE8;
-
-// SDK 20+ HOME Menu friend tile: a 0x40-byte identity header, title ID at 0xE0,
-// 0xE0-byte presence block at 0xE8, and the valid flag at 0x21F.
-void WriteNextendoFriendRecordV2(
-    u8* record, const Common::NextendoFriendCache::Entry& entry, u64 requested_network_id) {
-    const auto legacy = MakeNextendoFriendInfo(entry, requested_network_id);
-    std::memset(record, 0, NextendoFriendRecordV2Size);
-    std::memcpy(record, &legacy, 0x40);
-    std::memcpy(record + 0xE8,
-                reinterpret_cast<const u8*>(&legacy) + 0x40, 0xE0);
-    if (entry.presence_status > 0) {
-        const u64 title_id = entry.application_id != 0
-            ? entry.application_id
-            : NextendoHomeMenuTitleId;
-        std::memcpy(record + 0xE0, &title_id, sizeof(title_id));
-    }
-    record[0x21F] = 1;
-}
-
-// The SDK 20+ friend page reads its current title from 0x570/0x578.
-// Unknown history, avatar and "friends since" fields remain empty.
-void WriteNextendoFriendDetailedInfoV2(
-    std::array<u8, NextendoFriendDetailedInfoV2Size>& output,
-    const Common::NextendoFriendCache::Entry& entry, u64 requested_network_id) {
-    output.fill(0);
-    const auto legacy = MakeNextendoFriendInfo(entry, requested_network_id);
-    std::memcpy(output.data(), &legacy, 0x40);
-    output[0x608] = 1;
-    if (entry.presence_status > 0) {
-        const u64 title_id = entry.application_id != 0
-            ? entry.application_id
-            : NextendoHomeMenuTitleId;
-        std::memcpy(output.data() + 0x570, &title_id, sizeof(title_id));
-        std::memcpy(output.data() + 0x578, &title_id, sizeof(title_id));
-    }
-}
+using namespace Common::NextendoFriendHle;
 
 std::vector<u64> ReadNextendoPids(HLERequestContext& ctx) {
     constexpr std::size_t MaxRequestedIds = Common::NextendoFriendCache::MaxFriends;
@@ -390,7 +290,7 @@ std::vector<u64> ReadNextendoPids(HLERequestContext& ctx) {
 
 void RespondNextendoProfileList(HLERequestContext& ctx, const char* label) {
     const auto requested = ReadNextendoPids(ctx);
-    const auto friends = Common::NextendoFriendCache::Get();
+    const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
     const auto capacity = std::min(
         ctx.GetWriteBufferNumElements<NextendoProfileInfo>(),
         Common::NextendoFriendCache::MaxFriends);
@@ -403,14 +303,13 @@ void RespondNextendoProfileList(HLERequestContext& ctx, const char* label) {
         }
         const auto found = std::find_if(friends.begin(), friends.end(),
             [pid](const auto& entry) {
-                return entry.pid == pid || entry.network_service_account_id == pid;
+                return entry.network_service_account_id == pid;
             });
         if (found == friends.end()) {
             continue;
         }
 
         NextendoProfileInfo profile{};
-        profile.user_uuid = NextendoUidForPid(found->pid);
         profile.network_user_id = pid;
         const auto length = std::min(found->username.size(), profile.nickname.size() - 1);
         std::memcpy(profile.nickname.data(), found->username.data(), length);
@@ -429,7 +328,7 @@ void RespondNextendoProfileList(HLERequestContext& ctx, const char* label) {
 
 void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     const auto requested = ReadNextendoPids(ctx);
-    const auto friends = Common::NextendoFriendCache::Get();
+    const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
     const auto capacity = std::min(
         ctx.GetWriteBufferNumElements<NextendoFriendInfo>(),
         Common::NextendoFriendCache::MaxFriends);
@@ -441,8 +340,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         const auto requested_network_id = requested[i];
         const auto found = std::find_if(friends.begin(), friends.end(),
             [requested_network_id](const auto& entry) {
-                return entry.pid == requested_network_id ||
-                    entry.network_service_account_id == requested_network_id;
+                return entry.network_service_account_id == requested_network_id;
             });
         details.push_back(found == friends.end() ? NextendoFriendInfo{}
                                                  : MakeNextendoFriendInfo(*found, requested_network_id));
@@ -512,27 +410,10 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     }""",
         """    void GetUserPresenceView(HLERequestContext& ctx) {
         IPC::RequestParser rp{ctx};
-        const auto uuid = rp.PopRaw<Common::UUID>();
-        const auto friends = Common::NextendoFriendCache::Get();
+        [[maybe_unused]] const auto uuid = rp.PopRaw<Common::UUID>();
+        // The public Nextendo friend payload has no Switch account UUID mapping.
         NextendoUserPresence presence{};
-        const auto found = std::find_if(friends.begin(), friends.end(),
-            [&uuid](const auto& entry) {
-                return NextendoUidForPid(entry.pid).RawString() == uuid.RawString();
-            });
-        if (found != friends.end()) {
-            presence.user_id = NextendoUidForPid(found->pid);
-            presence.status = found->presence_status;
-            presence.last_time_online_timestamp = 0x7FFFFFFFFFFFFFFFLL;
-            presence.same_presence_group_application = 1;
-            const auto app_field_size = std::min(
-                found->app_field_size, presence.app_key_value.size());
-            std::copy_n(
-                found->app_field.begin(), app_field_size,
-                presence.app_key_value.begin());
-        }
         ctx.WriteBuffer(presence);
-        LOG_INFO(Service_Friend, "[NEX Nextendo] GetUserPresenceView uuid=0x{} found={}",
-                 uuid.RawString(), found != friends.end());
         IPC::ResponseBuilder rb{ctx, 3};
         rb.Push(ResultSuccess);
     }""",
@@ -545,7 +426,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         [[maybe_unused]] const auto filter = rp.PopRaw<SizedFriendFilter>();
         const auto pid = rp.Pop<u64>();
 
-        const auto friends = Common::NextendoFriendCache::Get();
+        const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
         const auto capacity = std::min(
             ctx.GetWriteBufferNumElements<NextendoFriendInfo>(),
             Common::NextendoFriendCache::MaxFriends);
@@ -592,7 +473,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     new_handlers = """    void GetFriendListIds(HLERequestContext& ctx) {
         IPC::RequestParser rp{ctx};
         const auto offset = rp.Pop<s32>();
-        const auto friends = Common::NextendoFriendCache::Get();
+        const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
         const auto capacity = ctx.GetWriteBufferNumElements<u64>();
         std::vector<u64> pids;
         if (offset == 0) {
@@ -601,7 +482,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
                 if (pids.size() >= capacity) {
                     break;
                 }
-                pids.push_back(entry.pid);
+                pids.push_back(entry.network_service_account_id);
             }
         }
         if (!pids.empty()) {
@@ -636,11 +517,10 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
         const auto requested_id = rp.Pop<u64>();
         std::array<u8, NextendoFriendDetailedInfoV2Size> output{};
-        const auto friends = Common::NextendoFriendCache::Get();
+        const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
         const auto found = std::find_if(friends.begin(), friends.end(),
             [requested_id](const auto& entry) {
-                return entry.pid == requested_id ||
-                    entry.network_service_account_id == requested_id;
+                return entry.network_service_account_id == requested_id;
             });
         if (found != friends.end()) {
             WriteNextendoFriendDetailedInfoV2(output, *found, requested_id);
@@ -658,7 +538,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
         const auto offset = rp.Pop<s32>();
         [[maybe_unused]] const auto filter = rp.PopRaw<SizedFriendFilter>();
-        const auto friends = Common::NextendoFriendCache::Get();
+        const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
         const auto output_bytes =
             ctx.GetWriteBufferNumElements<u64>() * sizeof(u64);
         const auto capacity = output_bytes / NextendoFriendRecordV2Size;
@@ -670,7 +550,9 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
             for (std::size_t i = 0; i < count; ++i) {
                 const auto& entry = friends[static_cast<std::size_t>(offset) + i];
                 WriteNextendoFriendRecordV2(
-                    output.data() + i * NextendoFriendRecordV2Size, entry, entry.pid);
+                    output.data() + i * NextendoFriendRecordV2Size,
+                    entry,
+                    entry.network_service_account_id);
             }
         }
         if (!output.empty()) {
@@ -692,14 +574,13 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
             ctx.GetWriteBufferNumElements<u64>() * sizeof(u64);
         const auto capacity = output_bytes / NextendoFriendRecordV2Size;
         const auto count = std::min(requested.size(), capacity);
-        const auto friends = Common::NextendoFriendCache::Get();
+        const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
         std::vector<u8> output(count * NextendoFriendRecordV2Size);
         for (std::size_t i = 0; i < count; ++i) {
             const auto requested_id = requested[i];
             const auto found = std::find_if(friends.begin(), friends.end(),
                 [requested_id](const auto& entry) {
-                    return entry.pid == requested_id ||
-                        entry.network_service_account_id == requested_id;
+                    return entry.network_service_account_id == requested_id;
                 });
             if (found != friends.end()) {
                 WriteNextendoFriendRecordV2(
@@ -731,12 +612,8 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     void GetUserPresenceViewV2(HLERequestContext& ctx) {
         IPC::RequestParser rp{ctx};
         [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
+        // No verified Switch UUID or live qLaunch presence snapshot is available.
         std::array<u8, NextendoUserPresenceViewV2Size> view{};
-        if (Common::NextendoFriendCache::GetPlayerPid() > 0) {
-            const u64 title_id = NextendoHomeMenuTitleId;
-            std::memcpy(view.data(), &title_id, sizeof(title_id));
-            view[0x20] = 2; // OnlinePlay: qLaunch shows the HOME Menu title card.
-        }
         ctx.WriteBuffer(view);
         IPC::ResponseBuilder rb{ctx, 2};
         rb.Push(ResultSuccess);
@@ -759,7 +636,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         rb.Push(0);
     }""",
         """    void GetFriendCount(HLERequestContext& ctx) {
-        const auto count = static_cast<u32>(Common::NextendoFriendCache::Get().size());
+        const auto count = static_cast<u32>(Common::NextendoFriendCache::GetNetworkFriends().size());
         LOG_INFO(Service_Friend, "[NEX Nextendo] GetFriendCount -> {}", count);
         IPC::ResponseBuilder rb{ctx, 3};
         rb.Push(ResultSuccess);
@@ -779,7 +656,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         """    void GetFriendListForViewer(HLERequestContext& ctx) {
         IPC::RequestParser rp{ctx};
         const auto offset = rp.Pop<s32>();
-        const auto friends = Common::NextendoFriendCache::Get();
+        const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
         const auto capacity = ctx.GetWriteBufferNumElements<u64>();
         std::vector<u64> pids;
         if (offset == 0) {
@@ -788,7 +665,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
                 if (pids.size() >= capacity) {
                     break;
                 }
-                pids.push_back(entry.pid);
+                pids.push_back(entry.network_service_account_id);
             }
         }
         if (!pids.empty()) {
