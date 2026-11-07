@@ -58,7 +58,7 @@ NEX follows the published public-client documentation where it is explicit. It d
 
 ## Android UI and social data
 
-The account panel reads the signed-in identity from OAuth userinfo and displays the available PID, username and Friend Code. The OAuth friends view is read-only.
+The account panel reads the signed-in identity from OAuth userinfo and displays the available PID, username and Friend Code. It also shows the scopes actually returned by OAuth and the latest token-free HTTP diagnostic from presence publishing. The OAuth friends view is read-only.
 
 The game-facing friend snapshot is requested separately with the \`nx2.\` token. The parser accepts only fields actually present in the response: PID, username, explicit NSA, presence status, title/application ID and bounded AppField data. Missing identifiers are not synthesized.
 

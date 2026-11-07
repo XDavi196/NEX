@@ -40,6 +40,20 @@ object NextendoPresencePublisher {
     @Volatile
     private var enabled = false
 
+    @Volatile
+    private var lastPresenceDiagnostic: String = "ainda não testado"
+
+    /** Safe, token-free result of the last OAuth presence attempt. */
+    fun diagnostic(): String = lastPresenceDiagnostic
+
+    private fun describeFailure(error: Throwable): String = when (error) {
+        is NextendoAuthClient.NextendoException ->
+            NextendoRequestDiagnostic.fromHttpStatus(error.httpStatus)
+        is java.io.IOException -> "network_error"
+        is IllegalStateException -> "session_unavailable"
+        else -> "request_error"
+    }
+
     /** Start the heartbeat scheduler; publishing requires the OAuth presence scope. */
     fun start(context: Context) {
         synchronized(lock) {
@@ -126,10 +140,13 @@ object NextendoPresencePublisher {
         gameTitleId = ""
         gameDetail = ""
         appFieldBase64 = ""
-        if (accessToken.isNullOrBlank()) return
+        if (accessToken.isNullOrBlank()) {
+            lastPresenceDiagnostic = "offline_status_not_sent"
+            return
+        }
 
         executor.execute {
-            runCatching {
+            val result = runCatching {
                 NextendoAuthClient.postPresence(
                     accessToken = accessToken,
                     status = 0,
@@ -138,15 +155,26 @@ object NextendoPresencePublisher {
                     appDetail = ""
                 )
             }
+            lastPresenceDiagnostic = result.fold(
+                onSuccess = { "HTTP 2xx (offline accepted)" },
+                onFailure = ::describeFailure
+            )
         }
     }
 
     private fun publishCurrentPresence() {
         if (!enabled) return
-        val context = synchronized(lock) { applicationContext } ?: return
-        val session = runCatching {
+        val context = synchronized(lock) { applicationContext } ?: run {
+            lastPresenceDiagnostic = "not_started"
+            return
+        }
+        val sessionResult = runCatching {
             NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
-        }.getOrNull() ?: return
+        }
+        val session = sessionResult.getOrElse { error ->
+            lastPresenceDiagnostic = describeFailure(error)
+            return
+        }
 
         // Follow the documented OAuth presence scope. The public account-server
         // source currently disagrees and may reject this until its deployed contract
@@ -156,11 +184,18 @@ object NextendoPresencePublisher {
             grantedScopes = session.grantedScopes,
             expiresAtEpochSeconds = session.accessTokenExpiresAtEpochSeconds,
             nowEpochSeconds = System.currentTimeMillis() / 1000L
-        ) ?: return
+        ) ?: run {
+            lastPresenceDiagnostic = if ("presence" !in session.grantedScopes) {
+                NextendoRequestDiagnostic.missingScope("presence")
+            } else {
+                "oauth_token_unavailable"
+            }
+            return
+        }
 
         val titleId = gameTitleId
         val inGame = titleId.isNotBlank()
-        runCatching {
+        val presenceResult = runCatching {
             NextendoAuthClient.postPresence(
                 accessToken = accessToken,
                 status = if (inGame) 2 else 1,
@@ -169,6 +204,10 @@ object NextendoPresencePublisher {
                 appDetail = if (inGame) gameDetail else ""
             )
         }
+        lastPresenceDiagnostic = presenceResult.fold(
+            onSuccess = { "HTTP 2xx (accepted)" },
+            onFailure = ::describeFailure
+        )
 
         // Friend data is a separate game-token contract. Never pass the OAuth
         // access token to /api/friends; keep the last validated snapshot on failure.

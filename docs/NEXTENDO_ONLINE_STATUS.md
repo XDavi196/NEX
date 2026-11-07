@@ -16,7 +16,8 @@ A successful APK build proves that the configured Android source and native tool
 - GitHub release asset SHA-256: \`2ae9258b771204107e5aad879122d1ab77ae83f27517b292458207c96fda2cc4\`.
 - Release also includes \`SHA256SUMS.txt\`.
 - Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It requested all six portal scopes.
-- The current branch now includes logo restoration and glass-effect removal; those visual changes require the next CI build before they are considered verified.
+- Commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e` restores the original NEX logo and removes the fragment-wide glass treatment. Run #103 is the verification build for those changes; it is still in progress.
+- The current work adds token-free runtime diagnostics for the OAuth scopes granted by the server and the HTTP result of presence publishing. The next build must validate this code.
 - Pinned Eden source: \`v0.2.0-rc1\`, commit \`8e373eb714aa01117ec885680477501cdb572112\`.
 - Android application ID: \`com.nex.nx\`.
 - OAuth callback: \`com.nex.nx://oauth/callback\`.
@@ -36,6 +37,10 @@ Run #102 verified code commit \`1eeaef07c96ae9d365c9739c22eb523c857937c2\`. The 
 - Refresh-token rotation is serialized and the returned token set is persisted as a whole. If a refresh token is absent, NEX does not invent one.
 - Presence publishing uses an unexpired OAuth access token with the \`presence\` scope and a 60-second heartbeat. It never substitutes the \`nx2.\` game token for the documented OAuth credential.
 - Game friends are fetched separately with the \`nx2.\` token. The HOME Menu publisher does not fabricate AppField data.
+
+### Runtime diagnostics
+
+The account panel shows the exact scopes returned in the OAuth token response and whether `game.matchmaking` is present. Presence publishing records only safe result labels: accepted 2xx, HTTP 401, HTTP 403, HTTP 404, other HTTP status, missing scope, network error or session unavailable. It never prints access tokens, refresh tokens, `nx2.` tokens, authorization codes or request headers. This lets the owner report the live deployment result without exposing credentials.
 
 ### ACC and player identity
 
@@ -134,14 +139,11 @@ The public server repository is server-side code, not a complete client handshak
 
 ## Test and release gate
 
-Run #99 passed:
+Run #102 passed the native friend-cache/HLE serializer test, Android Nextendo unit tests, optimized Android APK build, artifact upload and experimental release publication. It also requested all six scopes shown in the owner's portal.
 
-1. The native friend-cache/HLE serializer test.
-2. The Android Nextendo unit-test task, including game-token, game-friend, OAuth, presence, PRUDP-Lite, RMC, social and NAT tests.
-3. The optimized Android APK build against the pinned Eden source.
-4. Artifact upload and GitHub release publication.
+Run #103 verifies the logo restoration and glass removal from commit `1503bdf4bbf7e6d58f1bc927c1a4b2c1d078f73e`. It was still in progress at the time of this update. The request-diagnostic code being added now will be verified by a later run.
 
-This is build/test evidence only. It is not a live account-service acceptance test or a multiplayer test.
+These are build/test results only. They do not prove live account-service acceptance or in-game multiplayer.
 
 Required before claiming in-game online support:
 
@@ -159,8 +161,8 @@ Until those checks pass, NEX in-game multiplayer remains **not implemented / not
 ## NEX UI and current device-facing status
 
 - The official NEX logo is used in the Android launcher identity and the Games screen header.
-- A NEX-owned Android glass layer styles fragment bars, Material buttons, selected card surfaces and on/off switches with translucent gradients and accent strokes. It remains compatible with Android 11 and does not depend on the iOS-only Expo GlassEffect component.
-- The account panel now separates account sign-in from game readiness. A valid \`nx2.\` token is displayed as a prerequisite only; SMM2 is still marked disconnected until BAAS/nnex signing, title endpoint and PRUDP session are implemented and verified.
+- The fragment-wide glass layer was removed. The Android app uses the owner's original NEX logo and Eden's original Material styling for bars, buttons, cards and switches.
+- The account panel separates account sign-in from game readiness. It displays the scopes actually returned by OAuth, whether `game.matchmaking` was granted, and a token-free diagnostic for the latest presence request (HTTP status, missing scope or network/session failure). A valid `nx2.` token is only a prerequisite; SMM2 remains disconnected until BAAS/nnex signing, title endpoint and PRUDP session are implemented and verified.
 - The friends panel explains that an OAuth-visible friend is not automatically a game-visible friend: qLaunch records still require a confirmed NSA/UUID mapping.
 - OAuth callback state is now mandatory and compared in constant time before exchanging an authorization code.
 - The account panel retries the documented game-token request when a granted \`game.matchmaking\` scope exists and the stored game token is missing/expired. Failure does not invalidate OAuth account access and is not presented as multiplayer readiness.
