@@ -21,6 +21,7 @@ inline std::optional<IPv4> observed_external_ip;
 inline std::optional<IPv4> pending_external_ip;
 inline std::array<std::optional<IPv4>, 2> observed_nncs_responders{};
 inline std::uint8_t observed_nncs_vantage_mask = 0;
+inline std::uint16_t pending_nncs_local_port = 0;
 
 inline bool IsPrivateOrReserved(const IPv4& ip) {
     const auto a = ip[0];
@@ -73,6 +74,7 @@ inline void ResetObservedNncsStateLocked() {
     pending_external_ip.reset();
     observed_nncs_responders = {};
     observed_nncs_vantage_mask = 0;
+    pending_nncs_local_port = 0;
 }
 
 /**
@@ -83,9 +85,10 @@ inline void ResetObservedNncsStateLocked() {
  * NNCS response layout (four big-endian u32 values):
  *   test id (101), external mapped port, external IPv4, responder IPv4.
  */
-inline bool ObserveNncsReply(std::uint16_t source_port,
+inline bool ObserveNncsReply(std::uint16_t source_port, std::uint16_t local_port,
                              std::span<const std::uint8_t> response) {
-    if ((source_port != 10025 && source_port != 10125) || response.size() != 16) {
+    if ((source_port != 10025 && source_port != 10125) || local_port == 0 ||
+        response.size() != 16) {
         return false;
     }
     const auto read_be32 = [&response](std::size_t offset) -> std::uint32_t {
@@ -109,6 +112,9 @@ inline bool ObserveNncsReply(std::uint16_t source_port,
     const std::uint8_t bit = static_cast<std::uint8_t>(1U << vantage);
     std::lock_guard lock{observed_ip_mutex};
 
+    if (pending_nncs_local_port != 0 && pending_nncs_local_port != local_port) {
+        ResetObservedNncsStateLocked();
+    }
     if (pending_external_ip.has_value() && *pending_external_ip != address) {
         ResetObservedNncsStateLocked();
     }
@@ -118,6 +124,7 @@ inline bool ObserveNncsReply(std::uint16_t source_port,
     }
 
     pending_external_ip = address;
+    pending_nncs_local_port = local_port;
     observed_nncs_responders[vantage] = responder;
     observed_nncs_vantage_mask = static_cast<std::uint8_t>(observed_nncs_vantage_mask | bit);
 
