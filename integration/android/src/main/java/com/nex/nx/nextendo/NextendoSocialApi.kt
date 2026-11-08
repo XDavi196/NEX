@@ -58,4 +58,39 @@ object NextendoSocialApi {
 
     fun fetchFriends(accessToken: String): List<Friend> =
         fetchFriendList(accessToken).friends
+
+    /**
+     * Loads the richer server-authorized game friend data. Unlike OAuth userinfo,
+     * this response also includes incoming friend requests and the game presence
+     * fields consumed by the guest friend service.
+     */
+    fun fetchGameFriendList(gameToken: String): FriendList {
+        val snapshot = NextendoAuthClient.fetchGameFriendSnapshot(gameToken)
+        return FriendList(
+            friends = snapshot.friends.map(::toSocialFriend),
+            requests = snapshot.requests.map(::toSocialFriend)
+        )
+    }
+
+    fun addFriendByCode(gameToken: String, friendCode: String) =
+        NextendoAuthClient.addFriendByCode(gameToken, friendCode)
+
+    fun acceptFriendRequest(gameToken: String, pid: Long) =
+        NextendoAuthClient.acceptFriendRequest(gameToken, pid)
+
+    fun declineFriendRequest(gameToken: String, pid: Long) =
+        NextendoAuthClient.declineFriendRequest(gameToken, pid)
+
+    fun removeFriend(gameToken: String, pid: Long) =
+        NextendoAuthClient.removeFriend(gameToken, pid)
+
+    private fun toSocialFriend(friend: NextendoGameFriend) = Friend(
+        pid = friend.pid,
+        username = friend.username,
+        friendCode = friend.friendCode,
+        presenceStatus = friend.presenceStatus,
+        appId = friend.appId,
+        appName = friend.appDetail,
+        imageBase64 = friend.imageBase64
+    )
 }
