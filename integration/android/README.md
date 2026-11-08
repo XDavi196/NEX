@@ -8,6 +8,8 @@ This folder contains the NEX-owned Android integration source:
 - `NextendoCallbackActivity.kt` — Android deep-link callback handler.
 - `NextendoAccountApi.kt` — authenticated read-only player profile lookup.
 - `NextendoSocialApi.kt` — OAuth `/api/oauth/userinfo` and read-only friends list.
+- `NextendoChatClient.kt` — opt-in adapter for the independent Den2 friend-chat service; NEX uses its own PID/session and an encrypted per-installation chat secret, never its OAuth or `nx2.` token as the chat credential.
+- `NextendoChatDialog.kt` — friend conversation UI with message polling, send, read receipts, block/report actions and an explicit third-party data disclosure.
 - `NextendoPresencePublisher.kt` — online presence heartbeat every 60 seconds, offline publication on disconnect, and in-game Title ID publication from the Eden lifecycle hook.
 - `NextendoPrudpLiteAuthenticator.kt` — Nextendo published Lite CONNECT HMAC-MD5 proof, using only a runtime-provided title key.
 - `NextendoSmm2Profile.kt` — public SMM2 title profile, WSS endpoint construction and dynamic secure StationURL parsing.
@@ -38,6 +40,16 @@ The README on `main` currently has a different Client ID (`nxc_6BozwtiXy9n`). Co
 The sources are not compiled as a standalone Android module. `scripts/apply-eden-overlay.py` copies them into the pinned Eden Android project, changes the Optimized flavor package from Eden's original spoofed ID to `com.nex.nx`, adds AndroidX Browser, registers the callback and inserts a Nextendo account entry in the root settings.
 
 GitHub Actions builds the Optimized release flavor from Eden tag `v0.2.0-rc1`.
+
+## Optional friend chat (external service)
+
+The conversation UI is adapted from DEN's GPL-3.0-or-later `DenChat.kt` (upstream repository: https://github.com/Dmr77680/Den2, source revision `be6c6ae3161ad5d7ddd232510e4f97f182619cdc`). NEX retains its own Nextendo OAuth client, encrypted account session and PID lookup.
+
+**Important:** the messaging backend is not operated by Nextendo. The adapted DEN client points to `https://2-29-6-216.sslip.io`, a service operated by the DEN developer. Before the first chat request, NEX asks the player to opt in and discloses the data sent: the player's PID, accepted-friend PIDs, messages, read receipts, block and report actions. NEX does not send OAuth access tokens, refresh tokens or `nx2.` game tokens to this service.
+
+A random per-installation chat secret is encrypted with an AES-GCM key in Android Keystore. The chat feature can be disabled locally from the conversation's Options menu. Disabling it does not erase messages already stored by the external operator; deletion requests must be sent to the service operator.
+
+This adapter provides private direct messages only. It does not implement Nextendo matchmaking, BAAS, game presence or in-game voice chat.
 
 The Android integration currently has:
 - OAuth login/session scaffold and account profile panel.
