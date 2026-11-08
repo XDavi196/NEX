@@ -13,7 +13,9 @@ class NextendoGameNetworkProfilesTest {
         assertEquals("g2b309e01-lp1.s.n.srv.nintendo.net", byName["Mario Kart 8 Deluxe"]?.authHostname)
         assertEquals("g2df33d01-lp1.s.n.srv.nintendo.net", byName["Splatoon 2"]?.authHostname)
         assertEquals("g23380901-lp1.s.n.srv.nintendo.net", byName["Super Smash Bros. Ultimate"]?.authHostname)
-        assertTrue(byName.size >= 8)
+        assertEquals("g23bda200-lp1.s.n.srv.nintendo.net", byName["Tetris 99"]?.authHostname)
+        assertEquals("g2ee2e300-lp1.s.n.srv.nintendo.net", byName["Animal Crossing: New Horizons"]?.authHostname)
+        assertTrue(byName.size >= 11)
     }
 
     @Test
