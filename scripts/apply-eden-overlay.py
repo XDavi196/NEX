@@ -115,6 +115,13 @@ def main() -> None:
     udp_keeper_destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(udp_keeper_source, udp_keeper_destination)
 
+    # Copy the payload-blind PRUDP SYN/CONNECT observer used only for safe diagnostics.
+    prudp_observer_source = NEX_SOURCE / "integration/android/src/main/cpp/nextendo_prudp_observer.h"
+    prudp_observer_destination = eden / "src/core/internal_network/nextendo_prudp_observer.h"
+    if not prudp_observer_source.is_file():
+        raise RuntimeError(f"Missing NEX PRUDP observer header: {prudp_observer_source}")
+    shutil.copy2(prudp_observer_source, prudp_observer_destination)
+
     native_cpp = app_dir / "src/main/jni/native.cpp"
     replace_once(
         native_cpp,
@@ -677,6 +684,95 @@ void ClearParkedNextendoUdpSockets() {
     }
 
     [[maybe_unused]] const int result = closesocket(fd);
+""",
+    )
+
+
+    # Observe only SMM2/Nextendo WSS handshakes after TLS decryption. The observer
+    # emits virtual station metadata for SYN/CONNECT only; it never logs DATA/RMC
+    # payloads, tickets, signatures, or BAAS tokens.
+    ssl_backend = eden / "src/core/hle/service/ssl/ssl_backend_openssl.cpp"
+    replace_once(
+        ssl_backend,
+        '#include "core/internal_network/network.h"\\n',
+        '#include "core/internal_network/network.h"\\n'
+        '#include "core/internal_network/nextendo_prudp_observer.h"\\n',
+    )
+    replace_once(
+        ssl_backend,
+        """        if (!SSL_set_tlsext_host_name(ssl, hostname.c_str())) { // hostname for SNI
+            LOG_ERROR(Service_SSL, "SSL_set_tlsext_host_name({}) failed", hostname);
+            return CheckOpenSSLErrors();
+        }
+        return ResultSuccess;
+""",
+        """        if (!SSL_set_tlsext_host_name(ssl, hostname.c_str())) { // hostname for SNI
+            LOG_ERROR(Service_SSL, "SSL_set_tlsext_host_name({}) failed", hostname);
+            return CheckOpenSSLErrors();
+        }
+        nextendo_prudp_observer.SetServerName(hostname);
+        return ResultSuccess;
+""",
+    )
+    replace_once(
+        ssl_backend,
+        """    Result Read(size_t* out_size, std::span<u8> data) override {
+        const int ret = SSL_read_ex(ssl, data.data(), data.size(), out_size);
+        return HandleReturn("SSL_read_ex", out_size, ret);
+    }
+
+    Result Write(size_t* out_size, std::span<const u8> data) override {
+        const int ret = SSL_write_ex(ssl, data.data(), data.size(), out_size);
+        return HandleReturn("SSL_write_ex", out_size, ret);
+    }
+""",
+        """    Result Read(size_t* out_size, std::span<u8> data) override {
+        const int ret = SSL_read_ex(ssl, data.data(), data.size(), out_size);
+        const Result result = HandleReturn("SSL_read_ex", out_size, ret);
+        if (result == ResultSuccess && out_size != nullptr && *out_size > 0) {
+            for (const auto& packet :
+                 nextendo_prudp_observer.ObserveInbound(data.data(), *out_size)) {
+                LOG_INFO(Service_SSL,
+                         "[NEX PRUDP DIAG] dir=in sni={} type={} flags=0x{:x} src={}:{} dst={}:{} packet={} minor={} supported=0x{:06x} payload_bytes={}",
+                         packet.server_name, packet.type, packet.flags,
+                         packet.source_type, packet.source_port,
+                         packet.destination_type, packet.destination_port,
+                         packet.packet_id, packet.minor_version,
+                         packet.supported_functions, packet.payload_bytes);
+            }
+        }
+        return result;
+    }
+
+    Result Write(size_t* out_size, std::span<const u8> data) override {
+        const int ret = SSL_write_ex(ssl, data.data(), data.size(), out_size);
+        const Result result = HandleReturn("SSL_write_ex", out_size, ret);
+        if (result == ResultSuccess && out_size != nullptr && *out_size > 0) {
+            for (const auto& packet :
+                 nextendo_prudp_observer.ObserveOutbound(data.data(), *out_size)) {
+                LOG_INFO(Service_SSL,
+                         "[NEX PRUDP DIAG] dir=out sni={} type={} flags=0x{:x} src={}:{} dst={}:{} packet={} minor={} supported=0x{:06x} payload_bytes={}",
+                         packet.server_name, packet.type, packet.flags,
+                         packet.source_type, packet.source_port,
+                         packet.destination_type, packet.destination_port,
+                         packet.packet_id, packet.minor_version,
+                         packet.supported_functions, packet.payload_bytes);
+            }
+        }
+        return result;
+    }
+""",
+    )
+    replace_once(
+        ssl_backend,
+        """    bool skip_cert_verification = false;
+
+    std::shared_ptr<Network::SocketBase> socket;
+""",
+        """    bool skip_cert_verification = false;
+    Common::NextendoPrudpObserver nextendo_prudp_observer;
+
+    std::shared_ptr<Network::SocketBase> socket;
 """,
     )
 

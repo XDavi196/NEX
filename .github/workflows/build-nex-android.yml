@@ -113,6 +113,10 @@ jobs:
             integration/android/src/test/cpp/nextendo_udp_port_keeper_test.cpp \
             -o "$RUNNER_TEMP/nextendo_udp_port_keeper_test"
           "$RUNNER_TEMP/nextendo_udp_port_keeper_test"
+          g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+            integration/android/src/test/cpp/nextendo_prudp_observer_test.cpp \
+            -o "$RUNNER_TEMP/nextendo_prudp_observer_test"
+          "$RUNNER_TEMP/nextendo_prudp_observer_test"
 
       - name: Run NEX Nextendo unit tests
         working-directory: eden/src/android
