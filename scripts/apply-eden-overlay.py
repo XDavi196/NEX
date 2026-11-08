@@ -71,6 +71,18 @@ def main() -> None:
             "    </application>",
         )
 
+    baas_import_activity = "com.nex.nx.nextendo.NextendoBaasKeyImportActivity"
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if baas_import_activity not in manifest_text:
+        replace_once(
+            manifest,
+            "</application>",
+            '        <activity android:name="' + baas_import_activity + '" '
+            'android:exported="false" '
+            'android:theme="@android:style/Theme.Translucent.NoTitleBar" />\n'
+            "    </application>",
+        )
+
     # Add the NEX native friend-cache API to Eden's Kotlin/JNI boundary.
     native_library = app_dir / "src/main/java/org/yuzu/yuzu_emu/NativeLibrary.kt"
     replace_once(
@@ -1710,7 +1722,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     navigation_anchor = "    private fun navigateToSettings() {\n"
     if games_text.count(navigation_anchor) != 1:
         raise RuntimeError("Could not identify GamesFragment navigation")
-    nextendo_methods = "    private fun showNextendoMenu() {\n        val host = requireActivity()\n        MaterialAlertDialogBuilder(host)\n            .setTitle(\"Nextendo Network\")\n            .setItems(arrayOf(\"Amigos\", \"Conta Nextendo\", \"Configurar rede\")) { _, which ->\n                when (which) {\n                    0 -> NextendoAuthManager.openFriends(host)\n                    1 -> NextendoAuthManager.openAccount(host)\n                    2 -> NextendoAuthManager.openNetworkSettings(host)\n                }\n            }\n            .setNegativeButton(android.R.string.cancel, null)\n            .show()\n    }\n\n    private fun startNextendoOnlineCountsPolling() {\n        viewLifecycleOwner.lifecycleScope.launch {\n            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {\n                while (isActive) {\n                    val counts = withContext(Dispatchers.IO) {\n                        runCatching { NextendoAuthClient.fetchOnlineCounts() }.getOrNull()\n                    }\n                    if (counts != null && _binding != null) {\n                        gameAdapter.setNextendoOnlineCounts(counts)\n                    }\n                    delay(30_000L)\n                }\n            }\n        }\n    }\n\n"
+    nextendo_methods = "    private fun showNextendoMenu() {\n        val host = requireActivity()\n        MaterialAlertDialogBuilder(host)\n            .setTitle(\"Nextendo Network\")\n            .setItems(arrayOf(\"Amigos\", \"Conta Nextendo\", \"Configurar rede\", \"Importar chave BAAS\")) { _, which ->\n                when (which) {\n                    0 -> NextendoAuthManager.openFriends(host)\n                    1 -> NextendoAuthManager.openAccount(host)\n                    2 -> NextendoAuthManager.openNetworkSettings(host)\n                    3 -> NextendoAuthManager.startCitronBaasKeyImport(host)\n                }\n            }\n            .setNegativeButton(android.R.string.cancel, null)\n            .show()\n    }\n\n    private fun startNextendoOnlineCountsPolling() {\n        viewLifecycleOwner.lifecycleScope.launch {\n            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {\n                while (isActive) {\n                    val counts = withContext(Dispatchers.IO) {\n                        runCatching { NextendoAuthClient.fetchOnlineCounts() }.getOrNull()\n                    }\n                    if (counts != null && _binding != null) {\n                        gameAdapter.setNextendoOnlineCounts(counts)\n                    }\n                    delay(30_000L)\n                }\n            }\n        }\n    }\n\n"
     games_text = games_text.replace(navigation_anchor, nextendo_methods + navigation_anchor, 1)
     games_fragment.write_text(games_text, encoding="utf-8")
 
