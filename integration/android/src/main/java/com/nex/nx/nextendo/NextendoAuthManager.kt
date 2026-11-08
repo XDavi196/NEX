@@ -335,15 +335,15 @@ object NextendoAuthManager {
         val saved = NextendoNetworkConfigStore.load(activity)
         val serverInput = EditText(activity).apply {
             hint = "IP principal do servidor (SERVER_IP)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
-                android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setSingleLine(true)
             setText(saved?.serverIpv4.orEmpty())
         }
         val natInput = EditText(activity).apply {
             hint = "IP do segundo ponto NAT (NAT_IP)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
-                android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setSingleLine(true)
             setText(saved?.natIpv4.orEmpty())
         }
