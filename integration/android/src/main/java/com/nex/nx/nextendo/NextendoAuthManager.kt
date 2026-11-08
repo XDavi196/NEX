@@ -336,7 +336,7 @@ object NextendoAuthManager {
 
     private class MissingOnlineGameTokenException : Exception()
 
-    /** Displays the consented friend list returned by /api/oauth/userinfo. */
+    /** Displays accepted friends and incoming requests returned by the game-facing API. */
     fun openFriends(activity: Activity) {
         val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
         if (stored == null) {
@@ -357,12 +357,19 @@ object NextendoAuthManager {
                 val oauthFriendList = NextendoSocialApi.fetchFriendList(session.accessToken)
                 if (hasValidGameToken(session)) {
                     runCatching {
-                        NextendoAuthClient.fetchGameFriends(session.nexGameToken)
-                    }.onSuccess(NextendoNativeBridge::replaceFriendCache)
+                        val snapshot = NextendoAuthClient.fetchGameFriendSnapshot(session.nexGameToken)
+                        NextendoNativeBridge.replaceFriendCache(snapshot.friends)
+                        NextendoSocialApi.toFriendList(snapshot)
+                    }.getOrElse {
+                        // Account-level OAuth friends remain useful when the
+                        // game-facing route is unavailable; native cache stays empty.
+                        NextendoNativeBridge.clearFriendCache()
+                        oauthFriendList
+                    }
                 } else {
                     NextendoNativeBridge.clearFriendCache()
+                    oauthFriendList
                 }
-                oauthFriendList
             }
 
             mainHandler.post {
@@ -370,9 +377,27 @@ object NextendoAuthManager {
 
                 result.fold(
                     onSuccess = { friendList ->
-                        NextendoFriendsDialog.show(activity, friendList) {
-                            openFriends(activity)
-                        }
+                        NextendoFriendsDialog.show(
+                            activity = activity,
+                            result = friendList,
+                            onRefresh = { openFriends(activity) },
+                            onAddFriend = { showAddFriendDialog(activity) },
+                            onAcceptFriend = { pid ->
+                                runGameFriendAction(activity, "Pedido de amizade aceito.") { token ->
+                                    NextendoSocialApi.acceptFriendRequest(token, pid)
+                                }
+                            },
+                            onDeclineFriend = { pid ->
+                                runGameFriendAction(activity, "Pedido de amizade recusado.") { token ->
+                                    NextendoSocialApi.declineFriendRequest(token, pid)
+                                }
+                            },
+                            onRemoveFriend = { pid ->
+                                runGameFriendAction(activity, "Amigo removido.") { token ->
+                                    NextendoSocialApi.removeFriend(token, pid)
+                                }
+                            }
+                        )
                     },
                     onFailure = { error ->
                         AlertDialog.Builder(activity)
@@ -380,6 +405,64 @@ object NextendoAuthManager {
                             .setMessage(error.message ?: "Falha ao consultar a Nextendo.")
                             .setPositiveButton("Tentar novamente") { _, _ -> openFriends(activity) }
                             .setNegativeButton("Fechar", null)
+                            .show()
+                    }
+                )
+            }
+        }
+    }
+
+    private fun showAddFriendDialog(activity: Activity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val codeInput = EditText(activity).apply {
+            hint = "SW-1234-5678-9012"
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("Adicionar amigo Nextendo")
+            .setMessage("Digite o código de amigo. O pedido será enviado pela sua própria conta NEX.")
+            .setView(codeInput)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Enviar pedido") { _, _ ->
+                val code = codeInput.text.toString().trim()
+                runGameFriendAction(activity, "Pedido de amizade enviado.") { token ->
+                    NextendoSocialApi.addFriendByCode(token, code)
+                }
+            }
+            .show()
+    }
+
+    private fun runGameFriendAction(
+        activity: Activity,
+        successMessage: String,
+        action: (String) -> Unit
+    ) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        executor.execute {
+            val result = runCatching {
+                val session = refreshSessionIfNeeded(activity)
+                if (!hasValidGameToken(session)) throw MissingOnlineGameTokenException()
+                action(session.nexGameToken)
+            }
+            mainHandler.post {
+                if (activity.isFinishing || activity.isDestroyed) return@post
+                result.fold(
+                    onSuccess = {
+                        Toast.makeText(activity, successMessage, Toast.LENGTH_SHORT).show()
+                        openFriends(activity)
+                    },
+                    onFailure = { error ->
+                        val message = if (error is MissingOnlineGameTokenException) {
+                            "O NEX precisa de um token de jogo nx2. válido para gerenciar os amigos. Reconecte a conta ou confira a permissão game.matchmaking."
+                        } else {
+                            error.message ?: "A Nextendo não conseguiu concluir esta ação."
+                        }
+                        AlertDialog.Builder(activity)
+                            .setTitle("Ação de amizade não concluída")
+                            .setMessage(message)
+                            .setPositiveButton("OK", null)
                             .show()
                     }
                 )
