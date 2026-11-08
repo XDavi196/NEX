@@ -27,6 +27,10 @@ The current NEX client uses these routes:
 | Account identity and basic friends | \`GET /api/oauth/userinfo\` | OAuth access token |
 | Game token | \`GET /api/nex-token\` | OAuth access token with \`game.matchmaking\` |
 | Game-facing friend snapshot | \`GET /api/friends\` | Nextendo \`nx2.\` game token |
+| Add friend by Friend Code | POST /api/friends | nx2 game token + friend_code |
+| Accept friend request | POST /api/friends/accept | nx2 game token + target pid |
+| Decline friend request | POST /api/friends/decline | nx2 game token + target pid |
+| Remove friend | POST /api/friends/remove | nx2 game token + target pid |
 | App/game presence | \`POST /api/presence\` | OAuth access token with \`presence\` |
 
 Every REST request made by \`NextendoAuthClient\` carries the NEX Client ID header. Player-protected requests also carry the appropriate Bearer credential.
@@ -58,9 +62,11 @@ NEX follows the published public-client documentation where it is explicit. It d
 
 ## Android UI and social data
 
-The account panel reads the signed-in identity from OAuth userinfo and displays the available PID, username and Friend Code. It also shows the scopes actually returned by OAuth and the latest token-free HTTP diagnostic from presence publishing. The OAuth friends view is read-only.
+The account panel reads the signed-in identity from OAuth userinfo and displays the available username and Friend Code. It shows the scopes actually returned by OAuth and the latest token-free HTTP diagnostic from presence publishing. The internal PID is not displayed because Nextendo treats it as a credential.
 
-The game-facing friend snapshot is requested separately with the \`nx2.\` token. The parser accepts only fields actually present in the response: PID, username, explicit NSA, presence status, title/application ID and bounded AppField data. Missing identifiers are not synthesized.
+When a valid nx2 game token is available, the Friends screen requests the game-facing GET /api/friends snapshot. It displays accepted friends and incoming requests, supports adding a friend by Friend Code, accepting or declining requests, and removing a friend. If the game-facing route is unavailable, the UI can fall back to the OAuth userinfo friend list. Friend mutations require a valid server-issued game token and a successful response from Nextendo.
+
+The parser accepts records without a presence object and marks their presence as unknown. It preserves server-provided PID, Friend Code, avatar, presence, title/application ID and bounded AppField data. A PID is never converted into a Switch NSA. Friends with missing NSA may still appear in the Android UI but are filtered out before entering the game-facing native cache.
 
 ## Native cache and game-facing nn::friends HLE
 
@@ -92,7 +98,7 @@ NEX now owns a testable PRUDP-Lite client and WebSocket transport layer:
 
 The BAAS side now has a JWT builder and an \`AuthenticationInfo\` DataHolder encoder for the \`LoginEx.extraData\` field. Unit tests cover the public title profile, StationURL parsing, the \`nnex\` binding and local serialization. They do not prove acceptance by a live Nextendo service.
 
-**Not yet connected to a live title:** NEX still needs the provisioned NEX RSA signer/JWKS registration and issuer/audience/subject values; the original SMM2 auth hostname and its DNS/TLS route; and the secure CONNECT ticket/check payload that follows LoginEx. The title key above is public, but it is not a substitute for the server-issued ticket. Complete SMM2 RMC arguments, retry policy, matchmaking and NAT/P2P lifecycle also remain unfinished.
+**Not yet connected to a live title:** game BAAS/ACC authentication is blocked by the Nextendo founder's explicit refusal of client-generated signing keys and third-party RS256 tokens. NEX needs a new server-issued or otherwise officially approved game-authentication mechanism before LoginEx can proceed. It also needs the original SMM2 auth hostname and its DNS/TLS route, plus the secure CONNECT ticket/check payload that follows a successful LoginEx. The title key above is public, but it is not a substitute for a server-issued ticket. Complete SMM2 RMC arguments, retry policy, matchmaking and NAT/P2P lifecycle also remain unfinished.
 
 See [the detailed SMM2 BAAS and PRUDP profile](NEXTENDO_SMM2_PROFILE.md).
 
@@ -147,14 +153,14 @@ When title routing is implemented, it must preserve the original hostname for SN
 The launcher uses NEX adaptive-icon resources with the original artwork inset in the Android safe area; Android applies its launcher mask. The Games header uses Eden's original MaterialTextView title and displays the text `NEX`, not a large image. The fragment-wide glass treatment has been removed. Buttons, bars, switches and panels keep Eden's original Material styling.
 
 
-## BAAS signing boundary
+## BAAS signing boundary — blocked by Nextendo policy
 
-The Android integration now creates a per-installation RSA-2048 key inside Android Keystore with a non-exportable private key. The matching public JWK uses its RFC 7638 thumbprint as `kid`. The app does not copy a key from DEN and never exports private RSA parameters.
+NEX retains the BAAS JWT builder, AuthenticationInfo DataHolder encoder and Eden ACC cache bridge as protocol/test scaffolding. They do not constitute a production authentication path. The Android Keystore RSA/JWK work was only an earlier proposal; it is not an approved or enabled NEX signing method.
 
-The **Configurar rede → Copiar solicitação de registro BAAS** action exports a support-ready JSON with NEX's public application identity and the public JWK only. It is a request, not a registration receipt. The public key must be added to the approved Nextendo JWKS endpoint before it can be used for a game BAAS token.
+The Nextendo founder explicitly confirmed that client-generated public keys will not be registered in the Nextendo JWKS, RS256 BAAS tokens signed by third-party clients will not be accepted, and the JWKS is not open to per-installation registrations. The founder also said that Nextendo issues game tokens only from its own servers after the player signs in, and that there is currently no third-party client certification process or BAAS token contract.
 
-The same screen accepts the HTTPS `jku` supplied by Nextendo and can verify the JWKS publication. `NextendoBaasJwksVerifier` uses platform TLS validation, refuses redirects and oversized documents, and confirms that exactly one JWKS entry matches the local `kid`, modulus and exponent. It also rejects private RSA members in a purported public JWKS. A verified publication proof is required before the Android Keystore provider can be installed.
+Accordingly, the old per-installation JWK registration proposal is superseded. Do not submit a client-generated JWK as an implementation path, do not activate an Android Keystore BAAS signer, and do not copy DEN/Citron local RSA fallbacks or any other emulator's private key. The ACC runtime remains fail-closed and must not expose a client-generated BAAS JWT to Eden.
 
-**External confirmation is still required:** the public `NextendoNetwork/baas-jwks` service source loads a server-side RSA key from `BAAS_SIGNING_KEY` and derives the published public JWK from that key; the public repository does not document a per-installation registration API. Nextendo must confirm whether NEX can register independent Android Keystore keys or must use another approved signing arrangement, and provide the accepted `iss`, `aud`, `sub` mapping, claim profile and any client-attestation requirements.
+The required dependency is a new official Nextendo mechanism that issues or authorizes a game-ready credential for NEX on the server side. Until Nextendo changes its policy and documents that mechanism, NEX cannot complete BAAS/LoginEx for third-party games. The current PRUDP, LoginEx and DataHolder code must not be described as working multiplayer.
 
-Verifying that a JWKS endpoint serves the correct public key proves publication only. It does not prove that the live Nextendo game service accepts the BAAS token. No production provider is installed in the current branch; the runtime remains fail-closed and does not send a production BAAS JWT to Eden ACC until the key publication and claim contract are verified.
+The BAAS JWT belongs in LoginEx extraData, not in the PRUDP CONNECT packet. Secure CONNECT happens after LoginEx and requires the ticket issued by the service plus the encrypted check request.
