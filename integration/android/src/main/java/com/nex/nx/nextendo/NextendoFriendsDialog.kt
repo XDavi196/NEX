@@ -26,7 +26,11 @@ object NextendoFriendsDialog {
     fun show(
         activity: Activity,
         result: NextendoSocialApi.FriendList,
-        onRefresh: () -> Unit
+        onRefresh: () -> Unit,
+        onAddFriend: () -> Unit,
+        onAcceptFriend: (Long) -> Unit,
+        onDeclineFriend: (Long) -> Unit,
+        onRemoveFriend: (Long) -> Unit
     ) {
         if (activity.isFinishing || activity.isDestroyed) return
 
@@ -180,6 +184,28 @@ object NextendoFriendsDialog {
                 )
                 params.bottomMargin = dp(7)
                 row.layoutParams = params
+
+                if (friend.pid > 0L && isRequest) {
+                    row.setOnClickListener {
+                        AlertDialog.Builder(activity)
+                            .setTitle("Pedido de amizade")
+                            .setMessage("Aceitar o pedido de ${name}?")
+                            .setPositiveButton("Aceitar") { _, _ -> onAcceptFriend(friend.pid) }
+                            .setNeutralButton("Recusar") { _, _ -> onDeclineFriend(friend.pid) }
+                            .setNegativeButton("Cancelar", null)
+                            .show()
+                    }
+                } else if (friend.pid > 0L) {
+                    row.setOnLongClickListener {
+                        AlertDialog.Builder(activity)
+                            .setTitle("Remover amigo")
+                            .setMessage("Remover ${name} da sua lista de amigos?")
+                            .setPositiveButton("Remover") { _, _ -> onRemoveFriend(friend.pid) }
+                            .setNegativeButton("Cancelar", null)
+                            .show()
+                        true
+                    }
+                }
             }
         }
 
@@ -209,14 +235,6 @@ object NextendoFriendsDialog {
         if (result.requests.isNotEmpty()) {
             addSectionTitle("PEDIDOS RECEBIDOS (${result.requests.size})")
             result.requests.forEach { content.addView(friendRow(it, isRequest = true)) }
-            content.addView(
-                TextView(activity).apply {
-                    text = "Os pedidos aparecem aqui para consulta. Aceitar ou recusar ainda não está habilitado no NEX."
-                    textSize = 11f
-                    setTextColor(0xFF9CA3AF.toInt())
-                    setPadding(0, dp(4), 0, dp(8))
-                }
-            )
         }
 
         val visibleRows = result.friends.size + result.requests.size
@@ -240,6 +258,7 @@ object NextendoFriendsDialog {
             .setTitle("Nextendo Network · Amigos")
             .setView(scroll)
             .setPositiveButton("Atualizar", null)
+            .setNeutralButton("Adicionar amigo", null)
             .setNegativeButton("Fechar", null)
             .create()
 
@@ -247,6 +266,10 @@ object NextendoFriendsDialog {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 dialog.dismiss()
                 onRefresh()
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                dialog.dismiss()
+                onAddFriend()
             }
         }
         dialog.show()
