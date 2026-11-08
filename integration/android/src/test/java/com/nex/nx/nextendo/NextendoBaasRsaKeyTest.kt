@@ -7,6 +7,7 @@ import java.security.Signature
 import java.security.interfaces.RSAPublicKey
 import java.util.Base64
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -28,7 +29,7 @@ class NextendoBaasRsaKeyTest {
         assertEquals("RS256", json["alg"]?.toString()?.trim('"'))
         assertEquals("sig", json["use"]?.toString()?.trim('"'))
         assertEquals(jwk.keyId, json["kid"]?.toString()?.trim('"'))
-        assertEquals(1, set["keys"]?.toString()?.count { it == '{' }?.minus(0))
+        assertEquals(1, set["keys"]?.jsonArray?.size)
         assertTrue(jwk.modulus.isNotBlank())
         assertTrue(jwk.exponent.isNotBlank())
         assertFalse(json.containsKey("d"))
