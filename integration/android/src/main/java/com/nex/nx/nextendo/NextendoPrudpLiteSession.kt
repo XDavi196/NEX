@@ -29,7 +29,8 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
         val fragmentSize: Int = 1300,
         val maxRmcMessageBytes: Int = 1024 * 1024,
         val maxPendingReliablePackets: Int = 256,
-        val resendTimeoutMs: Long = 5000L
+        val resendTimeoutMs: Long = 5000L,
+        val pingTimeoutMs: Long = 5000L
     ) {
         init {
             require(accessKey.isNotBlank()) { "A runtime-provided PRUDP access key is required." }
@@ -52,6 +53,9 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
             }
             require(resendTimeoutMs in 1L..120_000L) {
                 "PRUDP retransmission timeout is out of range."
+            }
+            require(pingTimeoutMs in 1L..120_000L) {
+                "PRUDP ping timeout is out of range."
             }
             require(connectPayload.size <= 0xFFFF) {
                 "PRUDP CONNECT payload is too large for one packet."
@@ -95,6 +99,7 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
     private val maxRmcMessageBytes = config.maxRmcMessageBytes
     private val maxPendingReliablePackets = config.maxPendingReliablePackets
     private val resendTimeoutMs = config.resendTimeoutMs
+    private val pingTimeoutMs = config.pingTimeoutMs
 
     // Retain the title key only until the CONNECT proof has been generated.
     private var runtimeAccessKey: String? = config.accessKey
@@ -110,6 +115,8 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
     private var negotiatedMinorVersion = 0
     private var negotiatedSupportedFunctions = 0
     private var nextReliablePacketId = 1
+    private var nextPingPacketId = 0
+    private var lastActivityAtMs = monotonicNowMs()
     private var nextExpectedFragmentId = 1
 
     @Synchronized
@@ -132,6 +139,7 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
             supportedFunctions = supportedFunctions
         )
         currentState = State.SYN_SENT
+        lastActivityAtMs = nowMs
         val frame = NextendoPrudpLiteCodec.encode(syn)
         pendingHandshake = PendingFrame(frame, nowMs)
         return Step(outboundFrames = listOf(frame.copyOf()))
@@ -146,6 +154,8 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
         check(currentState != State.NEW && currentState != State.CLOSED) {
             "PRUDP-Lite session is not receiving data."
         }
+        require(nowMs >= lastActivityAtMs) { "PRUDP monotonic clock moved backwards." }
+        if (bytes.isNotEmpty()) lastActivityAtMs = nowMs
         val outbound = mutableListOf<ByteArray>()
         val events = mutableListOf<Event>()
 
@@ -159,6 +169,8 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
     @Synchronized
     fun sendRmc(encodedRmc: ByteArray, nowMs: Long = monotonicNowMs()): Step {
         check(currentState == State.CONNECTED) { "PRUDP-Lite handshake is not complete." }
+        require(nowMs >= lastActivityAtMs) { "PRUDP monotonic clock moved backwards." }
+        lastActivityAtMs = nowMs
         require(encodedRmc.size <= maxRmcMessageBytes) {
             "RMC message exceeds the configured size limit."
         }
@@ -222,6 +234,25 @@ internal class NextendoPrudpLiteSession(config: Config) : AutoCloseable {
                 pending.lastSentAtMs = nowMs
                 due += pending.frame.copyOf()
             }
+        }
+        if (due.isNotEmpty()) {
+            lastActivityAtMs = nowMs
+        } else if (
+            currentState == State.CONNECTED &&
+            nowMs - lastActivityAtMs >= pingTimeoutMs
+        ) {
+            val ping = NextendoPrudpLiteCodec.Packet(
+                type = NextendoPrudpLiteCodec.TYPE_PING,
+                flags = NextendoPrudpLiteCodec.FLAG_NEED_ACK,
+                sourceType = clientSourceType,
+                destinationType = serverDestinationType,
+                sourcePort = clientSourcePort,
+                destinationPort = serverDestinationPort,
+                packetId = nextPingPacketId
+            )
+            nextPingPacketId = (nextPingPacketId + 1) and 0xFFFF
+            due += NextendoPrudpLiteCodec.encode(ping)
+            lastActivityAtMs = nowMs
         }
         return Step(outboundFrames = due)
     }
