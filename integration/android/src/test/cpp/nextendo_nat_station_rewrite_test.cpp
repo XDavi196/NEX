@@ -214,14 +214,10 @@ bool TestNncsReplyCapture() {
 
 bool TestObservedIpv4Validation() {
     using namespace Common::NextendoNatStationRewrite;
-    ClearObservedExternalIPv4();
-    if (SetObservedExternalIPv4("192.168.1.2")) return false;
-    if (SetObservedExternalIPv4("203.0.113.5")) return false;
-    if (!SetObservedExternalIPv4("8.8.8.8")) return false;
-    const auto value = GetObservedExternalIPv4();
-    if (!value || *value != IPv4{8, 8, 8, 8}) return false;
-    ClearObservedExternalIPv4();
-    return !GetObservedExternalIPv4().has_value();
+    if (ParsePublicIPv4("192.168.1.2").has_value()) return false;
+    if (ParsePublicIPv4("203.0.113.5").has_value()) return false;
+    const auto value = ParsePublicIPv4("8.8.8.8");
+    return value.has_value() && *value == IPv4{8, 8, 8, 8};
 }
 
 } // namespace
