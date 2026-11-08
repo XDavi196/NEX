@@ -104,5 +104,18 @@ int main() {
     Common::NextendoPrudpObserver::ClearRecentPackets();
     assert(Common::NextendoPrudpObserver::GetRecentPackets().empty());
 
+    // The process-wide diagnostic ring must remain bounded under repeated handshakes.
+    for (std::size_t i = 0; i < 40; ++i) {
+        observer.SetServerName("g22306d00-lp1.s.n.srv.nintendo.net");
+        assert(observer.ObserveOutbound(
+            reinterpret_cast<const std::uint8_t*>(request.data()), request.size()).empty());
+        (void)observer.ObserveOutbound(masked.data(), masked.size());
+    }
+    recent = Common::NextendoPrudpObserver::GetRecentPackets();
+    assert(recent.size() == 32);
+    assert(recent.back().from_client);
+    assert(recent.back().type == 0);
+    Common::NextendoPrudpObserver::ClearRecentPackets();
+
     return 0;
 }
