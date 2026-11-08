@@ -64,6 +64,16 @@ Nextendo must confirm or provide through an authorized developer channel:
 
 The public profile currently associates the SMM2 title key `fdf6617f` with game-server ID `22306D00`; the corresponding candidate hostname is recorded in `NEXTENDO_SMM2_PROFILE.md`. The production IP, live certificate route and deployed matchmaking support remain unconfirmed.
 
+## 3.1. Shared DNS routing now implemented in the NEX client
+
+The Android account panel now exposes **Configurar rede**. It accepts the main Nextendo IPv4 and a second, distinct NAT-vantage IPv4; both values are encrypted at rest with Android Keystore (AES-GCM), and neither is compiled into the APK.
+
+At emulator startup, NEX restores the saved configuration and installs exact-host DNS mappings in Eden's native resolver. The current registry covers the public game auth host pattern for SMM2, Mario Kart 8 Deluxe, Splatoon 2, Smash Ultimate, Luigi's Mansion 3, ARMS, Mario Tennis Aces, Super Mario Bros. 35 and PAC-MAN 99, plus the exact DAUTH hosts listed in the online architecture. Eden preserves the original hostname for TLS SNI and still performs normal certificate validation. No wildcard Nintendo-domain redirect or trust-all TLS mode is installed.
+
+**Important boundary:** the configured main IPv4 is currently used for these exact auth/DAUTH mappings. The second NAT-vantage IPv4 is securely stored but is not yet consumed by an automatically scheduled NNCS probe; the SMM2 NNCS hostnames, ports and probe lifecycle are still unconfirmed. The game-host registry is routing metadata, not proof that every listed game has a complete Nextendo server, title key, matchmaking contract or P2P path. SMM2 remains the first validation target.
+
+The user must obtain the two correct deployment IPv4 values from Nextendo before using this setting. Documentation example addresses, the Android device IP, or the SMM2 auth hostname are not substitutes for the actual server and NAT vantage addresses.
+
 ## 4. NNCS, NAT and P2P
 
 NEX has a 16-byte NNCS probe codec, a two-vantage mapping classifier, a bounded one-shot UDP probe client and a short-lived native UDP socket keeper. The probe client reuses one local socket for two explicitly configured endpoints and validates both response sources. The keeper preserves a game's UDP mapping across a close/reopen sequence. Neither component completes peer discovery, matchmaking signaling or P2P hole-punching. The SMM2 probe runner is not wired into the game's network lifecycle.
@@ -96,5 +106,7 @@ The release gate is:
 For service-side support, send only a token-free diagnostic: exact UTC timestamp, app build/commit, game title and version, test PID(s), endpoint path/hostname, HTTP status or game error code, and the step where the flow stopped. Never send OAuth access/refresh tokens, `nx2.` tokens, BAAS JWTs, authorization codes, PKCE verifiers, private keys or passwords.
 
 ## Current engineering boundary
+
+NEX now has an Android Keystore-backed network configuration screen and an exact-host multi-title auth/DAUTH DNS installer. This closes the client-side plumbing for main-server hostname routing, but it does not supply production addresses or complete the title login path.
 
 NEX can implement and test its Android Keystore signer, JWT/DataHolder serialization, ACC delivery, DNS route installation, guest socket integration and NAT client logic. NEX cannot truthfully fill production IPs, certificate deployment data, live `jku` registration, third-party attestation requirements or missing server-side SMM2 matchmaking behavior without confirmation from Nextendo or a verified live handshake.
