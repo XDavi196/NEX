@@ -227,6 +227,7 @@ inline bool RewriteRmcBody(std::span<const std::uint8_t> body, const IPv4& exter
                 .old_total = 2 + static_cast<std::size_t>(station_length),
                 .replacement = std::move(replacement)
             });
+            ++count;
         }
         cursor = marker_pos + station_length;
     }
