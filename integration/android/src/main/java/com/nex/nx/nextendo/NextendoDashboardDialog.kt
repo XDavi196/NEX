@@ -30,6 +30,7 @@ internal object NextendoDashboardDialog {
         val baasDiagnostic: String,
         val routeDiagnostic: String,
         val installedRouteCount: Int,
+        val prudpDiagnostics: List<String>,
         val onlinePlayers: Long?,
         val registeredAccounts: Long?,
         val gamesOnline: Long?,
@@ -299,6 +300,51 @@ internal object NextendoDashboardDialog {
         )
         statusCard.addView(statusContent)
         root.addView(statusCard)
+
+        addSection(
+            root,
+            "Diagnóstico PRUDP",
+            "Somente metadados de SYN/CONNECT; payloads, tickets e tokens não são exibidos."
+        )
+        val prudpCard = card()
+        val prudpContent = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+        }
+        val recentPrudpPackets = snapshot.prudpDiagnostics.takeLast(8).asReversed()
+        if (recentPrudpPackets.isEmpty()) {
+            prudpContent.addView(
+                text(
+                    "Nenhum handshake PRUDP do Nextendo foi observado nesta sessão.",
+                    12f,
+                    COLOR_MUTED
+                ).apply {
+                    setPadding(dp(2), dp(8), dp(2), dp(8))
+                }
+            )
+        } else {
+            recentPrudpPackets.forEachIndexed { index, diagnostic ->
+                prudpContent.addView(
+                    text(diagnostic, 11f, COLOR_TEXT).apply {
+                        typeface = Typeface.MONOSPACE
+                        setPadding(dp(2), dp(7), dp(2), dp(7))
+                    }
+                )
+                if (index < recentPrudpPackets.lastIndex) {
+                    prudpContent.addView(
+                        android.view.View(activity).apply {
+                            setBackgroundColor(COLOR_BORDER)
+                            layoutParams = LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                dp(1)
+                            )
+                        }
+                    )
+                }
+            }
+        }
+        prudpCard.addView(prudpContent)
+        root.addView(prudpCard)
 
         addSection(root, "Multiplayer")
         val gameCard = card()
