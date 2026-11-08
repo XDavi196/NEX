@@ -16,7 +16,14 @@ internal data class NextendoGameFriend(
     val appId: String,
     val appIdValue: Long,
     val appDetail: String,
-    val appField: ByteArray
+    val appField: ByteArray,
+    val friendCode: String = "",
+    val imageBase64: String = ""
+)
+
+internal data class NextendoGameFriendSnapshot(
+    val friends: List<NextendoGameFriend>,
+    val requests: List<NextendoGameFriend>
 )
 
 /**
@@ -30,16 +37,25 @@ internal object NextendoGameFriendParser {
     private const val MAX_APP_FIELD_BYTES = 0xC0
     private const val BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
-    fun parse(response: String): List<NextendoGameFriend> {
-        val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }
-            .getOrNull() ?: return emptyList()
+    fun parse(response: String): List<NextendoGameFriend> =
+        parseSnapshot(response).friends
 
-        return (root["friends"] as? JsonArray)
-            .orEmpty()
-            .mapNotNull { it as? JsonObject }
-            .mapNotNull(::parseFriend)
-            .distinctBy { it.pid }
-            .take(300)
+    fun parseSnapshot(response: String): NextendoGameFriendSnapshot {
+        val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }
+            .getOrNull() ?: return NextendoGameFriendSnapshot(emptyList(), emptyList())
+
+        fun readList(name: String): List<NextendoGameFriend> =
+            (root[name] as? JsonArray)
+                .orEmpty()
+                .mapNotNull { it as? JsonObject }
+                .mapNotNull(::parseFriend)
+                .distinctBy { it.pid }
+                .take(300)
+
+        return NextendoGameFriendSnapshot(
+            friends = readList("friends"),
+            requests = readList("requests")
+        )
     }
 
     private fun parseFriend(item: JsonObject): NextendoGameFriend? {
@@ -50,17 +66,18 @@ internal object NextendoGameFriendParser {
             .ifBlank { item.stringField("display_name") }
         if (username.isBlank()) return null
 
-        val presence = item["presence"] as? JsonObject ?: return null
-        val status = presence.intField("status") ?: return null
-        if (status !in 0..2) return null
+        // Friends and incoming requests can exist without a presence object. Do not
+        // drop those records or manufacture an offline/playing status.
+        val presence = item["presence"] as? JsonObject
+        val status = presence?.intField("status") ?: -1
+        if (status !in -1..2) return null
 
-        // The Nextendo reference emulator uses the persistent PID as its NSA.
-        // Prefer an explicit server field when present, otherwise apply that same
-        // service-specific mapping instead of leaving every game friend unresolved.
+        // Prefer an explicit server-provided NSA. The existing PID fallback is
+        // retained for the currently documented Nextendo account mapping.
         val nsa = item.hex64Field("nsa") ?: pid
-        val appIdValue = presence.hex64Field("app_id") ?: 0L
+        val appIdValue = presence?.hex64Field("app_id") ?: 0L
 
-        val appFieldValue = presence["app_field"]
+        val appFieldValue = presence?.get("app_field")
         val encodedAppField = when (appFieldValue) {
             null -> ""
             is JsonPrimitive -> {
@@ -77,10 +94,13 @@ internal object NextendoGameFriendParser {
             networkServiceAccountId = nsa,
             username = username,
             presenceStatus = status,
-            appId = presence.stringField("app_id"),
+            appId = presence?.stringField("app_id").orEmpty(),
             appIdValue = appIdValue,
-            appDetail = presence.stringField("app_detail"),
-            appField = appField
+            appDetail = presence?.stringField("app_detail").orEmpty(),
+            appField = appField,
+            friendCode = item.stringField("friend_code"),
+            imageBase64 = item.stringField("image")
+                .ifBlank { item.stringField("image_base64") }
         )
     }
 
