@@ -5,9 +5,9 @@ import android.security.keystore.KeyProperties
 import java.net.URI
 import java.security.KeyPairGenerator
 import java.security.KeyStore
+import java.security.PrivateKey
 import java.security.Signature
 import java.security.interfaces.RSAPublicKey
-import java.security.PrivateKey
 
 /**
  * Per-installation RS256 signer backed by Android Keystore.
@@ -42,10 +42,33 @@ internal class NextendoAndroidKeystoreBaasSigner private constructor(
         const val KEY_ALIAS = "com.nex.nx.nextendo.baas.rs256.v1"
         const val RSA_KEY_SIZE_BITS = 2048
         private const val MAX_SIGNING_INPUT_BYTES = 64 * 1024
+        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+
+        private data class KeyMaterial(
+            val privateKey: PrivateKey,
+            val publicKey: RSAPublicKey
+        )
 
         fun createOrLoad(jwksUrl: String): NextendoAndroidKeystoreBaasSigner {
             validateJwksUrl(jwksUrl)
-            val store = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            val material = loadOrCreateKeyMaterial()
+            return NextendoAndroidKeystoreBaasSigner(
+                privateKey = material.privateKey,
+                publicJwk = NextendoBaasJwk.from(material.publicKey),
+                jwksUrl = jwksUrl
+            )
+        }
+
+        /**
+         * Creates or loads the per-installation key and returns only its public JWK Set.
+         * Safe to share with the Nextendo operator for registration; no private
+         * parameters or signing capability are returned.
+         */
+        fun exportOrCreatePublicJwks(): String =
+            NextendoBaasJwk.from(loadOrCreateKeyMaterial().publicKey).toJwksJson()
+
+        private fun loadOrCreateKeyMaterial(): KeyMaterial {
+            var store = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             if (!store.containsAlias(KEY_ALIAS)) {
                 val generator = KeyPairGenerator.getInstance(
                     KeyProperties.KEY_ALGORITHM_RSA,
@@ -63,18 +86,18 @@ internal class NextendoAndroidKeystoreBaasSigner private constructor(
                         .build()
                 )
                 generator.generateKeyPair()
+                store = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             }
 
             val privateKey = store.getKey(KEY_ALIAS, null) as? PrivateKey
-                ?: throw IllegalStateException("NEX BAAS private key is unavailable in Android Keystore.")
+                ?: throw IllegalStateException(
+                    "NEX BAAS private key is unavailable in Android Keystore."
+                )
             val publicKey = store.getCertificate(KEY_ALIAS)?.publicKey as? RSAPublicKey
-                ?: throw IllegalStateException("NEX BAAS public key is unavailable in Android Keystore.")
-
-            return NextendoAndroidKeystoreBaasSigner(
-                privateKey = privateKey,
-                publicJwk = NextendoBaasJwk.from(publicKey),
-                jwksUrl = jwksUrl
-            )
+                ?: throw IllegalStateException(
+                    "NEX BAAS public key is unavailable in Android Keystore."
+                )
+            return KeyMaterial(privateKey, publicKey)
         }
 
         private fun validateJwksUrl(value: String) {
@@ -89,7 +112,5 @@ internal class NextendoAndroidKeystoreBaasSigner private constructor(
                 "The NEX BAAS JWKS URL must be a provisioned HTTPS URL."
             }
         }
-
-        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     }
 }
