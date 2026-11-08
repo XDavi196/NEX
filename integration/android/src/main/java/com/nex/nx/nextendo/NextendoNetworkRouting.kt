@@ -1,6 +1,7 @@
 package com.nex.nx.nextendo
 
 import android.content.Context
+import okhttp3.Dns
 
 /**
  * Installs the explicit, title-specific host routes in Eden's native resolver.
@@ -27,6 +28,15 @@ internal object NextendoNetworkRouting {
             return
         }
         apply(config)
+    }
+
+    /** Creates an OkHttp client whose exact-host DNS matches Eden's guest resolver. */
+    fun createHttpClient(
+        context: Context,
+        fallbackDns: Dns = Dns.SYSTEM
+    ): okhttp3.OkHttpClient {
+        val config = NextendoNetworkConfigStore.load(context.applicationContext)
+        return NextendoHttpClientFactory.create(config, fallbackDns)
     }
 
     fun apply(config: NextendoNetworkConfigStore.Config) {
