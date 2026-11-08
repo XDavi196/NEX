@@ -5,8 +5,6 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import org.json.JSONObject
-import java.net.Inet4Address
-import java.net.InetAddress
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -29,9 +27,7 @@ internal object NextendoNetworkConfigStore {
 
     data class Config(
         val serverIpv4: String,
-        val natIpv4: String,
-        val primaryNncsPort: Int? = null,
-        val secondaryNncsPort: Int? = null
+        val natIpv4: String
     ) {
         init {
             require(NextendoNetworkAddress.isValidIpv4(serverIpv4)) {
@@ -43,15 +39,6 @@ internal object NextendoNetworkConfigStore {
             require(serverIpv4 != natIpv4) {
                 "Os dois pontos do Nextendo precisam usar IPv4 diferentes."
             }
-            require((primaryNncsPort == null) == (secondaryNncsPort == null)) {
-                "Informe as duas portas NNCS ou deixe ambas vazias."
-            }
-            primaryNncsPort?.let {
-                require(it in 1..65535) { "A porta NNCS principal precisa estar entre 1 e 65535." }
-            }
-            secondaryNncsPort?.let {
-                require(it in 1..65535) { "A segunda porta NNCS precisa estar entre 1 e 65535." }
-            }
         }
     }
 
@@ -59,8 +46,6 @@ internal object NextendoNetworkConfigStore {
         val json = JSONObject()
             .put("server_ipv4", config.serverIpv4)
             .put("nat_ipv4", config.natIpv4)
-            .put("primary_nncs_port", config.primaryNncsPort ?: 0)
-            .put("secondary_nncs_port", config.secondaryNncsPort ?: 0)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val ciphertext = cipher.doFinal(json.toString().toByteArray(Charsets.UTF_8))
@@ -86,9 +71,7 @@ internal object NextendoNetworkConfigStore {
         )
         Config(
             serverIpv4 = json.getString("server_ipv4"),
-            natIpv4 = json.getString("nat_ipv4"),
-            primaryNncsPort = json.optInt("primary_nncs_port", 0).takeIf { it in 1..65535 },
-            secondaryNncsPort = json.optInt("secondary_nncs_port", 0).takeIf { it in 1..65535 }
+            natIpv4 = json.getString("nat_ipv4")
         )
     }.getOrNull()
 
