@@ -139,7 +139,7 @@ object NextendoAuthManager {
 
                 val savedSession = NextendoSessionStore.load(context)
                 savedSession?.let(::syncNativeIdentity)
-                NextendoBaasRuntime.refresh(savedSession)
+                NextendoBaasRuntime.refresh(context, savedSession)
                 if (savedSession?.let(::hasValidGameToken) == true) {
                     runCatching {
                         NextendoAuthClient.fetchGameFriends(savedSession.nexGameToken)
@@ -238,7 +238,7 @@ object NextendoAuthManager {
                 val savedSession = NextendoSessionStore.load(appContext)
                     ?: throw IllegalStateException("A sessão importada não foi persistida.")
                 syncNativeIdentity(savedSession)
-                NextendoBaasRuntime.refresh(savedSession)
+                NextendoBaasRuntime.refresh(context, savedSession)
                 if (hasValidGameToken(savedSession)) {
                     runCatching {
                         NextendoAuthClient.fetchGameFriends(savedSession.nexGameToken)
@@ -924,7 +924,7 @@ object NextendoAuthManager {
         }
 
         syncNativeIdentity(cached)
-        NextendoBaasRuntime.refresh(cached)
+        NextendoBaasRuntime.refresh(context, cached)
 
         executor.execute {
             val active = runCatching {
@@ -934,7 +934,7 @@ object NextendoAuthManager {
             }
 
             syncNativeIdentity(active)
-            NextendoBaasRuntime.refresh(active)
+            NextendoBaasRuntime.refresh(context, active)
             if (hasValidGameToken(active)) {
                 runCatching {
                     NextendoAuthClient.fetchGameFriends(active.nexGameToken)
@@ -976,7 +976,7 @@ object NextendoAuthManager {
             }
         }
         syncNativeIdentity(session)
-        NextendoBaasRuntime.refresh(session)
+        NextendoBaasRuntime.refresh(context, session)
         return session
     }
 
@@ -1004,7 +1004,7 @@ object NextendoAuthManager {
                 NextendoPresencePublisher.start(context)
                 val session = NextendoSessionStore.load(context)
                 session?.let(::syncNativeIdentity)
-                NextendoBaasRuntime.refresh(session)
+                NextendoBaasRuntime.refresh(context, session)
                 val gameTokenReady = session?.let(::hasValidGameToken) == true
                 if (session != null && gameTokenReady) {
                     runCatching {
