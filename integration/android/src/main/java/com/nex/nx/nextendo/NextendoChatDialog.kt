@@ -24,6 +24,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 /** Optional private messages between accepted Nextendo friends. */
 internal object NextendoChatDialog {
     private const val CONVERSATION_REFRESH_MS = 3_000L
+    @Volatile private var openConversationPid = 0L
+
+    fun isConversationOpenFor(pid: Long): Boolean = openConversationPid == pid
     private val main = Handler(Looper.getMainLooper())
 
     fun open(
@@ -330,6 +333,7 @@ internal object NextendoChatDialog {
                                 )
                                 .setPositiveButton("Desativar") { _, _ ->
                                     NextendoChatIdentityStore.revokeConsent(activity)
+                                    NextendoChatNotifications.stop(activity)
                                     dialog.dismiss()
                                     Toast.makeText(activity, "Chat externo desativado.", Toast.LENGTH_LONG).show()
                                 }
@@ -350,12 +354,15 @@ internal object NextendoChatDialog {
             }
         }
         dialog.setOnShowListener {
+            openConversationPid = friend.pid
+            NextendoChatNotifications.start(activity)
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener { showOptions() }
             ticker.run()
         }
         dialog.setOnDismissListener {
             alive = false
             main.removeCallbacks(ticker)
+            if (openConversationPid == friend.pid) openConversationPid = 0L
         }
         dialog.show()
         dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
