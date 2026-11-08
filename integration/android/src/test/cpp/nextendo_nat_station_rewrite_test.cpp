@@ -111,7 +111,7 @@ bool TestSupportedMethods() {
     constexpr std::array<std::pair<std::uint8_t, std::uint32_t>, 5> methods{{
         {0x0B, 0x01}, {0x0B, 0x07}, {0x6D, 0x26}, {0x6D, 0x27}, {0x6D, 0x28}
     }};
-    for (const auto [protocol, method] : methods) {
+    for (const auto& [protocol, method] : methods) {
         const auto input = BuildFrame(protocol, method, station);
         Bytes output;
         std::size_t count = 0;
