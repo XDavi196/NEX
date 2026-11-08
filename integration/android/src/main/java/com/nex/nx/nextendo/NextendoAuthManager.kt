@@ -99,6 +99,7 @@ object NextendoAuthManager {
                 NextendoSessionStore.clearPendingAuthorization(context)
                 NextendoNativeBridge.clearFriendCache()
                 NextendoNativeBridge.clearIdentity()
+                NextendoNativeBridge.clearPrudpDiagnostics()
 
                 // Populate the account identity and accepted-friend cache from the
                 // OAuth-scoped userinfo contract. No presence is invented when absent.
@@ -197,6 +198,7 @@ object NextendoAuthManager {
             // Immutable snapshot avoids the Kotlin smart-cast CI error caused by
             // capturing the mutable session variable inside this UI closure.
             val displaySession = activeSession
+            val prudpDiagnostics = NextendoNativeBridge.prudpDiagnostics().takeLast(8)
             mainHandler.post {
                 if (activity.isFinishing || activity.isDestroyed) return@post
 
@@ -219,6 +221,7 @@ object NextendoAuthManager {
                         baasDiagnostic = NextendoBaasRuntime.diagnostic,
                         routeDiagnostic = NextendoNetworkRouting.diagnostic,
                         installedRouteCount = NextendoNetworkRouting.installedRouteCount,
+                        prudpDiagnostics = prudpDiagnostics,
                         onlinePlayers = networkStats?.onlinePlayers,
                         registeredAccounts = networkStats?.totalRegistered,
                         gamesOnline = networkStats?.gamesOnline,
@@ -242,6 +245,7 @@ object NextendoAuthManager {
                         NextendoPresencePublisher.stop(activity)
                         NextendoNativeBridge.clearFriendCache()
                         NextendoNativeBridge.clearIdentity()
+                        NextendoNativeBridge.clearPrudpDiagnostics()
                         NextendoBaasRuntime.clear()
                         runCatching { NextendoSessionStore.clear(activity) }
                         Toast.makeText(
