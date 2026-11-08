@@ -52,7 +52,8 @@ internal object NextendoChatDialog {
         val disclosure = (
             "Este chat usa um serviço independente operado pelo " +
                 NextendoChatClient.SERVER_OPERATOR_LABEL + ", não pela Nextendo.\n\n" +
-                "Servidor: " + NextendoChatClient.SERVER_URL + "\n\n" +
+                "Servidor: " + NextendoChatClient.SERVER_URL + " (hospedado na Finlândia/UE).\\n" +
+                "Contato do operador e pedidos de exclusão: https://discord.gg/YjdS6wrbUj\\n\\n" +
                 "Para funcionar, o NEX enviará seu PID Nextendo, os PIDs da sua lista de amigos, " +
                 "as mensagens, confirmações de leitura e ações de bloquear/denunciar. " +
                 "As mensagens ficam armazenadas no servidor para que seus amigos possam recebê-las.\n\n" +
