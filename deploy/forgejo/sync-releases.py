@@ -27,7 +27,7 @@ ASSET_RELEASES = max(0, int(os.environ.get("SYNC_ASSET_RELEASES", "8")))
 TIMEOUT = 180
 
 
-def request(url: str, *, method: str = "GET", payload=None, data=None, content_type=None, github=False):
+def request(url: str, *, method: str = "GET", payload=None, data=None, content_type=None, github=False, raw=False):
     headers = {"User-Agent": "NEX-Forgejo-Release-Sync/1.0"}
     if github:
         headers["Accept"] = "application/vnd.github+json"
@@ -47,6 +47,8 @@ def request(url: str, *, method: str = "GET", payload=None, data=None, content_t
             raw = response.read()
             if not raw:
                 return None
+            if raw:
+                return raw
             ctype = response.headers.get("Content-Type", "")
             if "json" in ctype:
                 return json.loads(raw.decode("utf-8"))
@@ -73,10 +75,17 @@ def github_releases():
 
 
 def forgejo_releases():
-    url = (f"{FORGEJO_API}/repos/{urllib.parse.quote(FORGEJO_OWNER, safe='')}/"
-           f"{urllib.parse.quote(FORGEJO_REPO, safe='')}/releases?limit=100")
-    return request(url) or []
-
+    results = []
+    for page in range(1, 51):
+        url = (f"{FORGEJO_API}/repos/{urllib.parse.quote(FORGEJO_OWNER, safe='')}/"
+               f"{urllib.parse.quote(FORGEJO_REPO, safe='')}/releases?limit=50&page={page}")
+        batch = request(url) or []
+        if not batch:
+            break
+        results.extend(batch)
+        if len(batch) < 50:
+            break
+    return results
 
 def forgejo_assets(release_id):
     url = (f"{FORGEJO_API}/repos/{urllib.parse.quote(FORGEJO_OWNER, safe='')}/"
@@ -102,7 +111,7 @@ def upload_asset(release_id, asset):
     name = os.path.basename(asset["name"])
     if not name or any(ch in name for ch in ('\r', '\n', '"')):
         raise RuntimeError(f"Unsafe release asset filename: {asset['name']!r}")
-    download = request(asset["browser_download_url"], github=True)
+    download = request(asset["browser_download_url"], github=True, raw=True)
     if not isinstance(download, bytes):
         raise RuntimeError(f"Could not download {name}")
     boundary = "----NEXForgejo" + uuid.uuid4().hex
