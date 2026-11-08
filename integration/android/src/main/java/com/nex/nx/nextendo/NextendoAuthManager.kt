@@ -323,6 +323,7 @@ object NextendoAuthManager {
                     ),
                     onFriends = { openFriends(activity) },
                     onCommunity = { openCommunity(activity) },
+                    onAccountTools = { openAccountTools(activity) },
                     onNetworkSettings = { openNetworkSettings(activity) },
                     onCheckOnlineAccess = { checkOnlineAccess(activity) },
                     onCopyFriendCode = {
@@ -430,6 +431,147 @@ object NextendoAuthManager {
     }
 
     private class MissingOnlineGameTokenException : Exception()
+
+    /** Opens the profile/history tools available in DEN2's Nextendo account API. */
+    fun openAccountTools(activity: Activity) {
+        val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
+        if (stored == null) {
+            startLogin(activity)
+            return
+        }
+
+        executor.execute {
+            val sessionResult = runCatching { refreshSessionIfNeeded(activity) }
+            val session = sessionResult.getOrNull()
+            val profileResult = if (session != null) {
+                runCatching { NextendoAccountExtrasApi.fetchProfile(session.accessToken) }
+            } else {
+                Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
+            }
+            val historyResult = if (session != null) {
+                runCatching { NextendoAccountExtrasApi.fetchHistory(session.accessToken) }
+            } else {
+                Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
+            }
+            val ping = runCatching { NextendoAccountExtrasApi.pingBackend() }.getOrNull()
+
+            mainHandler.post {
+                if (activity.isFinishing || activity.isDestroyed) return@post
+                if (session == null) {
+                    showSessionRecoveryDialog(
+                        activity,
+                        sessionResult.exceptionOrNull()?.message.orEmpty()
+                    )
+                    return@post
+                }
+                NextendoAccountToolsDialog.show(
+                    activity = activity,
+                    profile = profileResult.getOrNull(),
+                    history = historyResult.getOrDefault(emptyList()),
+                    pingMs = ping,
+                    profileError = profileResult.exceptionOrNull()?.let(NextendoRequestDiagnostic::fromFailure),
+                    historyError = historyResult.exceptionOrNull()?.let(NextendoRequestDiagnostic::fromFailure),
+                    onRefresh = { openAccountTools(activity) },
+                    onChangeUsername = { showChangeUsernameDialog(activity, session.username) },
+                    onChangeConsoleNickname = {
+                        showChangeConsoleNicknameDialog(
+                            activity,
+                            profileResult.getOrNull()?.consoleNickname.orEmpty()
+                        )
+                    }
+                )
+            }
+        }
+    }
+
+    private fun showChangeUsernameDialog(activity: Activity, currentName: String) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val input = EditText(activity).apply {
+            setSingleLine(true)
+            setText(currentName)
+            hint = "Nome de 3 a 16 caracteres"
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("Alterar nome da conta")
+            .setMessage("Use letras, números, _ ou -. A Nextendo valida a alteração.")
+            .setView(input)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Salvar") { _, _ ->
+                val name = input.text.toString().trim()
+                executor.execute {
+                    val result = runCatching {
+                        val session = refreshSessionIfNeeded(activity)
+                        NextendoAccountExtrasApi.setUsername(session.accessToken, name)
+                        NextendoSessionStore.saveAccountIdentity(
+                            activity,
+                            pid = session.pid,
+                            username = name,
+                            friendCode = session.friendCode
+                        )
+                    }
+                    mainHandler.post {
+                        if (activity.isFinishing || activity.isDestroyed) return@post
+                        result.fold(
+                            onSuccess = {
+                                Toast.makeText(activity, "Nome da conta atualizado.", Toast.LENGTH_SHORT).show()
+                                openAccountTools(activity)
+                            },
+                            onFailure = { error ->
+                                AlertDialog.Builder(activity)
+                                    .setTitle("Não foi possível alterar o nome")
+                                    .setMessage(error.message ?: NextendoRequestDiagnostic.fromFailure(error))
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            }
+                        )
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun showChangeConsoleNicknameDialog(activity: Activity, currentNickname: String) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val input = EditText(activity).apply {
+            setSingleLine(true)
+            setText(currentNickname)
+            hint = "Nickname exibido aos amigos"
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("Alterar nickname do console")
+            .setMessage("Este nome é salvo no perfil Nextendo e pode aparecer nas listas de amigos.")
+            .setView(input)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Salvar") { _, _ ->
+                val nickname = input.text.toString().trim()
+                executor.execute {
+                    val result = runCatching {
+                        val session = refreshSessionIfNeeded(activity)
+                        NextendoAccountExtrasApi.updateProfile(
+                            accessToken = session.accessToken,
+                            consoleNickname = nickname
+                        )
+                    }
+                    mainHandler.post {
+                        if (activity.isFinishing || activity.isDestroyed) return@post
+                        result.fold(
+                            onSuccess = {
+                                Toast.makeText(activity, "Nickname do console atualizado.", Toast.LENGTH_SHORT).show()
+                                openAccountTools(activity)
+                            },
+                            onFailure = { error ->
+                                AlertDialog.Builder(activity)
+                                    .setTitle("Não foi possível atualizar o perfil")
+                                    .setMessage(error.message ?: NextendoRequestDiagnostic.fromFailure(error))
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            }
+                        )
+                    }
+                }
+            }
+            .show()
+    }
 
     /** Opens the DEN2-style current-lobby and recent-player view. */
     fun openCommunity(activity: Activity) {
