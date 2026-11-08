@@ -24,6 +24,8 @@ object NextendoSessionStore {
     private const val SESSION_CIPHERTEXT = "session_ciphertext"
     private const val PENDING_IV = "pending_iv"
     private const val PENDING_CIPHERTEXT = "pending_ciphertext"
+    private const val BAAS_KEY_IV = "baas_signing_key_iv"
+    private const val BAAS_KEY_CIPHERTEXT = "baas_signing_key_ciphertext"
     private const val PENDING_MAX_AGE_SECONDS = 10L * 60L
 
     data class Session(
@@ -44,6 +46,51 @@ object NextendoSessionStore {
         val state: String,
         val createdAtEpochSeconds: Long
     )
+
+    /**
+     * Stores the operator-provided Citron-compatible RSA PEM encrypted with the
+     * installation's Android Keystore AES-GCM key. The PEM is never exported.
+     */
+    fun saveBaasSigningKeyPem(context: Context, pem: String) {
+        val normalized = pem.trim()
+        require(normalized.length in 100..(32 * 1024)) {
+            "O arquivo de chave BAAS deve ter entre 100 bytes e 32 KiB."
+        }
+        require(
+            normalized.contains("-----BEGIN PRIVATE KEY-----") ||
+                normalized.contains("-----BEGIN RSA PRIVATE KEY-----")
+        ) {
+            "O arquivo precisa conter uma chave RSA PEM PKCS#8 ou PKCS#1 não criptografada."
+        }
+        val (iv, ciphertext) = encrypt(normalized)
+        val saved = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .putString(BAAS_KEY_IV, iv)
+            .putString(BAAS_KEY_CIPHERTEXT, ciphertext)
+            .commit()
+        check(saved) { "Não foi possível salvar a chave BAAS criptografada." }
+    }
+
+    /** Decrypts the local BAAS PEM only for in-memory signing and JWKS validation. */
+    fun loadBaasSigningKeyPem(context: Context): String? {
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        val iv = preferences.getString(BAAS_KEY_IV, null) ?: return null
+        val ciphertext = preferences.getString(BAAS_KEY_CIPHERTEXT, null) ?: return null
+        return runCatching { decrypt(iv, ciphertext) }
+            .getOrElse {
+                clearBaasSigningKeyPem(context)
+                null
+            }
+    }
+
+    fun clearBaasSigningKeyPem(context: Context) {
+        val cleared = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .remove(BAAS_KEY_IV)
+            .remove(BAAS_KEY_CIPHERTEXT)
+            .commit()
+        check(cleared) { "Não foi possível remover a chave BAAS." }
+    }
 
     fun saveOAuthTokens(context: Context, tokens: NextendoAuthClient.OAuthTokens) {
         val previous = runCatching { load(context) }.getOrNull()
