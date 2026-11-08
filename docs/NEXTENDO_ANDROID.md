@@ -104,9 +104,11 @@ See [the detailed SMM2 BAAS and PRUDP profile](NEXTENDO_SMM2_PROFILE.md).
 
 ## NAT and P2P
 
-NEX includes a strict 16-byte NNCS probe codec, a two-vantage mapping tracker and `NextendoNatProbeClient`. The client sends one message-type-101 probe to each explicitly configured endpoint through the same ephemeral UDP socket, validates the response length and source IPv4/port, then passes both observations to the tracker. The mapping result is deliberately conservative: it compares the observed external mapping and is not a complete NAT filtering diagnosis.
+NEX now reads NNCS responses from the game's real emulated BSD UDP socket, not from an app-owned socket. The Eden overlay hooks `BSD::RecvFromImpl` and inspects only successful 16-byte datagrams from remote source ports `10025` and `10125`. A response is accepted only when its big-endian test ID is `101`, its external port is valid, and its external IPv4 is public. The two observations must arrive on the same local guest UDP port, report the same external IPv4, and identify distinct responder IPv4s. Only then does the native rewriter receive a usable public address. The native UDP socket keeper preserves the same local UDP port across the game's brief close/reopen sequence.
 
-The probe client has no default hostnames or ports and is not yet called by the game's network lifecycle. SMM2's two NNCS endpoints, ports and timing remain unconfirmed. The separate native Eden socket keeper preserves a game UDP mapping across the short close/reopen sequence, but NEX still lacks periodic NAT keepalives, peer discovery, matchmaking signaling, UDP hole-punching and live P2P cleanup tests.
+The SSL-layer Station URL rewriter adapts the DEN2 behavior for outbound SecureConnection Register/ReplaceURL and MatchmakeExtension Create/Join/AutoMatchmake RMC requests. It changes only a private station `address=` with nonzero `natf`, retains the port and other parameters, rebuilds the length fields, and keeps the rewritten TLS write buffer stable across non-blocking retries. It does not rewrite inbound peer Station URLs because substituting this client's own public IP for a remote peer would be incorrect.
+
+`NextendoNatProbeClient` remains a separate diagnostic harness; it is not called by the app's network settings and must not be used to set the guest game's NAT mapping. The observed NNCS source ports and message layout are based on DEN2 and still need confirmation against the live SMM2 deployment. NEX does not yet implement periodic NNCS keepalives, peer discovery, matchmaking signaling, UDP hole-punching or live two-device P2P cleanup tests.
 
 ## BAAS / ACC game authentication
 
