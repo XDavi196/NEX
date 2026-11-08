@@ -9,7 +9,7 @@ import org.yuzu.yuzu_emu.NativeLibrary
 internal object NextendoNativeBridge {
     fun replaceFriendCache(friends: List<NextendoGameFriend>) {
         val normalized = friends.asSequence()
-            .filter { it.pid > 0L && it.username.isNotBlank() && it.presenceStatus in 0..2 }
+            .filter { it.pid > 0L && it.networkServiceAccountId > 0L && it.username.isNotBlank() && it.presenceStatus in 0..2 }
             .distinctBy { it.pid }
             .take(300)
             .toList()
