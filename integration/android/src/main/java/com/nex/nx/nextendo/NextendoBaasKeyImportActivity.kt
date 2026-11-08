@@ -78,12 +78,16 @@ class NextendoBaasKeyImportActivity : Activity() {
             mainHandler.post {
                 if (!isFinishing && !isDestroyed) {
                     result.fold(
-                        onSuccess = {
-                            Toast.makeText(
-                                this,
-                                "Chave BAAS Citron validada no JWKS. O ACC do NEX foi atualizado.",
-                                Toast.LENGTH_LONG
-                            ).show()
+                        onSuccess = { status ->
+                            val message = when (status) {
+                                "citron_baas_id_token_cached" ->
+                                    "Chave BAAS Citron validada no JWKS e ACC atualizado."
+                                "game_token_unavailable_or_expired" ->
+                                    "Chave validada e salva; falta um nx2. válido para atualizar o ACC."
+                                else ->
+                                    "Chave BAAS Citron validada e salva. Estado da conta: $status."
+                            }
+                            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                         },
                         onFailure = { error ->
                             Toast.makeText(
