@@ -217,7 +217,7 @@ internal object NextendoDashboardDialog {
         )
         playerContent.addView(
             text(
-                if (snapshot.pid > 0L) "PID " + snapshot.pid else "PID aguardando credencial de jogo",
+                "Identificador de rede oculto por segurança",
                 11f,
                 COLOR_MUTED
             )
