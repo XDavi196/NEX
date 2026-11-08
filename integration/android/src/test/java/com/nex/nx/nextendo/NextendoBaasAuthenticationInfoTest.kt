@@ -24,7 +24,9 @@ class NextendoBaasAuthenticationInfoTest {
             "iss" to JsonPrimitive("https://baas.example.test/issuer"),
             "aud" to JsonPrimitive("smm2-test"),
             "sub" to JsonPrimitive("test-player"),
-            "hm" to JsonPrimitive(true)
+            "hm" to JsonPrimitive(true),
+            "iat" to JsonPrimitive(1_800_000_000L),
+            "exp" to JsonPrimitive(1_800_003_600L)
         )
         val idToken = NextendoBaasIdTokenBuilder.build(claims, gameToken, TestSigner())
         val extraData = NextendoBaasAuthenticationInfo.encodeLoginExtraData(idToken, gameToken)
@@ -57,7 +59,9 @@ class NextendoBaasAuthenticationInfoTest {
             "iss" to JsonPrimitive("https://baas.example.test/issuer"),
             "aud" to JsonPrimitive("smm2-test"),
             "sub" to JsonPrimitive("test-player"),
-            "hm" to JsonPrimitive(true)
+            "hm" to JsonPrimitive(true),
+            "iat" to JsonPrimitive(1_800_000_000L),
+            "exp" to JsonPrimitive(1_800_003_600L)
         )
         val idToken = NextendoBaasIdTokenBuilder.build(
             claims,
