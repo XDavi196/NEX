@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.webp" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.225">Get the latest verified experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.227">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
-> **Please read before installing:** NEX is an experimental preview. The latest published and verified APK is **v0.1.0-alpha.225** (Build 59, source commit `04cde4e8`); native and Kotlin tests, optimized APK build, artifact upload and prerelease publication passed. This preview is not multiplayer-ready. The Den2-inspired UI adaptation is being validated in the next branch build.
+> **Please read before installing:** NEX is an experimental preview. The latest published and verified APK is **v0.1.0-alpha.227** (Actions run #227, source commit `5fb063f2`); native/Kotlin tests, optimized APK build, artifact upload and prerelease publication passed. It includes the first Den2-inspired Games toolbar adaptation. It is not multiplayer-ready; the account eligibility diagnostic is in Build 228 and is not yet part of this APK.
 
 ## What NEX is
 
@@ -73,9 +73,9 @@ The current Nextendo compatibility entry lists Super Mario Maker 2 as **Experime
 
 The latest verified Android APK is the experimental prerelease:
 
-**[NEX v0.1.0-alpha.225 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.225)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.225/NEX-Android-v0.2.0-rc1-optimized.apk)
+**[NEX v0.1.0-alpha.227 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.227)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.227/NEX-Android-v0.2.0-rc1-optimized.apk)
 
-The release includes `SHA256SUMS.txt`. Alpha.178 is built from commit `04cde4e8`; it contains the ACC bridge, BAAS signing boundary, SMM2 LoginEx/ticket codecs and the standalone two-vantage UDP probe client. It does **not** contain the newer shared multi-title DNS routing/configuration changes from the current development branch, and it does not provide working in-game multiplayer. Those latest source changes are being validated by [Actions run #190](https://github.com/XDavi196/NEX/actions/runs/42437984166).
+The release includes `SHA256SUMS.txt`. Alpha.178 is built from commit `5fb063f2`; it contains the ACC bridge, BAAS signing boundary, SMM2 LoginEx/ticket codecs and the standalone two-vantage UDP probe client. It does **not** contain the newer shared multi-title DNS routing/configuration changes from the current development branch, and it does not provide working in-game multiplayer. Those latest source changes are being validated by [Actions run #190](https://github.com/XDavi196/NEX/actions/runs/42437984166).
 
 This is an experimental preview, not a stable or online-ready release.
 

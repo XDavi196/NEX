@@ -6,9 +6,10 @@ A successful APK build proves that the configured Android source and native tool
 
 ## Account admission diagnostic — 8 November 2026
 
-- Build #226 failed only at Kotlin compilation because the optional Eden toolbar binding `friendsButton` was accessed without a safe call; native tests and the overlay stage had passed. Commit `5fb063f` applies the null-safe listener and started run [#227](https://github.com/XDavi196/NEX/actions/runs/42492268002).
-- The next diagnostic patch adds **Verificar elegibilidade online** to the NEX account panel. It queries public `GET /api/online-status` with the current NEX-issued `nx2.` token, validates the allow/reason response, and displays only the known server reason codes. This check is read-only and does not create a play session.
-- An allowed account-gate response does not prove BAAS/ACC, secure PRUDP, SMM2 matchmaking or NAT/P2P.
+- **Build 227 passed and was published** as [NEX v0.1.0-alpha.227](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.227). Its Actions run [#227](https://github.com/XDavi196/NEX/actions/runs/42492268002) passed native and Kotlin tests, optimized APK compilation, artifact upload and prerelease publication. This is the first verified APK containing the Den2-inspired Games toolbar entry and public per-title online badges.
+- Build 228 is validating the NEX account-panel action **Verificar elegibilidade online**. It queries public `GET /api/online-status` with the NEX-issued `nx2.` token, validates the `allow/reason` response, and does not create a play session. Its Actions run is [#228](https://github.com/XDavi196/NEX/actions/runs/42492377444); the APK stage was still running at this checkpoint.
+- **HTTP 401 is intentionally ambiguous.** The public handler authenticates with `accountFromBearer` before evaluating the online gate. That resolver rejects disabled accounts as well as invalid/expired bearers, so a 401 cannot be translated into a specific "disabled" or "expired" diagnosis. NEX now tells the player that the token was rejected or the account is unavailable, and recommends reconnecting/checking account status.
+- A successful `allow: true` response only confirms the account admission gate; it does not prove BAAS/ACC, secure PRUDP, SMM2 matchmaking or NAT/P2P.
 
 ## Current checkpoint — 8 November 2026
 

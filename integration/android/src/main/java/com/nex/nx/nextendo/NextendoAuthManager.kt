@@ -317,7 +317,7 @@ object NextendoAuthManager {
                                 "O NEX ainda não possui um nx2. válido. Verifique se a autorização concedeu game.matchmaking e atualize a sessão da conta."
                             is NextendoAuthClient.NextendoException ->
                                 if (error.httpStatus == 401) {
-                                    "A Nextendo rejeitou o nx2. atual. Atualize a credencial de jogo ou conecte novamente a conta NEX."
+                                    "O servidor recusou o token nx2. O HTTP 401 desta rota não diferencia token inválido/expirado de conta indisponível ou desativada. Reconecte a conta NEX; se persistir, verifique o estado da conta com a Nextendo. Isso não é um diagnóstico do matchmaking."
                                 } else {
                                     NextendoRequestDiagnostic.fromFailure(error)
                                 }
