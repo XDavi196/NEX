@@ -80,8 +80,7 @@ internal object NextendoBaasRuntime {
             return
         }
 
-        var provider = provisioningProvider
-        if (provider == null) {
+        val provider = provisioningProvider ?: run {
             val pem = runCatching {
                 NextendoSessionStore.loadBaasSigningKeyPem(appContext)
             }.getOrNull()
@@ -89,14 +88,15 @@ internal object NextendoBaasRuntime {
                 clearCache("citron_signing_key_missing")
                 return
             }
-            provider = runCatching {
+            val restored = runCatching {
                 NextendoCitronBaasProvider(NextendoCitronBaasSigner.fromPem(pem))
             }.getOrElse {
                 clearCache("citron_signing_key_invalid")
                 return
             }
-            provisioningProvider = provider
+            provisioningProvider = restored
             diagnostic = "citron_baas_key_restored"
+            restored
         }
 
         runCatching {
