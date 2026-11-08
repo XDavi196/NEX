@@ -13,6 +13,9 @@ This folder contains the NEX-owned Android integration source:
 - `NextendoSmm2Profile.kt` — public SMM2 title profile, WSS endpoint construction and dynamic secure StationURL parsing.
 - `NextendoNatProbeClient.kt` — bounded two-vantage NNCS UDP probe using one local socket and explicit runtime endpoint configuration.
 - `NextendoBaasIdTokenBuilder.kt` — RS256 BAAS `id_token` with the provisioned JWKS `jku` header and the `nnex` game-token claim.
+- `NextendoBaasJwk.kt` — RFC 7638 RSA JWK thumbprint and public-only JWKS serialization.
+- `NextendoAndroidKeystoreBaasSigner.kt` — per-installation non-exportable RSA-2048/RS256 key in Android Keystore, with public JWK export only.
+- `NextendoAndroidKeystoreBaasProvider.kt` — provider using only provisioned issuer/audience/subject mapping and game-token-bounded `iat`/`exp` claims.
 - `NextendoBaasAuthenticationInfo.kt` — wraps the signed JWT in the NEX `AuthenticationInfo` DataHolder for `LoginEx.extraData`.
 - `NextendoPrudpLiteSession.kt` — tested PRUDP-Lite handshake, reliable DATA/ACK handling, duplicate suppression, fragmentation and connection state machine.
 - `NextendoPrudpLiteWebSocketTransport.kt` — OkHttp binary WebSocket transport with normal TLS verification.
@@ -64,6 +67,6 @@ The account panel distinguishes OAuth connectivity from the separate `nx2.` game
 
 ## BAAS boundary (not enabled)
 
-The NEX BAAS pipeline now builds the RS256 compact JWT, puts the current server-issued \`nx2.\` token in the string-valued \`nnex\` claim, and encodes it as the \`Token\` field of the \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\`. The JWS \`kid\` and \`jku\` are supplied by the NEX runtime signer; \`iss\`, \`aud\` and \`sub\` are supplied by the provisioned claim provider. The serializer and validation tests do not sign with a production key and do not connect this payload to Eden ACC.
+The NEX BAAS pipeline now builds the RS256 compact JWT, puts the current server-issued \`nx2.\` token in the string-valued \`nnex\` claim, and encodes it as the \`Token\` field of the \`AuthenticationInfo\` DataHolder for \`LoginEx.extraData\`. The JWS \`kid\` and \`jku\` are supplied by the NEX runtime signer; \`iss\`, \`aud\` and \`sub\` are supplied by the provisioned claim provider. The NEX Android Keystore signer now creates a per-installation RSA-2048 key with a non-exportable private component, signs the exact compact-JWT input with SHA256withRSA, and exports only a public RSA JWK Set whose `kid` is the RFC 7638 thumbprint. The account network settings can copy that public JWKS for registration. A provisioned provider can then use server-supplied issuer, audience, subject mapping and token lifetime; its `exp` is capped at the current `nx2.` token expiry. The key/JWK tests verify public-only serialization and RS256 interoperability. This still does not publish the JWK to a public endpoint or satisfy Nextendo's registration/attestation contract, so the runtime remains fail-closed by default.
 
 See [the SMM2 profile and BAAS/LoginEx contract](../../docs/NEXTENDO_SMM2_PROFILE.md) for the public SMM2 values and the remaining live-provisioning requirements. No private key, server password, fallback signature or other emulator credential is shipped.
