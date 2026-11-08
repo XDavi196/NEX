@@ -12,7 +12,7 @@ This document describes the code present in the NEX branch and separates it from
 - Requested scopes (matching the owner's generated portal URL): `identity friends presence profil game.matchmaking emulator.status`
 - Application identity header: \`X-Nextendo-Client-Id: nxc_yAdR-14bOEq7\`
 
-NEX is a public Android OAuth client. It uses Authorization Code + PKCE (S256); no client secret or bot token is embedded in the APK. No Den2 or other emulator credential, token, session, signing key or attestation is reused.
+NEX is a public Android OAuth client. It uses Authorization Code + PKCE (S256); no client secret or bot token is embedded in the APK. NEX does not import another emulator's Client ID, build secret, signing key or attestation material. A player may explicitly import DEN/Citron's nextendo_account.txt session file; its bearer token is validated and re-encrypted locally, while NEX continues to identify every API request with its own Client ID.
 
 The app owner's current portal-generated URL selects six scopes: `identity friends presence profil game.matchmaking emulator.status`. NEX requests those exact names, including the portal's spelling `profil`. A requested scope is not assumed to be granted: the authorization response's `scope` field remains the source of truth. The meaning and live API contract for `profil` and `emulator.status` still require confirmation; requesting them does not imply that NEX already calls their APIs.
 
@@ -36,6 +36,12 @@ The current NEX client uses these routes:
 Every REST request made by \`NextendoAuthClient\` carries the NEX Client ID header. Player-protected requests also carry the appropriate Bearer credential.
 
 The sign-in coordinator generates a new PKCE verifier, S256 challenge and state for each authorization. It saves the pending transaction using the Android Keystore-backed session store before opening the browser. The callback validates the NEX scheme, host and path, then exchanges the one-time code. OAuth access tokens and the separate game token are stored as different credential types.
+
+### Importing a DEN/Citron account file
+
+The account panel's **Servidores e backup** section opens the Android document picker for a user-selected `nextendo_account.txt`. The parser accepts DEN's `pid`, `username`, `friend_code`, `token`, optional `refresh_token` and `token_expiry` fields. The access token is checked against `/api/oauth/userinfo`; the PID returned by Nextendo must exactly match the file before the import replaces the current session. The plaintext file is not copied into shared storage or logged. Accepted data is stored in the same AES-GCM / Android Keystore session store as a NEX PKCE login.
+
+The import does **not** import DEN's application Client ID or any local BAAS signing key. The game-facing `nx2.` token is requested again from `/api/nex-token` using NEX's `X-Nextendo-Client-Id`. A capability such as `game.matchmaking` or `presence` is only recorded after the corresponding protected operation succeeds. A refresh token created for another OAuth client may not be redeemable with NEX's Client ID; if it is rejected or expires, sign in through NEX's own browser/PKCE flow.
 
 The current Developer Documentation states:
 
