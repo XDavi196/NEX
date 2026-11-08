@@ -90,7 +90,7 @@ Esses nomes podem ser adicionados ao cache DNS exato depois que o IPv4 oficial d
 
 ## 7. NAT e P2P
 
-O NEX tem o parser de um probe NNCS de 16 bytes e um tracker de duas observações para classificar mapeamentos iguais, portas diferentes ou observações inconclusivas.
+O NEX tem o parser de um probe NNCS de 16 bytes, um tracker de duas observações e o `NextendoNatProbeClient`. O cliente executa uma medição de uma rodada: envia o tipo de mensagem 101 para dois endpoints configurados em runtime, reutilizando o mesmo socket UDP local, valida o IP/porta de origem das respostas e compara os mapeamentos observados. O resultado não é um diagnóstico completo do comportamento de filtragem NAT. Não há hostname nem porta padrão no cliente; os dois endpoints precisam ser fornecidos explicitamente.
 
 O overlay também liga um cache limitado de sockets UDP à camada de rede nativa do Eden. Enquanto existe um PID Nextendo ativo, sockets UDP vinculados e não conectados podem ser estacionados por cinco segundos quando o jogo os fecha. Se o jogo reabrir a mesma porta no mesmo IP local dentro desse intervalo, o Eden recupera o mesmo socket do host e preserva o mapeamento NAT. O cache é limitado a oito sockets e é limpo em troca/logout de conta ou encerramento da instância de rede. Há testes determinísticos para reuso, endereço incompatível, expiração, substituição, limite e limpeza.
 
