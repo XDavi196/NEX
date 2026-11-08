@@ -69,7 +69,6 @@ def main() -> None:
         "    external fun clearNextendoBaasIdToken()\n"
         "    external fun updateNextendoDnsRedirect(hostname: String, ipv4: String): Boolean\n"
         "    external fun clearNextendoDnsRedirects()\n"
-        "    external fun updateNextendoObservedExternalIpv4(ipv4: String): Boolean\n"
         "    external fun clearNextendoObservedExternalIpv4()\n"
         "    external fun getNextendoPrudpDiagnostics(): Array<String>?\n"
         "    external fun clearNextendoPrudpDiagnostics()\n"
@@ -249,21 +248,6 @@ JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoDnsRedirects(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Common::NextendoDnsRedirectCache::Clear();
-}
-
-JNIEXPORT jboolean JNICALL
-Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoObservedExternalIpv4(
-    JNIEnv* env, [[maybe_unused]] jobject obj, jstring ipv4) {
-    if (ipv4 == nullptr) return JNI_FALSE;
-    const char* chars = env->GetStringUTFChars(ipv4, nullptr);
-    if (chars == nullptr) {
-        if (env->ExceptionCheck()) env->ExceptionClear();
-        return JNI_FALSE;
-    }
-    const bool accepted =
-        Common::NextendoNatStationRewrite::SetObservedExternalIPv4(chars);
-    env->ReleaseStringUTFChars(ipv4, chars);
-    return accepted ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
@@ -690,6 +674,33 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
         1,
     )
     sfdnsres_cpp.write_text(sfdnsres_text, encoding="utf-8")
+
+    # Capture NNCS replies from the guest game's real UDP socket. A separate
+    # app-owned DatagramSocket changes the NAT mapping and is not authoritative.
+    bsd_cpp = eden / "src/core/hle/service/sockets/bsd.cpp"
+    replace_once(
+        bsd_cpp,
+        '#include "core/hle/service/sockets/bsd.h"\\n',
+        '#include "core/hle/service/sockets/bsd.h"\\n'
+        '#include "core/hle/service/ssl/nextendo_nat_station_rewrite.h"\\n',
+    )
+    replace_once(
+        bsd_cpp,
+        """    const auto [ret, bsd_errno] = Translate(descriptor.socket->RecvFrom(flags, message, p_addr_in));
+
+        // Restore original state""",
+        """    const auto [ret, bsd_errno] = Translate(descriptor.socket->RecvFrom(flags, message, p_addr_in));
+
+        if (ret == 16 && bsd_errno == Errno::SUCCESS && p_addr_in != nullptr &&
+            Common::NextendoNatStationRewrite::ObserveNncsReply(
+                addr_in.portno, std::span<const u8>(message.data(), message.size()))) {
+            LOG_INFO(Service,
+                     "[NEX] Captured the public NAT mapping from both NNCS vantages "
+                     "on the game's UDP socket");
+        }
+
+        // Restore original state""",
+    )
 
     network_header = eden / "src/core/internal_network/network.h"
     replace_once(
