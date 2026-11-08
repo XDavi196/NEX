@@ -1834,6 +1834,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     }
 
     fun onEmulationStopped(status: Int) {
+        NativeLibrary.playTimeManagerStop()
         NextendoHistoryPublisher.onGameStopped(this) { programId ->
             NativeLibrary.playTimeManagerGetPlayTime(programId)
         }
