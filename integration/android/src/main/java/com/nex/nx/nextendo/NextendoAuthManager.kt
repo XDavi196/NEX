@@ -3,6 +3,8 @@ package com.nex.nx.nextendo
 import android.app.Activity
 import androidx.appcompat.app.AlertDialog
 import android.widget.Toast
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -221,6 +223,13 @@ object NextendoAuthManager {
                     append(NextendoPresencePublisher.diagnostic())
                     append("\nToken BAAS no ACC: ")
                     append(NextendoBaasRuntime.diagnostic)
+                    append("\nRotas de rede Nextendo: ")
+                    append(NextendoNetworkRouting.diagnostic)
+                    if (NextendoNetworkRouting.installedRouteCount > 0) {
+                        append(" (")
+                        append(NextendoNetworkRouting.installedRouteCount)
+                        append(" hosts)")
+                    }
                     append("\n\nESTATÍSTICAS PÚBLICAS DA REDE")
                     if (networkStats != null) {
                         append("\nJogadores online: ")
@@ -249,7 +258,8 @@ object NextendoAuthManager {
                     .setTitle("Perfil Nextendo")
                     .setMessage(details)
                     .setPositiveButton("Amigos") { _, _ -> openFriends(activity) }
-                    .setNeutralButton("Desconectar") { _, _ ->
+                    .setNeutralButton("Configurar rede") { _, _ -> openNetworkSettings(activity) }
+                    .setNegativeButton("Desconectar") { _, _ ->
                         NextendoPresencePublisher.stop(activity)
                         NextendoNativeBridge.clearFriendCache()
                         NextendoNativeBridge.clearIdentity()
@@ -261,7 +271,6 @@ object NextendoAuthManager {
                             Toast.LENGTH_SHORT
                         ).show()
                     }
-                    .setNegativeButton("Fechar", null)
                     .show()
             }
         }
@@ -318,6 +327,87 @@ object NextendoAuthManager {
         }
     }
 
+    /**
+     * Configures the two distinct public IPv4 addresses used by a Nextendo
+     * deployment. These are intentionally not guessed or defaulted.
+     */
+    fun openNetworkSettings(activity: Activity) {
+        val saved = NextendoNetworkConfigStore.load(activity)
+        val serverInput = EditText(activity).apply {
+            hint = "IP principal do servidor (SERVER_IP)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setSingleLine(true)
+            setText(saved?.serverIpv4.orEmpty())
+        }
+        val natInput = EditText(activity).apply {
+            hint = "IP do segundo ponto NAT (NAT_IP)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setSingleLine(true)
+            setText(saved?.natIpv4.orEmpty())
+        }
+        val content = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            val inset = (20 * resources.displayMetrics.density).toInt()
+            setPadding(inset, inset / 2, inset, 0)
+            addView(
+                serverInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(
+                natInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        AlertDialog.Builder(activity)
+            .setTitle("Servidores Nextendo")
+            .setMessage(
+                "Informe os dois IPv4 fornecidos pela Nextendo. Eles precisam ser diferentes. " +
+                    "O NEX não presume IPs de produção."
+            )
+            .setView(content)
+            .setPositiveButton("Salvar e aplicar") { _, _ ->
+                runCatching {
+                    val config = NextendoNetworkConfigStore.Config(
+                        serverIpv4 = serverInput.text.toString().trim(),
+                        natIpv4 = natInput.text.toString().trim()
+                    )
+                    NextendoNetworkConfigStore.save(activity, config)
+                    NextendoNetworkRouting.apply(config)
+                }.onSuccess {
+                    Toast.makeText(
+                        activity,
+                        "Rotas DNS Nextendo aplicadas. O NAT/P2P ainda precisa da configuração específica do jogo.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }.onFailure { error ->
+                    Toast.makeText(
+                        activity,
+                        error.message ?: "Não foi possível aplicar os servidores.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+            .setNeutralButton("Remover configuração") { _, _ ->
+                NextendoNetworkRouting.clear(activity)
+                Toast.makeText(
+                    activity,
+                    "Rotas Nextendo removidas.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     private fun showSessionRecoveryDialog(activity: Activity, detail: String) {
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
@@ -348,6 +438,9 @@ object NextendoAuthManager {
      * the UI thread.
      */
     fun restoreCachedIdentity(context: Context) {
+        // DNS routing is independent from the OAuth account session; restore it
+        // before a game starts so guest sockets resolve the original NEX hosts.
+        runCatching { NextendoNetworkRouting.restore(context) }
         val cached = runCatching { NextendoSessionStore.load(context) }.getOrNull()
         if (cached == null) {
             NextendoNativeBridge.clearIdentity()
