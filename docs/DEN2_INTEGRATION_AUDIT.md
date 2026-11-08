@@ -1,126 +1,99 @@
-# NEX — DEN2 integration audit and implementation requirements
+# NEX — DEN2 and Citron Nextendo integration audit
 
 Updated: 8 November 2026.
 
-This document records what was verified in the public [Dmr77680/Den2](https://github.com/Dmr77680/Den2) source and how NEX can implement equivalent supported behavior while keeping its own Nextendo application identity.
+This audit compares the public [DEN2 repository](https://github.com/Dmr77680/Den2) and the official [NextendoNetwork/citron-nextendo repository](https://git.nextendo.network/NextendoNetwork/citron-nextendo) with NEX. They are references for architecture and observable API behavior only. NEX keeps its own application registration, client identity, session and native implementation.
 
-## Identity boundary — NEX keeps its own client
+## NEX identity — do not replace it
 
-NEX must continue using:
+NEX continues to use:
 
-- Android application ID: `com.nex.nx`
-- Public OAuth Client ID: `nxc_yAdR-14bOEq7`
-- OAuth redirect: `com.nex.nx://oauth/callback`
-- OAuth flow: Authorization Code + PKCE (S256)
+- Android application ID: com.nex.nx
+- Public OAuth Client ID: nxc_yAdR-14bOEq7
+- OAuth redirect: com.nex.nx://oauth/callback
+- Authorization Code + PKCE (S256)
 - No embedded client secret.
 
-DEN's source declares a different client ID (`nxc_z_fetCuVO1qx`) in `src/web_service/nextendo_api.cpp`. That value is evidence about DEN's own registration only. It must not be copied into NEX. The NEX branch already uses its own Client ID in `NextendoAuthClient.kt`.
+DEN2 declares a separate Client ID, nxc_z_fetCuVO1qx, in src/web_service/nextendo_api.cpp. The Citron Nextendo source loads its application identity from its own build-time secrets header. Neither value belongs in NEX. NEX must not copy their Client IDs, OAuth tokens, refresh tokens, account files, private signing keys, attestation material or service credentials.
 
-NEX must also not reuse DEN's OAuth refresh/access tokens, local account file, private signing material, attestation material, or service credentials. A user should sign in to NEX through NEX's own registered OAuth flow. The NEX encrypted backup is for NEX-created backups only; it is deliberately not a parser for another application's bearer-token file.
+## What the reference projects demonstrate
 
-## What the DEN source demonstrates
-
-The public source contains these separate pieces:
-
-| DEN source | Observed responsibility | NEX approach |
+| Project/source | What the public source shows | NEX implementation decision |
 |---|---|---|
-| `src/web_service/nextendo_api.cpp` | Browser OAuth/PKCE, app Client ID, token exchange/refresh, account API calls and `/api/nex-token` | Keep the NEX-owned Kotlin client and NEX Client ID. |
-| `src/common/nextendo_account.cpp` | Local account/session persistence, PID and player identity | NEX already stores its session encrypted with Android Keystore. |
-| `src/core/hle/service/acc/acc.cpp` | Game-facing ACC BAAS id_token construction and `nnex` claim | Do not copy the local-signing fallback; see the security decision below. |
-| `src/core/hle/service/ssl/ssl_backend_openssl.cpp` and `src/core/hle/service/sockets/sfdnsres.cpp` | TLS/SNI and Nextendo-specific DNS/socket compatibility | Port only protocol behavior that is verified against the official service and keep certificate verification enabled. |
-| `src/core/hle/service/friend` and the Android friends UI | Game-facing friend records and the in-app social view | Use NEX's own friend cache, serializers, UI, and verified PID/NSA mappings. |
+| DEN2 — src/web_service/nextendo_api.cpp | Separate application Client ID, browser OAuth/PKCE, token exchange/refresh and account/game-token API requests | Keep NEX's own Client ID and its existing PKCE callback and API client. |
+| DEN2 — src/common/nextendo_account.cpp | Local PID/profile/session persistence in nextendo_account.txt | Keep NEX's Android Keystore-encrypted session store and NEX-only encrypted backup. |
+| DEN2 — src/core/hle/service/acc/acc.cpp | Local BAAS RS256 JWT construction, nnex claim, private-key file/environment lookup and an auto-generated RSA fallback | Do not port the local-signing fallback. Nextendo explicitly rejects client-generated BAAS keys and third-party RS256 signatures. |
+| DEN2 — src/core/hle/service/ssl and service/sockets | Nextendo-specific TLS/SNI, DNS and socket compatibility fixes | Use NEX-owned exact-host DNS and TLS code; port only protocol behavior verified against the service. |
+| Citron Nextendo — src/web_service/nextendo_api.cpp | Browser OAuth/PKCE, an application identity injected from a private build header, account/profile APIs, friend list and friend-request operations | Keep NEX's own Client ID and NEX OAuth contract; implement the supported account actions in NEX's own client. |
+| Citron Nextendo — src/core/hle/service/acc/acc.cpp | BAAS id_token construction and local RS256 signing logic | Do not assume the presence of local signing code proves a key is trusted or accepted. Keep NEX BAAS fail-closed. |
+| Citron Nextendo — src/core/hle/service/ssl and service/sockets | Emulator-side DNS redirection, SNI/TLS and transport adaptations | NEX keeps its own Android-focused DNS, TLS/SNI, PRUDP and NAT implementation. |
 
-DEN's release notes describe obtaining `nextendo_account.txt` using the Orange app. DEN's README warns that the file contains a bearer token. That file is not a safe substitute for NEX OAuth authorization and must not be imported blindly or committed/shared.
+The Citron Nextendo README describes browser sign-in, hostname redirection, TLS, auth/secure connection, NAT checks, peer-to-peer, presence and account/friend management. It also warns that online support is new, incomplete and lightly tested. That README is useful architecture evidence, not proof that every flow is compatible with this NEX build or device.
 
-## What is already present in NEX
+## Account and friend integration now in NEX
 
-The current NEX branch already contains:
+NEX already owns:
 
-- Own OAuth Authorization Code + PKCE flow and callback validation.
-- NEX Client ID and application header.
+- Its own OAuth Authorization Code + PKCE login and callback validation.
+- The NEX Client ID header and exact NEX redirect URI.
 - Encrypted Android Keystore session storage and serialized refresh-token rotation.
-- Separate retrieval/parsing/storage of the server-issued `nx2.` game token.
-- NEX's own encrypted session backup and restore format.
-- Account profile, read-only friends view, presence publishing and public network statistics.
-- Native friend-cache bridge and qLaunch friend-service serializers/handlers.
-- Exact-host DNS route support, TLS/SNI diagnostics, a PRUDP-Lite test harness and NNCS/NAT probe components.
-- An ACC BAAS token cache and a fail-closed runtime boundary that does not deliver a locally signed token to the guest unless an approved NEX signer/claim contract is provisioned.
+- Separate parsing/storage for the server-issued nx2 game token.
+- NEX-only encrypted session backup/restore. It is intentionally not compatible with another application's bearer-token file.
+- Account profile, presence publishing and public network statistics.
+- A NEX-owned friends UI and native game-friend cache/HLE bridge.
 
-Relevant NEX code is under `integration/android/src/main/java/com/nex/nx/nextendo/`, native overlay components are under `integration/android/src/main/cpp/`, and the Eden integration is applied by `scripts/apply-eden-overlay.py`.
+The current integration adds the game-facing friend actions using NEX's own nx2 token:
 
-## Important security decision: do not copy DEN's local BAAS signer
+- GET /api/friends: read accepted friends and incoming requests.
+- POST /api/friends with friend_code: send a friend request by Friend Code.
+- POST /api/friends/accept with pid: accept a request.
+- POST /api/friends/decline with pid: decline a request.
+- POST /api/friends/remove with pid: remove a friend.
 
-The inspected DEN `acc.cpp` contains code that:
+The Android Friends screen displays accepted friends and incoming requests, supports add/accept/decline/remove actions, and refreshes the list after a mutation. These routes follow the publicly visible Citron Nextendo client behavior. They still require live validation with NEX's registered Client ID and the actual scopes/token contract returned by the deployed Nextendo service; source-level implementation is not proof that production accepted each request.
 
-1. Constructs an RS256 BAAS JWT locally.
-2. Places a game token in the `nnex` claim.
-3. Loads a key from `NEXTENDO_BAAS_SIGNING_KEY` or `nextendo_baas.pem`.
-4. If no key is available, generates and persists a local RSA-2048 key.
+Missing presence stays unknown, not offline. A friend can remain visible in the Android UI without an NSA. The NEX Android bridge and native HLE cache only accept entries with an explicit non-zero NSA from the service. NEX never substitutes a friend's PID for an NSA. The signed-in player's PID is also hidden in the NEX account panel because the Citron Nextendo README warns that a PID acts as a credential.
 
-The code's presence does not prove that a locally generated key is published, registered or accepted by Nextendo. The source alone cannot establish how a production DEN build obtains a trusted signing key.
+DEN2's README and release notes describe nextendo_account.txt as a session-bearing file generated through the Orange app and warn that it must not be shared. NEX does not import that file or use Orange to copy credentials across clients. The user signs in to NEX through NEX's own OAuth registration.
 
-The Nextendo founder explicitly told the NEX project that client-generated public keys cannot be registered, third-party RS256 BAAS tokens cannot be accepted, the JWKS is not open to per-installation registrations, and no third-party certification/token contract is currently available. Therefore:
+## BAAS / ACC — explicitly blocked by the founder's answer
 
-- NEX must not generate a replacement BAAS key and pretend it is trusted.
-- NEX must not copy DEN's private key, signing key, attestation or application credentials.
-- NEX must not hardcode DEN's BAAS issuer, audience, JKU, key ID or claim values as if they were an approved NEX contract.
-- Keep BAAS/ACC game authentication fail-closed until Nextendo changes its policy and provides an official, server-issued or explicitly approved third-party mechanism.
+DEN2 and Citron both contain code that constructs a BAAS RS256 id_token locally. DEN2's source loads a key from NEXTENDO_BAAS_SIGNING_KEY or nextendo_baas.pem and can generate an RSA-2048 fallback when no key is present. The existence of that code does not show that an installation-generated key is registered or accepted by the live Nextendo service.
 
-This is a service-side trust requirement, not a missing Kotlin screen or a missing Client ID.
+The Nextendo founder explicitly told NEX that client-generated keys will not be registered in the JWKS, third-party RS256 BAAS tokens will not be accepted, per-installation JWKS registration is not available, and there is currently no third-party certification or BAAS token contract. The founder also said that game tokens are issued by Nextendo's own servers after the player signs in.
+
+Therefore:
+
+- Do not copy DEN2's or Citron's private signing key, application secret, attestation material, issuer, audience, jku, kid or claims.
+- Do not activate NEX's Android Keystore RSA signer or submit the old per-installation JWK request as a workaround.
+- Do not put a locally generated RS256 token into Eden ACC.
+- Keep the NEX BAAS runtime fail-closed until Nextendo supplies a new official server-side game-authentication mechanism for NEX.
+
+The NEX JWT and AuthenticationInfo DataHolder code remains protocol/test scaffolding. It is not a live BAAS integration and must not be described as working in-game authentication.
 
 ## Remaining requirements for actual in-game multiplayer
 
-### 1. Official game-authentication path
+1. **Official game authentication:** Nextendo must provide a server-issued or explicitly approved game credential for the NEX application, with the account/PID binding, token lifetime/refresh and ACC/LoginEx contract. The founder's current answer says this is not available to third-party clients today.
+2. **Public-client API contract:** Nextendo must confirm that NEX's registered Client ID may use the requested OAuth scopes and the game-token, friends and presence routes. If protected calls require client attestation, Nextendo must provide an approved third-party mechanism; NEX cannot borrow DEN/Citron credentials.
+3. **SMM2 live service configuration:** production auth hostname and route IP, trusted TLS certificate/SNI behavior, the live StationURL and negotiated secure PRUDP parameters, plus confirmation that SMM2 LoginEx and secure sessions are enabled.
+4. **SMM2 gameplay services:** supported RMC methods and payloads for room creation/join/leave, player/session state and matchmaking; actual server-side availability for the target game version.
+5. **NAT and P2P:** SMM2 NNCS/NAT endpoints and ports for both vantage points, probe/keepalive timing, peer-discovery/signaling fields, UDP socket lifetime and hole-punch/cleanup behavior.
+6. **End-to-end verification:** two distinct NEX accounts, two Android devices, the same supported game/update version, live login on both clients, matchmaking, session entry and sustained P2P play.
 
-Required from Nextendo:
-
-- A supported method for a third-party NEX client to obtain the game-facing BAAS identity/token, or an official server-side exchange that returns a game-ready credential.
-- Confirmation of how the server binds that credential to the NEX account/PID and the `nx2.` game token.
-- The exact permitted LoginEx/ACC contract and token lifetime/refresh behavior.
-
-The founder's current response says this is not available to third-party clients today. Until that changes, this stage is blocked and must not be simulated.
-
-### 2. Client/API attestation, if the protected endpoints require it
-
-Required from Nextendo:
-
-- Whether NEX's registered public OAuth client may call `/api/nex-token`, friends and presence without official-emulator attestation.
-- If attestation is required, the approved third-party format and the NEX-specific provisioning/rotation process.
-
-NEX must not borrow the official emulator's or DEN's private attestation key.
-
-### 3. Live title endpoint configuration
-
-For the first target, Super Mario Maker 2:
-
-- Production auth hostname and route IPv4.
-- TLS certificate/SNI behavior for that hostname.
-- Actual secure StationURL returned by LoginEx and negotiated PRUDP station parameters.
-- Confirmation that the deployed SMM2 service currently accepts live LoginEx and secure sessions.
-
-Never substitute a development loopback address, another game's endpoint, a sample IP, or a guessed port.
-
-### 4. Matchmaking and NAT/P2P
-
-Required to verify with Nextendo's SMM2 service:
-
-- The RMC methods and payloads actually supported for room creation, joining, leaving and player/session state.
-- SMM2 NNCS/NAT check hostnames, ports, packet contract, two-vantage behavior and keepalive timing.
-- Peer discovery/signaling data and UDP hole-punch lifecycle.
-- Confirmation that SMM2 matchmaking is enabled server-side for the tested game version.
-
-NEX's standalone PRUDP/NAT test components and packet observer are not proof of a live game session. The PRUDP coordinator still needs to be connected to the guest game's real socket/lifecycle path and verified on two devices.
+NEX's DNS routes, PRUDP-Lite tests, LoginEx codecs and NAT probe utilities are client-side groundwork. They are not a connected guest-game lifecycle and do not prove multiplayer.
 
 ## What is needed from the project owner
 
-No DEN Client ID, DEN token file, password, private key, client secret or private attestation file is needed.
+No DEN Client ID, Citron build secret, nextendo_account.txt, Orange export, token, password, private key or attestation file is needed.
 
-The only owner-side checks are:
+The owner-side checks are limited to:
 
-1. Confirm in the Nextendo Developer Portal that NEX's own Client ID `nxc_yAdR-14bOEq7` and exact redirect `com.nex.nx://oauth/callback` remain active, and verify which scopes are actually granted to the test account.
-2. Provide only token-free diagnostics from a NEX test: build/commit, game title/update version, UTC time, endpoint hostname/path, HTTP status or game error code, and the stage that failed.
-3. Keep using NEX's own browser sign-in. Do not send `nextendo_account.txt`, OAuth tokens, `nx2.` tokens, BAAS JWTs, authorization codes, PKCE verifiers or passwords in chat.
+1. Verify in the Nextendo Developer Portal that NEX's Client ID nxc_yAdR-14bOEq7 and redirect com.nex.nx://oauth/callback remain active.
+2. Verify which scopes are actually granted in the OAuth response; do not assume requested scopes were granted.
+3. When testing, share only token-free diagnostics: NEX build/commit, game and update version, UTC time, endpoint hostname/path, HTTP status or game error code, and the step that failed.
 
-## Implementation status
+Never send access/refresh tokens, nx2 tokens, BAAS JWTs, authorization codes, PKCE verifiers, PIDs, passwords, private keys or client-attestation material in chat or logs.
 
-The account/social client layer is already present in NEX and can continue to be improved independently. The missing BAAS trust contract is currently denied by Nextendo, so a code-only port of DEN's local JWT signer would not be a legitimate or verifiable way to enable multiplayer. The remaining game-network pieces must be finished and tested only after the corresponding official service values and game-authentication path are available.
+## Current implementation status
+
+The NEX account/social client now has NEX-owned OAuth/session handling, game-token-backed friend list and friend mutations, presence plumbing, and a guarded native friend cache. The BAAS trust step remains blocked by Nextendo's explicit policy response. The SMM2 PRUDP/RMC/NAT pieces remain incomplete and unverified against a two-device live match.
