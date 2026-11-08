@@ -28,9 +28,9 @@ internal data class NextendoGameFriendSnapshot(
 
 /**
  * Parses the richer /api/friends payload returned for an nx2. game token.
- * This is deliberately separate from OAuth userinfo. Nextendo's reference
- * emulator binds its persistent player PID to the Switch NetworkServiceAccountId;
- * use that documented account mapping when the friend API omits an explicit NSA.
+ * This is deliberately separate from OAuth userinfo. A PID is not assumed to
+ * be a Switch NetworkServiceAccountId: when the server omits an explicit NSA,
+ * the friend can still appear in the Android UI but is excluded from qLaunch HLE.
  * Presence fields themselves remain server-sourced and are never synthesized.
  */
 internal object NextendoGameFriendParser {
@@ -72,9 +72,9 @@ internal object NextendoGameFriendParser {
         val status = presence?.intField("status") ?: -1
         if (status !in -1..2) return null
 
-        // Prefer an explicit server-provided NSA. The existing PID fallback is
-        // retained for the currently documented Nextendo account mapping.
-        val nsa = item.hex64Field("nsa") ?: pid
+        // Never infer a Switch NSA from PID. Zero keeps the friend visible in
+        // the Android UI while the native HLE cache excludes it from qLaunch.
+        val nsa = item.hex64Field("nsa") ?: 0L
         val appIdValue = presence?.hex64Field("app_id") ?: 0L
 
         val appFieldValue = presence?.get("app_field")
