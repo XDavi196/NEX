@@ -69,7 +69,9 @@ The account panel shows the exact scopes returned in the OAuth token response an
 - The Eden overlay injects matching JNI methods and copies the cache header into Eden's ACC service.
 - `IManagerForApplication::CheckAvailability` now reports whether the cache contains a token. `LoadIdTokenCache` and the deprecated async interface return the exact compact-JWT bytes. They return a zero byte-count if no token exists or the guest output buffer is too small; the previous fake 0x100-byte zero-filled result is removed.
 - `NextendoBaasRuntime` connects the RS256 builder and `AuthenticationInfo` DataHolder serializer to the ACC cache only when a NEX-specific provisioned signing provider exists and the current `nx2.` game token is valid. It clears ACC state on logout, absent/expired token, missing signer or invalid claims.
-- No production signer/provider is installed in this branch. The bridge is implemented and fail-closed, but the guest receives no BAAS token until the NEX key/JWKS, `kid`, `iss`, `aud`, `sub`/PID and any required attestation are provisioned.
+- The Android branch now includes `NextendoAndroidKeystoreBaasSigner`: it creates a per-installation RSA-2048 key in Android Keystore with a non-exportable private component, signs RS256 via `SHA256withRSA`, and exposes only a public RSA JWK Set. Its `kid` is the RFC 7638 thumbprint of the public key. The account's **Configurar rede** dialog includes a button to copy this public JWKS for registration.
+- `NextendoAndroidKeystoreBaasProvider` accepts the server-provisioned issuer, audience, subject resolver and token lifetime. It does not assume PID equals `sub`; `exp` is capped at the current `nx2.` token expiry. The builder tests now verify complete RS256 JWT output against the matching public key.
+- No production provider is installed automatically. The exported JWK still must be registered at the real HTTPS `jku` endpoint, and Nextendo must confirm the accepted `kid`, `iss`, `aud`, `sub` mapping, claim semantics and any third-party attestation. Until then, ACC remains fail-closed and the guest receives no BAAS token.
 - Eden's local profile UUID remains the offline fallback. For a linked Nextendo account, the game-facing ACC NetworkServiceAccountId is the persistent Nextendo PID, matching the reference emulator's account binding. A Switch UUID is not derived from PID.
 
 ### Native friend cache and nn::friends HLE
@@ -99,7 +101,7 @@ The public SMM2 profile records title key `fdf6617f`, NEX version `40000`, auth 
 
 The session coordinator is an explicit protocol client/test harness. It is **not yet called by the guest game's native socket lifecycle**; the guest should use Eden's ordinary emulated socket/NEX path and receive its BAAS token through ACC once provisioned. The original SMM2 auth hostname, DNS destination, TLS certificate/SNI route and virtual station parameters are not confirmed, so none are guessed.
 
-The BAAS builder is connected through `NextendoBaasRuntime` to Eden's ACC token cache, but it has no production signer/provider. As a result, ACC currently reports no BAAS token and the guest cannot complete BAAS-backed LoginEx. Complete title-specific RMC methods, matchmaking and live NAT/P2P are still unfinished. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
+The BAAS builder is connected through `NextendoBaasRuntime` to Eden's ACC token cache. The Android Keystore signer/provider code is implemented and can be installed only after the JWK and exact claims have been registered/confirmed; currently no production registration is present, so ACC continues to report no BAAS token and the guest cannot complete BAAS-backed LoginEx. The standalone SMM2 WSS coordinator still is not called by the guest game's native socket lifecycle. Complete title-specific RMC methods, matchmaking and live NAT/P2P are still unfinished. See [NEXTENDO_SMM2_PROFILE.md](NEXTENDO_SMM2_PROFILE.md).
 
 ### NAT primitives and UDP socket lifetime
 
@@ -210,7 +212,7 @@ These are build/test results only. They do not prove live account-service accept
 
 Required before claiming in-game online support:
 
-1. Connect the new BAAS JWT builder and AuthenticationInfo serializer to Eden ACC/LoginEx, then validate claims and RS256 signatures against NEX's provisioned live JWKS.
+1. Register a NEX per-installation public JWK at the accepted HTTPS JWKS endpoint; obtain confirmation for `kid`, `jku`, `iss`, `aud`, `sub` mapping and third-party attestation, then install the Android Keystore provider and validate ACC/LoginEx against the live service.
 2. Confirmed OAuth/game-token/refresh/presence API behavior in the live deployment.
 3. A verified NEX PID ↔ game account/NSA mapping and guest-visible HLE IPC tests.
 4. Derive the secure Kerberos ticket/check payload from LoginEx, connect both SMM2 PRUDP sessions to Eden's title lifecycle, and pass live authentication/reliability/RMC integration tests.
