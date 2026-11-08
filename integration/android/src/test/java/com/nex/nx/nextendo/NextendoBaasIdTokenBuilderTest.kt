@@ -1,23 +1,38 @@
 package com.nex.nx.nextendo
 
 import java.nio.charset.StandardCharsets
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.security.Signature
 import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
 class NextendoBaasIdTokenBuilderTest {
     private class TestSigner : NextendoBaasSigner {
+        private val keyPair: KeyPair = KeyPairGenerator.getInstance("RSA").run {
+            initialize(2048)
+            generateKeyPair()
+        }
+
         override val keyId = "nex-test-key-only"
         override val jwksUrl = "https://baas.test.invalid/1.0.0/certificates"
+        val publicKey = keyPair.public
         var lastSigningInput: ByteArray? = null
 
         override fun signRs256(signingInput: ByteArray): ByteArray {
-            lastSigningInput = signingInput
-            return "test-signature".toByteArray(StandardCharsets.US_ASCII)
+            lastSigningInput = signingInput.copyOf()
+            return Signature.getInstance("SHA256withRSA").run {
+                initSign(keyPair.private)
+                update(signingInput)
+                sign()
+            }
         }
     }
 
@@ -64,12 +79,18 @@ class NextendoBaasIdTokenBuilderTest {
             parts[0] + "." + parts[1],
             String(signer.lastSigningInput!!, StandardCharsets.US_ASCII)
         )
-        assertEquals(
-            Base64.getUrlEncoder().withoutPadding().encodeToString(
-                "test-signature".toByteArray(StandardCharsets.US_ASCII)
-            ),
-            parts[2]
-        )
+
+        val signingInput = (parts[0] + "." + parts[1]).toByteArray(StandardCharsets.US_ASCII)
+        val signatureBytes = Base64.getUrlDecoder().decode(parts[2])
+        val verifier = Signature.getInstance("SHA256withRSA")
+        verifier.initVerify(signer.publicKey)
+        verifier.update(signingInput)
+        assertTrue("The compact JWT must carry a valid RS256 signature.", verifier.verify(signatureBytes))
+
+        val tamperedVerifier = Signature.getInstance("SHA256withRSA")
+        tamperedVerifier.initVerify(signer.publicKey)
+        tamperedVerifier.update((parts[0] + "." + parts[1] + "x").toByteArray(StandardCharsets.US_ASCII))
+        assertFalse("A modified signing input must not verify.", tamperedVerifier.verify(signatureBytes))
     }
 
     @Test
