@@ -14,7 +14,7 @@ Do not add a client secret, another emulator's credential, or any service-side s
 
 ## 1. BAAS id_token and JWK publication
 
-NEX already contains the RS256 compact-JWT builder, the `nnex` game-token claim, the `AuthenticationInfo` DataHolder encoder, and the Eden ACC cache bridge. The current runtime intentionally refuses to expose a token until a valid signer and claims configuration are supplied.
+NEX already contains the RS256 compact-JWT builder, the `nnex` game-token claim, the `AuthenticationInfo` DataHolder encoder and the Eden ACC cache bridge. The Android client now also creates a per-installation RSA-2048 signing key inside Android Keystore with a non-exportable private key, derives its `kid` from an RFC 7638 public JWK thumbprint, signs using SHA256withRSA and exports a public-only JWKS JSON for registration. The app exposes a button to copy that public JWKS. A provisioned claim provider is implemented with injected `iss`, `aud`, subject mapping and a bounded token lifetime; it caps `exp` at the current server-issued `nx2.` token expiry. The runtime still refuses to expose a BAAS token by default.
 
 Important distinction: the public Ryujinx-Nextendo README documents a BAAS RSA signing key supplied at runtime (`NEXTENDO_BAAS_SIGNING_KEY`); it does not say that the private BAAS key must be issued by Nextendo. The public `baas-jwks` service publishes the matching public JWK from the same RSA key, with a matching `kid`. Therefore the unresolved issue is the NEX-specific key lifecycle and, especially, how the matching public key is made available at the `jku` URL used by the game's BAAS verification flow.
 
@@ -25,7 +25,7 @@ Before enabling the runtime provider, confirm:
 3. The exact required JWT header and claims: `alg`, `kid`, `typ`, `jku`, `iss`, `aud`, `sub`/PID mapping, `hm`, `iat`, `exp`, and any title/version claims such as `tv`.
 4. Whether the key can be generated and kept in Android Keystore, and whether the guest's BAAS request can reach the public JWK route through the configured exact-host DNS/TLS path.
 
-The private RSA key must not be committed to Git, printed to logs, embedded in CI output, or copied from another emulator. A local throwaway key is not production-ready unless its matching public JWK is reachable and accepted by the title/service.
+The private RSA key must not be committed to Git, printed to logs, embedded in CI output, or copied from another emulator. A local throwaway key is not production-ready unless its matching public JWK is reachable and accepted by the title/service. Each NEX installation has a distinct key; the operator must register the exact public JWK exported from the device at the shared/provisioned JWKS endpoint. Exporting the JWK does not publish it. The `jku`, `kid`, issuer, audience, subject mapping and client-attestation requirements must be confirmed before `installAndroidKeystoreProvider` is called.
 
 Public references:
 - https://github.com/NextendoNetwork/Ryujinx-Nextendo
