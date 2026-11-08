@@ -25,7 +25,9 @@ internal object NextendoGameNetworkProfiles {
         Profile("ARMS", "25C08801"),
         Profile("Mario Tennis Aces", "23932A00"),
         Profile("Super Mario Bros. 35", "21F12900"),
-        Profile("PAC-MAN 99", "2E471600")
+        Profile("PAC-MAN 99", "2E471600"),
+        Profile("Tetris 99", "23BDA200"),
+        Profile("Animal Crossing: New Horizons", "2EE2E300")
     )
 
     /** Nintendo/Nextendo device-auth hosts documented for exact DNS routing. */
