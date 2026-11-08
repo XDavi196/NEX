@@ -148,7 +148,7 @@ object NextendoSessionStore {
      * Imports the DEN/Citron key=value account file into this installation's
      * encrypted session store. The source file itself is never copied or retained.
      */
-    fun importDenAccountFile(context: Context, account: NextendoAccountTxtCodec.Account) {
+    internal fun importDenAccountFile(context: Context, account: NextendoAccountTxtCodec.Account) {
         saveSession(
             context,
             Session(
