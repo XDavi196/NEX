@@ -564,6 +564,11 @@ object NextendoAuthManager {
         }
     }
 
+    /** Opens the picker for the Nextendo-authorized Citron BAAS PEM. */
+    fun startCitronBaasKeyImport(activity: Activity) {
+        activity.startActivity(Intent(activity, NextendoBaasKeyImportActivity::class.java))
+    }
+
     /**
      * Configures the two distinct public IPv4 addresses used by a Nextendo
      * deployment. These are intentionally not guessed or defaulted.
