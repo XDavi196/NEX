@@ -51,7 +51,9 @@ object NextendoSessionStore {
             context,
             Session(
                 accessToken = tokens.accessToken,
-                refreshToken = tokens.refreshToken,
+                // Preserve the current refresh token only when the provider omits
+                // a replacement. When a rotated token is returned, it always wins.
+                refreshToken = tokens.refreshToken.ifBlank { previous?.refreshToken.orEmpty() },
                 accessTokenExpiresAtEpochSeconds = tokens.expiresAtEpochSeconds,
                 grantedScopes = tokens.grantedScopes.ifEmpty { previous?.grantedScopes ?: emptySet() },
                 nexGameToken = previous?.nexGameToken.orEmpty(),
