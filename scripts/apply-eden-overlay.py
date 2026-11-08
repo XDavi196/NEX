@@ -1476,6 +1476,61 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     layout_text = layout_text.replace(settings_anchor, friends_entry, 1)
     games_layout.write_text(layout_text, encoding="utf-8")
 
+    # Eden ships a separate fragment_games.xml for landscape. Keep the
+    # Nextendo entry in both resource qualifiers so rotation never removes it.
+    games_layout_land = app_dir / "src/main/res/layout-land/fragment_games.xml"
+    land_layout_text = games_layout_land.read_text(encoding="utf-8")
+    landscape_gap = 'android:layout_width="15dp"'
+    if land_layout_text.count(landscape_gap) != 2:
+        raise RuntimeError("Unexpected landscape Games toolbar spacing")
+    land_layout_text = land_layout_text.replace(
+        landscape_gap, 'android:layout_width="8dp"'
+    )
+    land_settings_anchor = '        <com.google.android.material.card.MaterialCardView\\n            android:id="@+id/settings_button"'
+    land_friends_entry = """        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/friends_button"
+            style="@style/EdenCard"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Nextendo friends and account"
+            app:cardCornerRadius="21dp"
+            android:padding="8dp">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_account_circle"
+                app:tint="#4CAF50" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <Space
+            android:layout_width="8dp"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/settings_button\\""" 
+    if land_layout_text.count(land_settings_anchor) != 1:
+        raise RuntimeError("Could not identify landscape Games settings button")
+    land_layout_text = land_layout_text.replace(
+        land_settings_anchor, land_friends_entry, 1
+    )
+    games_layout_land.write_text(land_layout_text, encoding="utf-8")
+
+    # Replace the inherited Eden/Yuzu logo shown above the Home Settings menu
+    # with the NEX brand asset copied to drawable-nodpi earlier in this overlay.
+    home_settings_layout = app_dir / "src/main/res/layout/fragment_home_settings.xml"
+    home_settings_text = home_settings_layout.read_text(encoding="utf-8")
+    replace_once(
+        home_settings_text,
+        'android:src="@drawable/ic_yuzu"',
+        'android:src="@drawable/nex_logo"',
+    )
+    home_settings_layout.write_text(home_settings_text, encoding="utf-8")
+
     games_fragment = app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/GamesFragment.kt"
     games_text = games_fragment.read_text(encoding="utf-8")
     games_import_anchor = "import org.yuzu.yuzu_emu.model.HomeViewModel\n"
