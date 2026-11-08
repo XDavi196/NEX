@@ -14,7 +14,7 @@ NEX continues to use:
 - Authorization Code + PKCE (S256)
 - No embedded client secret.
 
-DEN2 declares a separate Client ID, nxc_z_fetCuVO1qx, in src/web_service/nextendo_api.cpp. The Citron Nextendo source loads its application identity from its own build-time secrets header. Neither value belongs in NEX. NEX must not copy their Client IDs, OAuth tokens, refresh tokens, account files, private signing keys, attestation material or service credentials.
+DEN2 declares a separate Client ID, nxc_z_fetCuVO1qx, in src/web_service/nextendo_api.cpp. The Citron Nextendo source loads its application identity from its own build-time secrets header. Neither value belongs in NEX. NEX must not adopt their Client IDs, build secrets, private signing keys, attestation material or service credentials. The only credential migration is the explicit player-selected nextendo_account.txt import described below; its session token is validated as user-supplied account data and re-encrypted locally, not compiled into NEX.
 
 ## What the reference projects demonstrate
 
