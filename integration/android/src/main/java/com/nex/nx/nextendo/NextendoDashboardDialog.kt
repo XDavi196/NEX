@@ -54,6 +54,7 @@ internal object NextendoDashboardDialog {
         snapshot: Snapshot,
         onFriends: () -> Unit,
         onCommunity: () -> Unit,
+        onAccountTools: () -> Unit,
         onNetworkSettings: () -> Unit,
         onCheckOnlineAccess: () -> Unit,
         onCopyFriendCode: () -> Unit,
@@ -388,14 +389,14 @@ internal object NextendoDashboardDialog {
             setPadding(0, dp(8), 0, 0)
         }
         actionRow2.addView(
-            actionButton("Configurar rede") {
-                dialogDismissAndRun(dialogHolder[0], onNetworkSettings)
+            actionButton("Perfil e histórico") {
+                dialogDismissAndRun(dialogHolder[0], onAccountTools)
             },
             LinearLayout.LayoutParams(0, dp(48), 1f).apply { rightMargin = dp(5) }
         )
         actionRow2.addView(
-            actionButton("Copiar Friend Code", enabled = snapshot.friendCode.isNotBlank()) {
-                onCopyFriendCode()
+            actionButton("Configurar rede") {
+                dialogDismissAndRun(dialogHolder[0], onNetworkSettings)
             },
             LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) }
         )
@@ -406,10 +407,16 @@ internal object NextendoDashboardDialog {
             setPadding(0, dp(8), 0, 0)
         }
         actionRow3.addView(
+            actionButton("Copiar Friend Code", enabled = snapshot.friendCode.isNotBlank()) {
+                onCopyFriendCode()
+            },
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { rightMargin = dp(5) }
+        )
+        actionRow3.addView(
             actionButton("Desconectar") {
                 dialogDismissAndRun(dialogHolder[0], onDisconnect)
             },
-            LinearLayout.LayoutParams(0, dp(48), 1f)
+            LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) }
         )
         root.addView(actionRow3)
 
