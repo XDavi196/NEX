@@ -8,6 +8,9 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 import java.io.IOException
 import java.net.URI
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 /**
  * OkHttp WSS adapter for the tested PRUDP-Lite session engine.
@@ -36,6 +39,13 @@ internal class NextendoPrudpLiteWebSocketTransport(
     @Volatile
     private var closed = false
 
+    private val timerExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "NEX-PRUDP-Lite-retry").apply { isDaemon = true }
+    }
+
+    @Volatile
+    private var retransmissionTask: ScheduledFuture<*>? = null
+
     fun connect() {
         val uri = runCatching { URI(endpointUrl) }.getOrNull()
         require(
@@ -48,8 +58,6 @@ internal class NextendoPrudpLiteWebSocketTransport(
             "PRUDP WebSocket transport was already started or closed."
         }
 
-        // The public Nextendo server accepts binary PRUDP frames on its WebSocket
-        // endpoint and does not require a WebSocket subprotocol negotiation.
         val request = Request.Builder()
             .url(endpointUrl)
             .build()
@@ -74,8 +82,28 @@ internal class NextendoPrudpLiteWebSocketTransport(
         }
         socket = webSocket
         runCatching { session.start() }
-            .onSuccess { sendFrames(webSocket, it.outboundFrames) }
+            .onSuccess {
+                sendFrames(webSocket, it.outboundFrames)
+                startRetransmissionTimer()
+            }
             .onFailure(::fail)
+    }
+
+    private fun startRetransmissionTimer() {
+        if (closed || retransmissionTask != null) return
+        retransmissionTask = timerExecutor.scheduleAtFixedRate({
+            if (closed) return@scheduleAtFixedRate
+            val activeSocket = socket ?: return@scheduleAtFixedRate
+            runCatching { session.tick() }
+                .onSuccess { step -> sendFrames(activeSocket, step.outboundFrames) }
+                .onFailure(::fail)
+        }, 250L, 250L, TimeUnit.MILLISECONDS)
+    }
+
+    private fun stopRetransmissionTimer() {
+        retransmissionTask?.cancel(false)
+        retransmissionTask = null
+        if (!timerExecutor.isShutdown) timerExecutor.shutdownNow()
     }
 
     override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
@@ -93,6 +121,7 @@ internal class NextendoPrudpLiteWebSocketTransport(
                             events.onProtocolError(event.reason)
                         NextendoPrudpLiteSession.Event.Disconnected -> {
                             closed = true
+                            stopRetransmissionTimer()
                             session.close()
                             webSocket.close(1000, "Nextendo PRUDP session disconnected")
                             socket = null
@@ -115,8 +144,11 @@ internal class NextendoPrudpLiteWebSocketTransport(
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
         if (!closed) {
             closed = true
+            stopRetransmissionTimer()
             session.close()
             events.onDisconnected()
+        } else {
+            stopRetransmissionTimer()
         }
     }
 
@@ -125,11 +157,13 @@ internal class NextendoPrudpLiteWebSocketTransport(
     }
 
     override fun close() {
-        if (closed) return
-        closed = true
-        session.close()
-        socket?.close(1000, "NEX session closed")
-        socket = null
+        if (!closed) {
+            closed = true
+            session.close()
+            socket?.close(1000, "NEX session closed")
+            socket = null
+        }
+        stopRetransmissionTimer()
     }
 
     private fun sendFrames(webSocket: WebSocket, frames: List<ByteArray>) {
@@ -144,6 +178,7 @@ internal class NextendoPrudpLiteWebSocketTransport(
     private fun fail(error: Throwable) {
         if (closed) return
         closed = true
+        stopRetransmissionTimer()
         session.close()
         socket?.cancel()
         socket = null
