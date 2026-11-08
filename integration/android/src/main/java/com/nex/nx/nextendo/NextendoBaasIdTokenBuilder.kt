@@ -18,21 +18,21 @@ import java.util.Base64
  * "kid". Those values must be provisioned for NEX; no private key is bundled.
  */
 internal interface NextendoBaasSigner {
-    /** NEX-specific key ID registered in the BAAS JWKS. */
+    /** Fixed Nextendo BAAS key ID published in the server JWKS. */
     val keyId: String
 
     /** HTTPS URL that publishes this signer's matching public JWK. */
     val jwksUrl: String
 
-    /** Signs the exact ASCII compact-JWT signing input using the NEX-issued RSA key. */
+    /** Signs the exact ASCII compact-JWT input using the authorized Nextendo RSA key. */
     fun signRs256(signingInput: ByteArray): ByteArray
 }
 
 internal object NextendoBaasIdTokenBuilder {
     /**
      * Builds a compact RS256 id_token using claims supplied by a verified NEX
-     * provisioning provider. The JWK Set URL is a JOSE header parameter ("jku"),
-     * not an account payload claim. No sub/iss/aud values are invented here.
+     * provisioning provider. Like Citron, the JWK Set URL is included in both
+     * the JOSE header and payload. No sub/iss/aud values are invented here.
      */
     fun build(
         claims: Map<String, JsonElement>,
@@ -73,8 +73,8 @@ internal object NextendoBaasIdTokenBuilder {
                 "jku" to JsonPrimitive(signer.jwksUrl)
             )
         )
-        // The public BAAS verifier resolves jku from the JOSE header. The
-        // reference LoginEx helper places nnex in the payload, not jku.
+        // Citron includes jku in the payload as well as the JOSE header;
+        // nnex is the exact server-issued NEX game token.
         val payload = JsonObject(
             LinkedHashMap(claims).apply {
                 put("jku", JsonPrimitive(signer.jwksUrl))
