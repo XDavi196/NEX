@@ -17,12 +17,12 @@ The Client ID above belongs to NEX. Do not substitute DEN's `nxc_z_fetCuVO1qx`, 
 
 ## Current NEX-owned components
 
-- `NextendoAuthClient.kt` — NEX OAuth Authorization Code + PKCE, token exchange/refresh, userinfo, presence, public statistics, online-counts and separate `nx2.` game-token request.
+- `NextendoAuthClient.kt` — NEX OAuth Authorization Code + PKCE, token exchange/refresh, userinfo, presence, public statistics, online-counts, separate `nx2.` game-token request, and game-token-backed friend list/add/accept/decline/remove calls.
 - `NextendoSessionStore.kt` — AES-GCM encrypted OAuth/game session and pending PKCE transaction storage using Android Keystore.
 - `NextendoSessionRefresher.kt` — serialized refresh-token rotation; persists the new token set.
-- `NextendoAuthManager.kt` — Chrome Custom Tab login, callback verification, account panel, friend view, NEX session backup/restore and background refresh.
+- `NextendoAuthManager.kt` — Chrome Custom Tab login, callback verification, account panel, friend actions, NEX session backup/restore and background refresh.
 - `NextendoSessionBackupCodec.kt` — password-encrypted export/import of a NEX-created backup. It does not parse or import another application's bearer-token file.
-- `NextendoAccountApi.kt` and `NextendoSocialApi.kt` — authenticated own-profile and read-only friends data.
+- `NextendoAccountApi.kt` and `NextendoSocialApi.kt` — authenticated own-profile, accepted/incoming friend parsing, and friend mutations through the NEX game token.
 - `NextendoPresencePublisher.kt` — app presence heartbeat and offline publication.
 - `NextendoNativeBridge.kt`, `nextendo_friend_cache.h` and `nextendo_friend_hle.h` — native friend-cache bridge and guest-facing friend serializers/handlers.
 - `NextendoBaasRuntime.kt`, `NextendoBaasIdTokenBuilder.kt`, `NextendoBaasAuthenticationInfo.kt` — a fail-closed BAAS construction/cache boundary. It delivers no token unless an approved NEX signing/claim provider is provisioned.
@@ -31,13 +31,11 @@ The Client ID above belongs to NEX. Do not substitute DEN's `nxc_z_fetCuVO1qx`, 
 
 The sources are copied into the pinned Eden Android tree by `scripts/apply-eden-overlay.py`; they are not a separately compiled Android application module.
 
-## What the DEN2 audit changed
+## DEN2 and Citron reference integration
 
-The audit of [Dmr77680/Den2](https://github.com/Dmr77680/Den2) confirms it has a separate OAuth client ID in `src/web_service/nextendo_api.cpp`, local account persistence in `src/common/nextendo_account.cpp`, game-authentication code in `src/core/hle/service/acc/acc.cpp`, and networking adaptations in its SSL/socket code.
+The [DEN2](https://github.com/Dmr77680/Den2) and [Citron Nextendo](https://git.nextendo.network/NextendoNetwork/citron-nextendo) source trees are architectural references only. NEX keeps its own public Client ID `nxc_yAdR-14bOEq7`, OAuth redirect, PKCE flow, encrypted session and native networking code. NEX now has friend mutations using its own server-issued `nx2.` token; no DEN or Citron client identity or session is reused.
 
-NEX uses the same broad separation of responsibilities but must not copy DEN's client ID, account tokens, private signing key, client-attestation key, or other credentials. NEX signs in with its own Client ID and stores its own session encrypted with Android Keystore. The NEX backup format is intentionally not compatible with DEN/Citron `nextendo_account.txt`; a cross-client bearer-token import is not part of this integration.
-
-See [DEN2 integration audit and requirements](../../docs/DEN2_INTEGRATION_AUDIT.md) for the file-by-file comparison and exact prerequisites.
+See [the DEN2/Citron integration audit](../../docs/DEN2_INTEGRATION_AUDIT.md) for the file-by-file comparison and outstanding requirements.
 
 ## Multiplayer boundary
 
