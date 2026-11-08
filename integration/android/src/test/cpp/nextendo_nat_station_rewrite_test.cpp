@@ -159,33 +159,56 @@ bool TestNncsReplyCapture() {
     using namespace Common::NextendoNatStationRewrite;
     ClearObservedExternalIPv4();
 
-    Bytes response(16, 0);
-    // NNCS reply: test id 101, external port 41000, external IP 8.8.8.8.
-    response[3] = 101;
-    response[4] = 0;
-    response[5] = 0;
-    response[6] = 0xA0;
-    response[7] = 0x28;
-    response[8] = 8;
-    response[9] = 8;
-    response[10] = 8;
-    response[11] = 8;
+    Bytes primary(16, 0);
+    // NNCS reply: test id 101, external port 41000, external IP 8.8.8.8,
+    // first responder 9.9.9.9.
+    primary[3] = 101;
+    primary[6] = 0xA0;
+    primary[7] = 0x28;
+    primary[8] = 8;
+    primary[9] = 8;
+    primary[10] = 8;
+    primary[11] = 8;
+    primary[12] = 9;
+    primary[13] = 9;
+    primary[14] = 9;
+    primary[15] = 9;
 
-    if (!ObserveNncsReply(10025, response)) return false;
+    if (ObserveNncsReply(10025, primary)) return false;
+    if (GetObservedExternalIPv4().has_value()) return false;
+
+    Bytes secondary = primary;
+    // Second vantage is a distinct NNCS responder at 4.4.4.4.
+    secondary[12] = 4;
+    secondary[13] = 4;
+    secondary[14] = 4;
+    secondary[15] = 4;
+    if (!ObserveNncsReply(10125, secondary)) return false;
+
     const auto value = GetObservedExternalIPv4();
     if (!value || *value != IPv4{8, 8, 8, 8}) return false;
 
     ClearObservedExternalIPv4();
-    if (ObserveNncsReply(9999, response)) return false;
+    if (ObserveNncsReply(9999, primary)) return false;
     if (ObserveNncsReply(10025, Bytes{1, 2, 3})) return false;
-    response[3] = 100; // not the NNCS mapping test
-    if (ObserveNncsReply(10025, response)) return false;
-    response[3] = 101;
-    response[8] = 192;
-    response[9] = 168;
-    response[10] = 1;
-    response[11] = 20;
-    if (ObserveNncsReply(10025, response)) return false;
+    Bytes wrong_test = primary;
+    wrong_test[3] = 100;
+    if (ObserveNncsReply(10025, wrong_test)) return false;
+    Bytes private_address = primary;
+    private_address[8] = 192;
+    private_address[9] = 168;
+    private_address[10] = 1;
+    private_address[11] = 20;
+    if (ObserveNncsReply(10025, private_address)) return false;
+
+    ClearObservedExternalIPv4();
+    Bytes same_responder = primary;
+    same_responder[12] = 9;
+    same_responder[13] = 9;
+    same_responder[14] = 9;
+    same_responder[15] = 9;
+    if (ObserveNncsReply(10025, primary)) return false;
+    if (ObserveNncsReply(10125, same_responder)) return false;
     return !GetObservedExternalIPv4().has_value();
 }
 
