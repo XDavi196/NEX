@@ -76,6 +76,21 @@ int main() {
     Common::NextendoPrudpObserver::ClearRecentPackets();
     Common::NextendoPrudpObserver observer;
     observer.SetServerName("g22306d00-lp1.s.n.srv.nintendo.net");
+    auto events = Common::NextendoPrudpObserver::GetRecentEvents();
+    assert(events.size() == 1);
+    assert(events[0].stage == "SNI");
+    assert(events[0].status == "configured");
+    observer.RecordTlsHandshake(true, false, true);
+    events = Common::NextendoPrudpObserver::GetRecentEvents();
+    assert(events.size() == 2);
+    assert(events.back().stage == "TLS");
+    assert(events.back().status == "success");
+    assert(events.back().verification_skipped);
+    observer.RecordTlsHandshake(false, true, false);
+    events = Common::NextendoPrudpObserver::GetRecentEvents();
+    assert(events.size() == 3);
+    assert(events.back().status == "pending");
+    assert(!events.back().verification_skipped);
 
     const std::string request = "GET / HTTP/1.1\r\nUpgrade: websocket\r\n\r\n";
     assert(observer.ObserveOutbound(
@@ -146,10 +161,14 @@ int main() {
     // The process-wide diagnostic ring must remain bounded under repeated handshakes.
     for (std::size_t i = 0; i < 40; ++i) {
         observer.SetServerName("g22306d00-lp1.s.n.srv.nintendo.net");
+        observer.RecordTlsHandshake(true, false, true);
         assert(observer.ObserveOutbound(
             reinterpret_cast<const std::uint8_t*>(request.data()), request.size()).empty());
         (void)observer.ObserveOutbound(masked.data(), masked.size());
     }
+    events = Common::NextendoPrudpObserver::GetRecentEvents();
+    assert(events.size() == 16);
+    assert(events.back().stage == "TLS");
     recent = Common::NextendoPrudpObserver::GetRecentPackets();
     assert(recent.size() == 32);
     assert(recent.back().from_client);

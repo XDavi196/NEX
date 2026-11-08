@@ -19,6 +19,7 @@ This folder contains the NEX-owned Android integration source:
 - `NextendoBaasAuthenticationInfo.kt` — wraps the signed JWT in the NEX `AuthenticationInfo` DataHolder for `LoginEx.extraData`.
 - `NextendoPrudpLiteSession.kt` — tested PRUDP-Lite handshake, reliable DATA/ACK handling, duplicate suppression, fragmentation and connection state machine.
 - `NextendoPrudpLiteWebSocketTransport.kt` — OkHttp binary WebSocket transport with normal TLS verification.
+- The guest SSL path records bounded SNI/TLS handshake outcomes for the SMM2 auth host alongside the payload-blind PRUDP SYN/CONNECT metadata. The dashboard distinguishes TLS progress/failure from a PRUDP handshake; this is observability only, not a game-session client.
 
 ## NEX configuration
 

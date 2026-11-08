@@ -13,12 +13,13 @@
 namespace Common {
 
 /**
- * Bounded, payload-blind observer for the SMM2 PRUDP-Lite handshake carried
- * inside the game's TLS/WebSocket stream.
+ * Bounded, payload-blind observer for the SMM2 guest TLS/WebSocket and
+ * PRUDP-Lite connection lifecycle.
  *
- * It records only SYN/CONNECT packet metadata (virtual station types/ports,
- * protocol version and feature mask). It never retains or emits PRUDP DATA,
- * RMC bodies, AuthenticationInfo, tickets, signatures, or JWT bytes.
+ * It records target-host SNI/TLS stage outcomes and SYN/CONNECT packet metadata
+ * (virtual station types/ports, protocol version and feature mask). It never
+ * retains or emits PRUDP DATA, RMC bodies, AuthenticationInfo, tickets,
+ * signatures, or JWT bytes.
  */
 class NextendoPrudpObserver final {
 public:
@@ -37,12 +38,28 @@ public:
         bool from_client{};
     };
 
+    struct EventInfo {
+        std::string server_name;
+        std::string stage;
+        std::string status;
+        bool verification_skipped{};
+    };
+
     void SetServerName(std::string hostname) {
-        std::lock_guard lock{mutex};
-        server_name = std::move(hostname);
-        enabled = IsTargetHost(server_name);
-        Reset(outbound);
-        Reset(inbound);
+        std::string recorded_hostname;
+        {
+            std::lock_guard lock{mutex};
+            server_name = std::move(hostname);
+            enabled = IsTargetHost(server_name);
+            Reset(outbound);
+            Reset(inbound);
+            if (enabled) {
+                recorded_hostname = server_name;
+            }
+        }
+        if (!recorded_hostname.empty()) {
+            RecordRecentEvent(EventInfo{recorded_hostname, "SNI", "configured", false});
+        }
     }
 
     std::vector<PacketInfo> ObserveOutbound(const std::uint8_t* data, std::size_t size) {
@@ -53,16 +70,37 @@ public:
         return Observe(inbound, data, size, false);
     }
 
+    /** Records only the result of the guest TLS handshake for an approved title host. */
+    void RecordTlsHandshake(bool succeeded, bool pending, bool verification_skipped) {
+        std::string hostname;
+        {
+            std::lock_guard lock{mutex};
+            if (!enabled) {
+                return;
+            }
+            hostname = server_name;
+        }
+        const std::string status = pending ? "pending" : (succeeded ? "success" : "failed");
+        RecordRecentEvent(EventInfo{hostname, "TLS", status, verification_skipped});
+    }
+
     /** Returns a bounded process-wide snapshot of handshake metadata only. */
     static std::vector<PacketInfo> GetRecentPackets() {
         std::lock_guard lock{recent_mutex};
         return recent_packets;
     }
 
+    /** Returns the bounded SNI/TLS events that precede PRUDP handshakes. */
+    static std::vector<EventInfo> GetRecentEvents() {
+        std::lock_guard lock{recent_mutex};
+        return recent_events;
+    }
+
     /** Clears metadata when the linked NEX account changes or disconnects. */
     static void ClearRecentPackets() {
         std::lock_guard lock{recent_mutex};
         recent_packets.clear();
+        recent_events.clear();
     }
 
 private:
@@ -70,9 +108,11 @@ private:
     static constexpr std::size_t MaxFrameBytes = 1024 * 1024;
     static constexpr std::size_t HeaderBytes = 12;
     static constexpr std::size_t MaxRecentPackets = 32;
+    static constexpr std::size_t MaxRecentEvents = 16;
 
     inline static std::mutex recent_mutex;
     inline static std::vector<PacketInfo> recent_packets;
+    inline static std::vector<EventInfo> recent_events;
 
     struct StreamState {
         bool http_headers_complete{};
@@ -125,6 +165,14 @@ private:
             }
         }
         return std::string::npos;
+    }
+
+    static void RecordRecentEvent(EventInfo event) {
+        std::lock_guard lock{recent_mutex};
+        recent_events.push_back(std::move(event));
+        if (recent_events.size() > MaxRecentEvents) {
+            recent_events.erase(recent_events.begin());
+        }
     }
 
     static void RecordRecentPackets(const std::vector<PacketInfo>& packets) {

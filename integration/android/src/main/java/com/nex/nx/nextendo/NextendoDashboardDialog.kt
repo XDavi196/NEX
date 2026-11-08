@@ -304,8 +304,8 @@ internal object NextendoDashboardDialog {
 
         addSection(
             root,
-            "Diagnóstico PRUDP",
-            "Somente metadados de SYN/CONNECT; payloads, tickets e tokens não são exibidos."
+            "Diagnóstico da sessão online",
+            "Somente SNI/TLS e metadados PRUDP SYN/CONNECT; payloads, tickets e tokens não são exibidos."
         )
         val prudpCard = card()
         val prudpContent = LinearLayout(activity).apply {
@@ -316,7 +316,7 @@ internal object NextendoDashboardDialog {
         if (recentPrudpPackets.isEmpty()) {
             prudpContent.addView(
                 text(
-                    "Nenhum handshake PRUDP do Nextendo foi observado nesta sessão.",
+                    "Nenhuma etapa TLS/PRUDP do Nextendo foi observada neste processo.",
                     12f,
                     COLOR_MUTED
                 ).apply {

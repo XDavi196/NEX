@@ -147,20 +147,39 @@ def main() -> None:
     native_jni_bridge = r'''JNIEXPORT jobjectArray JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_getNextendoPrudpDiagnostics(
     JNIEnv* env, [[maybe_unused]] jobject obj) {
+    const auto events = Common::NextendoPrudpObserver::GetRecentEvents();
     const auto packets = Common::NextendoPrudpObserver::GetRecentPackets();
     jclass string_class = env->FindClass("java/lang/String");
     if (string_class == nullptr) {
         return nullptr;
     }
     jobjectArray result = env->NewObjectArray(
-        static_cast<jsize>(packets.size()), string_class, nullptr);
+        static_cast<jsize>(events.size() + packets.size()), string_class, nullptr);
     env->DeleteLocalRef(string_class);
     if (result == nullptr) {
         return nullptr;
     }
 
-    for (jsize index = 0; index < static_cast<jsize>(packets.size()); ++index) {
-        const auto& packet = packets[static_cast<std::size_t>(index)];
+    for (jsize event_index = 0; event_index < static_cast<jsize>(events.size()); ++event_index) {
+        const auto& event = events[static_cast<std::size_t>(event_index)];
+        std::string line = event.server_name + " | " + event.stage + " " + event.status;
+        if (event.stage == "TLS") {
+            line += event.verification_skipped ? " verify=skipped" : " verify=enabled";
+        }
+        jstring value = env->NewStringUTF(line.c_str());
+        if (value == nullptr) {
+            return nullptr;
+        }
+        env->SetObjectArrayElement(result, event_index, value);
+        env->DeleteLocalRef(value);
+        if (env->ExceptionCheck()) {
+            return nullptr;
+        }
+    }
+
+    for (jsize packet_index = 0; packet_index < static_cast<jsize>(packets.size()); ++packet_index) {
+        const auto& packet = packets[static_cast<std::size_t>(packet_index)];
+        const jsize index = static_cast<jsize>(events.size()) + packet_index;
         std::string line = packet.server_name;
         line += packet.from_client ? " | OUT " : " | IN ";
         line += packet.type == 0 ? "SYN" : "CONNECT";
@@ -764,6 +783,63 @@ void ClearParkedNextendoUdpSockets() {
         }
         nextendo_prudp_observer.SetServerName(hostname);
         return ResultSuccess;
+""",
+    )
+    replace_once(
+        ssl_backend,
+        """    Result DoHandshake() override {
+        SSL_set_verify_result(ssl, X509_V_OK);
+        const int ret = SSL_do_handshake(ssl);
+
+        if (!skip_cert_verification) {
+            const long verify_result = SSL_get_verify_result(ssl);
+            if (verify_result != X509_V_OK) {
+                LOG_ERROR(Service_SSL, "SSL cert verification failed because: {}",
+                          X509_verify_cert_error_string(verify_result));
+                return CheckOpenSSLErrors();
+            }
+        }
+
+        if (ret <= 0) {
+            const int ssl_err = SSL_get_error(ssl, ret);
+            if (ssl_err == SSL_ERROR_ZERO_RETURN ||
+                (ssl_err == SSL_ERROR_SYSCALL && got_read_eof)) {
+                LOG_ERROR(Service_SSL, "SSL handshake failed because server hung up");
+                return ResultInternalError;
+            }
+        }
+        return HandleReturn("SSL_do_handshake", 0, ret);
+    }
+""",
+        """    Result DoHandshake() override {
+        const auto record_handshake = [this](Result result) {
+            nextendo_prudp_observer.RecordTlsHandshake(
+                result == ResultSuccess, result == ResultWouldBlock, skip_cert_verification);
+            return result;
+        };
+
+        SSL_set_verify_result(ssl, X509_V_OK);
+        const int ret = SSL_do_handshake(ssl);
+
+        if (!skip_cert_verification) {
+            const long verify_result = SSL_get_verify_result(ssl);
+            if (verify_result != X509_V_OK) {
+                LOG_ERROR(Service_SSL, "SSL cert verification failed because: {}",
+                          X509_verify_cert_error_string(verify_result));
+                return record_handshake(CheckOpenSSLErrors());
+            }
+        }
+
+        if (ret <= 0) {
+            const int ssl_err = SSL_get_error(ssl, ret);
+            if (ssl_err == SSL_ERROR_ZERO_RETURN ||
+                (ssl_err == SSL_ERROR_SYSCALL && got_read_eof)) {
+                LOG_ERROR(Service_SSL, "SSL handshake failed because server hung up");
+                return record_handshake(ResultInternalError);
+            }
+        }
+        return record_handshake(HandleReturn("SSL_do_handshake", 0, ret));
+    }
 """,
     )
     replace_once(
