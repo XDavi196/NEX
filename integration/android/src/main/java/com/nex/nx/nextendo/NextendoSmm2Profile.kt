@@ -14,6 +14,13 @@ import java.util.Locale
 internal object NextendoSmm2Profile {
     const val NEX_VERSION = 40000
 
+    // The public game-server table pairs this ID with the title access key below.
+    // Switch NEX auth hosts use g<game-server-id>-lp1.s.n.srv.nintendo.net.
+    // DNS must still redirect this exact hostname to the provisioned Nextendo IP;
+    // this does not resolve or guess the deployment's address.
+    const val GAME_SERVER_ID = "22306D00"
+    const val AUTH_HOSTNAME = "g22306D00-lp1.s.n.srv.nintendo.net"
+
     /**
      * Public SMM2 title access key from the public Nextendo SMM2 server source.
      * This is the PRUDP Lite CONNECT title key, not the server Kerberos password.
@@ -87,7 +94,7 @@ internal object NextendoSmm2Profile {
      * DNS routing must redirect that hostname to the configured service IP; do
      * not replace it with an IP in this URI or TLS hostname verification will differ.
      */
-    fun authEndpoint(titleHostname: String): URI =
+    fun authEndpoint(titleHostname: String = AUTH_HOSTNAME): URI =
         wssEndpoint(titleHostname, AUTH_WSS_PORT)
 
     /**
