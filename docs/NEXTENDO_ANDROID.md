@@ -98,9 +98,9 @@ See [the detailed SMM2 BAAS and PRUDP profile](NEXTENDO_SMM2_PROFILE.md).
 
 ## NAT and P2P
 
-NEX includes a strict 16-byte NNCS probe codec and a two-vantage NAT observation tracker. The tracker rejects unknown vantage IDs, duplicate observations and ambiguous server addresses; closing it clears the observations and prevents reuse.
+NEX includes a strict 16-byte NNCS probe codec, a two-vantage mapping tracker and `NextendoNatProbeClient`. The client sends one message-type-101 probe to each explicitly configured endpoint through the same ephemeral UDP socket, validates the response length and source IPv4/port, then passes both observations to the tracker. The mapping result is deliberately conservative: it compares the observed external mapping and is not a complete NAT filtering diagnosis.
 
-The tracker owns no UDP socket. NEX does not yet preserve the game's socket mapping, schedule NAT keepalives, discover peers, coordinate a P2P session, perform hole-punching or verify cleanup of a live P2P connection. The SMM2-specific NNCS endpoints, ports and timing remain unconfirmed.
+The probe client has no default hostnames or ports and is not yet called by the game's network lifecycle. SMM2's two NNCS endpoints, ports and timing remain unconfirmed. The separate native Eden socket keeper preserves a game UDP mapping across the short close/reopen sequence, but NEX still lacks periodic NAT keepalives, peer discovery, matchmaking signaling, UDP hole-punching and live P2P cleanup tests.
 
 ## BAAS / ACC game authentication
 
