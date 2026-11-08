@@ -326,7 +326,7 @@ object NextendoAuthClient {
     /**
      * Calls a protected Nextendo account endpoint with the signed nx2. bearer
      * credential. The server's accountFromBearer contract accepts web sessions
-     * and nx2. tokens; OAuth access tokens are accepted only by /api/oauth/*.
+     * and nx2. tokens; OAuth access tokens are accepted only by OAuth-specific routes.
      */
     internal fun requestGameAccountJson(
         path: String,
