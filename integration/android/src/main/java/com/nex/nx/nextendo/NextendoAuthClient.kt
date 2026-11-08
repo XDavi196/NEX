@@ -77,6 +77,21 @@ object NextendoAuthClient {
         return NextendoOnlineCountsParser.parse(response)
     }
 
+    /** Read-only account-admission check authenticated by the NEX-issued nx2. token. */
+    internal fun fetchOnlineAccessStatus(gameToken: String): NextendoOnlineAccessStatus {
+        require(gameToken.startsWith("nx2.")) {
+            "Online admission diagnostics require the Nextendo nx2. game token."
+        }
+        val response = request(
+            url = "$BASE_URL/api/online-status",
+            method = "GET",
+            headers = mapOf("Authorization" to "Bearer $gameToken"),
+            connectTimeoutMs = 4_000,
+            readTimeoutMs = 4_000
+        )
+        return NextendoOnlineAccessStatusParser.parse(response)
+    }
+
     class NextendoException(
         val httpStatus: Int,
         message: String

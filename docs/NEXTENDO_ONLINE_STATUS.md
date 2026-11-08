@@ -4,6 +4,12 @@ Updated: 8 November 2026.
 
 A successful APK build proves that the configured Android source and native toolchain compile. It does not prove that the live account service, BAAS, SMM2 game service or multiplayer works.
 
+## Account admission diagnostic — 8 November 2026
+
+- Build #226 failed only at Kotlin compilation because the optional Eden toolbar binding `friendsButton` was accessed without a safe call; native tests and the overlay stage had passed. Commit `5fb063f` applies the null-safe listener and started run [#227](https://github.com/XDavi196/NEX/actions/runs/42492268002).
+- The next diagnostic patch adds **Verificar elegibilidade online** to the NEX account panel. It queries public `GET /api/online-status` with the current NEX-issued `nx2.` token, validates the allow/reason response, and displays only the known server reason codes. This check is read-only and does not create a play session.
+- An allowed account-gate response does not prove BAAS/ACC, secure PRUDP, SMM2 matchmaking or NAT/P2P.
+
 ## Current checkpoint — 8 November 2026
 
 - Latest published and verified Android preview before the current UI adaptation: [NEX v0.1.0-alpha.225](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.225), Build 59, source `04cde4e8889e7340a414250b096c0be884c0f3d2`. GitHub Actions run [#225](https://github.com/XDavi196/NEX/actions/runs/42488165308) passed native tests, Kotlin tests, optimized APK build, artifact upload and prerelease publication.

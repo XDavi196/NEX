@@ -54,6 +54,7 @@ internal object NextendoDashboardDialog {
         snapshot: Snapshot,
         onFriends: () -> Unit,
         onNetworkSettings: () -> Unit,
+        onCheckOnlineAccess: () -> Unit,
         onCopyFriendCode: () -> Unit,
         onDisconnect: () -> Unit
     ) {
@@ -398,6 +399,17 @@ internal object NextendoDashboardDialog {
             LinearLayout.LayoutParams(0, dp(48), 1f).apply { leftMargin = dp(5) }
         )
         root.addView(actionRow2)
+
+        val onlineCheckButton = actionButton("Verificar elegibilidade online", primary = true) {
+            dialogDismissAndRun(dialogHolder[0], onCheckOnlineAccess)
+        }
+        root.addView(
+            onlineCheckButton,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)
+            ).apply { topMargin = dp(8) }
+        )
 
         val scroll = ScrollView(activity).apply {
             isFillViewport = true

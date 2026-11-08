@@ -229,6 +229,7 @@ object NextendoAuthManager {
                     ),
                     onFriends = { openFriends(activity) },
                     onNetworkSettings = { openNetworkSettings(activity) },
+                    onCheckOnlineAccess = { checkOnlineAccess(activity) },
                     onCopyFriendCode = {
                         val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE)
                             as ClipboardManager
@@ -258,6 +259,82 @@ object NextendoAuthManager {
             }
         }
     }
+
+    /**
+     * Checks the read-only account gate using this NEX session's valid nx2. token.
+     * It does not create a play session or bypass an online restriction.
+     */
+    fun checkOnlineAccess(activity: Activity) {
+        val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
+        if (stored == null) {
+            startLogin(activity)
+            return
+        }
+
+        executor.execute {
+            val result = runCatching {
+                val session = refreshSessionIfNeeded(activity)
+                if (!hasValidGameToken(session)) throw MissingOnlineGameTokenException()
+                NextendoAuthClient.fetchOnlineAccessStatus(session.nexGameToken)
+            }
+
+            mainHandler.post {
+                if (activity.isFinishing || activity.isDestroyed) return@post
+                result.fold(
+                    onSuccess = { status ->
+                        val title = if (status.allow) {
+                            "Elegibilidade da conta aprovada"
+                        } else {
+                            "A Nextenda bloqueou o acesso online"
+                        }
+                        val message = if (status.allow) {
+                            "A Nextendo não encontrou bloqueios de conta para este NEX/PID. Isso não confirma BAAS/LoginEx, conexão segura nem matchmaking funcional no Super Mario Maker 2."
+                        } else {
+                            when (status.reason) {
+                                "unknown" ->
+                                    "O PID do token nx2. não corresponde a uma conta reconhecida pela Nextendo. Atualize a conta NEX e solicite novamente a credencial de jogo."
+                                "disabled" ->
+                                    "A conta Nextendo está desativada. Resolva o estado da conta com o suporte Nextendo."
+                                "unverified" ->
+                                    "O e-mail da conta Nextendo ainda não foi verificado. Confirme o e-mail e tente novamente."
+                                "discord_unlinked" ->
+                                    "A conta não está vinculada ao Discord exigido pela política atual. Faça o vínculo pelo fluxo oficial e permaneça no servidor Nextendo."
+                                "elsewhere" ->
+                                    "A mesma conta aparece jogando em outro dispositivo/emulador. Feche a sessão ativa nesse outro aparelho e tente novamente."
+                                else ->
+                                    "A Nextendo recusou o acesso por um motivo que esta versão do NEX não reconhece."
+                            }
+                        }
+                        AlertDialog.Builder(activity)
+                            .setTitle(title)
+                            .setMessage(message)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    },
+                    onFailure = { error ->
+                        val message = when (error) {
+                            is MissingOnlineGameTokenException ->
+                                "O NEX ainda não possui um nx2. válido. Verifique se a autorização concedeu game.matchmaking e atualize a sessão da conta."
+                            is NextendoAuthClient.NextendoException ->
+                                if (error.httpStatus == 401) {
+                                    "A Nextendo rejeitou o nx2. atual. Atualize a credencial de jogo ou conecte novamente a conta NEX."
+                                } else {
+                                    NextendoRequestDiagnostic.fromFailure(error)
+                                }
+                            else -> NextendoRequestDiagnostic.fromFailure(error)
+                        }
+                        AlertDialog.Builder(activity)
+                            .setTitle("Não foi possível verificar o acesso online")
+                            .setMessage(message)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                )
+            }
+        }
+    }
+
+    private class MissingOnlineGameTokenException : Exception()
 
     /** Displays the consented friend list returned by /api/oauth/userinfo. */
     fun openFriends(activity: Activity) {
