@@ -1792,6 +1792,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         activity_import,
         activity_import
         + "import com.nex.nx.nextendo.NextendoPresencePublisher\n"
+        + "import com.nex.nx.nextendo.NextendoHistoryPublisher\n"
         + "import com.nex.nx.nextendo.NextendoAuthManager\n",
         1,
     )
@@ -1819,6 +1820,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         NativeLibrary.playTimeManagerStart()
 
         val currentTitleId = NativeLibrary.playTimeManagerGetCurrentTitleId()
+        NextendoHistoryPublisher.onGameStarted(currentTitleId)
         if (currentTitleId > 0L) {
             val titleId = java.lang.String.format(java.util.Locale.ROOT, "%016x", currentTitleId)
             if (titleId.equals("0100000000001000", ignoreCase = true)) {
@@ -1832,6 +1834,9 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     }
 
     fun onEmulationStopped(status: Int) {
+        NextendoHistoryPublisher.onGameStopped(this) { programId ->
+            NativeLibrary.playTimeManagerGetPlayTime(programId)
+        }
         NextendoPresencePublisher.clearGameActivity(this)
         if (status == 0 && emulationViewModel.programChanged.value == -1) {
 """
