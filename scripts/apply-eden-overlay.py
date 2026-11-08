@@ -611,11 +611,24 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
             }
         }
 
+        const bool station_address_rewritten = !nextendo_pending_rewritten_write.empty();
         const std::span<const u8> send_data =
-            nextendo_pending_rewritten_write.empty()
-                ? data
-                : std::span<const u8>(nextendo_pending_rewritten_write);
+            station_address_rewritten
+                ? std::span<const u8>(nextendo_pending_rewritten_write)
+                : data;
         const Result result = backend->Write(out_size, send_data);
+        if (result == ResultSuccess && station_address_rewritten) {
+            // SSL Write reports bytes consumed from the guest buffer. The wire
+            // frame may have grown/shrunk when the IPv4 text length changed.
+            if (*out_size != send_data.size()) {
+                LOG_ERROR(Service_SSL,
+                          "[NEX] Rewritten SSL write completed partially; refusing to desync guest stream");
+                nextendo_pending_original_write.clear();
+                nextendo_pending_rewritten_write.clear();
+                return ResultInternalError;
+            }
+            *out_size = nextendo_pending_original_write.size();
+        }
         if (result != ResultWouldBlock) {
             nextendo_pending_original_write.clear();
             nextendo_pending_rewritten_write.clear();
