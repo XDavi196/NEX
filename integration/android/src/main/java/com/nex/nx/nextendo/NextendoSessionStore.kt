@@ -144,6 +144,37 @@ object NextendoSessionStore {
         clearPendingAuthorization(context)
     }
 
+    /**
+     * Imports the DEN/Citron key=value account file into this installation's
+     * encrypted session store. The source file itself is never copied or retained.
+     */
+    fun importDenAccountFile(context: Context, account: NextendoAccountTxtCodec.Account) {
+        saveSession(
+            context,
+            Session(
+                accessToken = account.accessToken,
+                refreshToken = account.refreshToken,
+                accessTokenExpiresAtEpochSeconds = account.tokenExpiryEpochSeconds,
+                grantedScopes = emptySet(),
+                pid = account.pid,
+                username = account.username,
+                friendCode = account.friendCode,
+                gameTokenDiagnostic = "imported_waiting_for_server_validation"
+            )
+        )
+        clearPendingAuthorization(context)
+    }
+
+    /** Records only scopes whose protected API operation succeeded on this server. */
+    fun addVerifiedScopes(context: Context, scopes: Set<String>) {
+        require(scopes.all { it.matches(Regex("[a-zA-Z0-9._-]{1,64}")) }) {
+            "The verified OAuth scope set contains an invalid value."
+        }
+        val current = load(context)
+            ?: throw IllegalStateException("Nenhuma conta Nextendo está conectada.")
+        saveSession(context, current.copy(grantedScopes = current.grantedScopes + scopes))
+    }
+
     fun load(context: Context): Session? {
         val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val ivText = preferences.getString(SESSION_IV, null) ?: return null
