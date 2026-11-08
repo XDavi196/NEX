@@ -5,6 +5,8 @@ import java.net.URI
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import javax.net.ssl.HttpsURLConnection
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -37,6 +39,31 @@ internal object NextendoBaasJwksVerifier {
                 keyId == jwk.keyId &&
                 modulus == jwk.modulus &&
                 exponent == jwk.exponent
+    }
+
+    /**
+     * Fetches the BAAS JWKS using NEX's exact-host DNS route (including the
+     * configured Nextendo server IP), with ordinary TLS verification and no redirects.
+     */
+    fun fetchAndVerify(
+        jwksUrl: String,
+        expected: NextendoBaasJwk.PublicRsaJwk,
+        client: OkHttpClient
+    ): VerifiedRegistration {
+        validateHttpsJwksUrl(jwksUrl)
+        val request = Request.Builder()
+            .url(jwksUrl)
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            require(response.code == 200) {
+                "O JWKS BAAS não retornou HTTP 200 (HTTP ${response.code})."
+            }
+            val body = response.body
+            val document = body.byteStream().use(::readBoundedUtf8)
+            return verifyDocument(jwksUrl, document, expected)
+        }
     }
 
     /** Fetches the JWKS with normal platform TLS validation and no redirects. */
