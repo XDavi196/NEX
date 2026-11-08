@@ -164,6 +164,100 @@ object NextendoAuthManager {
         }
     }
 
+    /**
+     * Imports DEN/Citron's legacy account file. The PID is accepted only after
+     * the bearer token returns the same identity from Nextendo userinfo.
+     * Any game credential is then requested using NEX's own Client ID header.
+     */
+    fun importDenAccountText(
+        context: Context,
+        fileContents: String,
+        onComplete: (Result<LoginOutcome>) -> Unit
+    ) {
+        val appContext = context.applicationContext
+        executor.execute {
+            val result = runCatching {
+                val account = NextendoAccountTxtCodec.parse(fileContents)
+                val userInfo = NextendoSocialApi.fetchUserInfo(account.accessToken)
+                require(userInfo.pid > 0L && userInfo.pid == account.pid) {
+                    "A Nextendo não confirmou a mesma identidade/PID contida no arquivo. Nenhuma sessão foi importada."
+                }
+
+                val validatedAccount = account.copy(
+                    username = userInfo.username.ifBlank { account.username },
+                    friendCode = userInfo.friendCode.ifBlank { account.friendCode }
+                )
+                NextendoSessionStore.importDenAccountFile(appContext, validatedAccount)
+
+                NextendoBaasRuntime.clear()
+                NextendoNativeBridge.clearFriendCache()
+                NextendoNativeBridge.clearIdentity()
+                NextendoNativeBridge.clearPrudpDiagnostics()
+
+                // A DEN file does not persist the OAuth scope list. Record a
+                // capability only after the corresponding protected operation succeeds.
+                val gameTokenAttempt = runCatching {
+                    val token = NextendoAuthClient.fetchNexGameToken(account.accessToken)
+                    require(token.pid == account.pid) {
+                        "O token de jogo retornado pertence a uma identidade diferente da conta importada."
+                    }
+                    NextendoSessionStore.saveNexGameToken(appContext, token)
+                    NextendoSessionStore.addVerifiedScopes(
+                        appContext,
+                        setOf("game.matchmaking")
+                    )
+                    token
+                }
+                val gameToken = gameTokenAttempt.getOrNull()
+                val gameTokenDiagnostic = gameTokenAttempt.fold(
+                    onSuccess = { "HTTP 200 (nx2 accepted)" },
+                    onFailure = NextendoRequestDiagnostic::fromFailure
+                )
+                NextendoSessionStore.saveGameTokenDiagnostic(
+                    appContext,
+                    gameTokenDiagnostic.take(96)
+                )
+
+                val presenceAccepted = runCatching {
+                    NextendoAuthClient.postPresence(
+                        accessToken = account.accessToken,
+                        status = 1,
+                        appField = "",
+                        appId = "",
+                        appDetail = ""
+                    )
+                }.isSuccess
+                if (presenceAccepted) {
+                    NextendoSessionStore.addVerifiedScopes(
+                        appContext,
+                        setOf("presence")
+                    )
+                }
+                NextendoPresencePublisher.start(appContext)
+
+                val savedSession = NextendoSessionStore.load(appContext)
+                    ?: throw IllegalStateException("A sessão importada não foi persistida.")
+                syncNativeIdentity(savedSession)
+                NextendoBaasRuntime.refresh(savedSession)
+                if (hasValidGameToken(savedSession)) {
+                    runCatching {
+                        NextendoAuthClient.fetchGameFriends(savedSession.nexGameToken)
+                    }.onSuccess(NextendoNativeBridge::replaceFriendCache)
+                        .onFailure { NextendoNativeBridge.clearFriendCache() }
+                }
+
+                LoginOutcome(
+                    pid = savedSession.pid,
+                    username = savedSession.username,
+                    friendCode = savedSession.friendCode,
+                    gameTokenReady = hasValidGameToken(savedSession),
+                    gameTokenDiagnostic = gameTokenDiagnostic
+                )
+            }
+            mainHandler.post { onComplete(result) }
+        }
+    }
+
     /** Opens the NEX account panel. */
     fun openAccount(activity: Activity) {
         val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
@@ -498,11 +592,19 @@ object NextendoAuthManager {
             text = "Importar backup criptografado"
             setOnClickListener { showImportSessionBackupDialog(activity) }
         }
+        val importDenAccount = Button(activity).apply {
+            text = "Importar nextendo_account.txt (DEN/Citron)"
+            setOnClickListener {
+                activity.startActivity(
+                    Intent(activity, NextendoAccountImportActivity::class.java)
+                )
+            }
+        }
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             val inset = (20 * resources.displayMetrics.density).toInt()
             setPadding(inset, inset / 2, inset, 0)
-            listOf(serverInput, natInput, exportBackup, importBackup).forEach { view ->
+            listOf(serverInput, natInput, exportBackup, importBackup, importDenAccount).forEach { view ->
                 addView(
                     view,
                     LinearLayout.LayoutParams(
@@ -693,8 +795,9 @@ object NextendoAuthManager {
             .setTitle("Importar conta NEX")
             .setMessage(
                 "A restauração substituirá a sessão Nextendo atualmente salva neste NEX. " +
-                    "Só são aceitos backups criptografados exportados pelo próprio NEX; " +
-                    "o arquivo nextendo_account.txt de DEN/Citron não é compatível."
+                    "Este campo aceita backups criptografados exportados pelo próprio NEX. " +
+                    "Para importar nextendo_account.txt de DEN/Citron, use o botão específico em Servidores e backup; " +
+                    "o conteúdo será validado pela conta Nextendo e recriptografado no Android Keystore."
             )
             .setView(content)
             .setNegativeButton("Cancelar", null)
