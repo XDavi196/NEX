@@ -46,9 +46,27 @@ internal object NextendoHistoryPublisher {
         val appContext = context.applicationContext
         executor.execute {
             runCatching {
-                val session = NextendoSessionRefresher.getValidSession(appContext, 60L)
+                var session = NextendoSessionRefresher.getValidSession(appContext, 60L)
+                if (
+                    !session.nexGameToken.startsWith("nx2.") ||
+                    session.nexGameTokenExpiresAtEpochSeconds <= System.currentTimeMillis() / 1000L
+                ) {
+                    val token = try {
+                        NextendoAuthClient.fetchNexGameToken(session.accessToken)
+                    } catch (error: NextendoAuthClient.NextendoException) {
+                        if (error.httpStatus != 401) throw error
+                        val refreshed = NextendoSessionRefresher.refreshAfterUnauthorized(
+                            context = appContext,
+                            rejectedAccessToken = session.accessToken
+                        )
+                        NextendoAuthClient.fetchNexGameToken(refreshed.accessToken)
+                    }
+                    NextendoSessionStore.saveNexGameToken(appContext, token)
+                    session = NextendoSessionStore.load(appContext)
+                        ?: throw IllegalStateException("A sessão Nextendo não está disponível.")
+                }
                 NextendoAccountExtrasApi.syncHistory(
-                    accessToken = session.accessToken,
+                    gameToken = session.nexGameToken,
                     entries = listOf(
                         NextendoAccountExtrasApi.HistoryEntry(
                             titleId = titleIdHex,
