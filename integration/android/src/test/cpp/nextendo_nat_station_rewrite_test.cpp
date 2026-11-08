@@ -133,7 +133,7 @@ bool TestMaskedLongFrame() {
     Bytes output;
     if (!Common::NextendoNatStationRewrite::TryFixupStationAddress(
             input, IPv4{1, 1, 1, 1}, output)) return false;
-    return ExtractStation(output).find("address=1.1.1.1;") == 0;
+    return ExtractStation(output).find("prudp:/address=1.1.1.1;") == 0;
 }
 
 bool TestNoRewriteForLocalOrUnsupportedTraffic() {
@@ -155,6 +155,40 @@ bool TestNoRewriteForLocalOrUnsupportedTraffic() {
     return !Common::NextendoNatStationRewrite::TryFixupStationAddress(http, public_ip, output);
 }
 
+bool TestNncsReplyCapture() {
+    using namespace Common::NextendoNatStationRewrite;
+    ClearObservedExternalIPv4();
+
+    Bytes response(16, 0);
+    // NNCS reply: test id 101, external port 41000, external IP 8.8.8.8.
+    response[3] = 101;
+    response[4] = 0;
+    response[5] = 0;
+    response[6] = 0xA0;
+    response[7] = 0x28;
+    response[8] = 8;
+    response[9] = 8;
+    response[10] = 8;
+    response[11] = 8;
+
+    if (!ObserveNncsReply(10025, response)) return false;
+    const auto value = GetObservedExternalIPv4();
+    if (!value || *value != IPv4{8, 8, 8, 8}) return false;
+
+    ClearObservedExternalIPv4();
+    if (ObserveNncsReply(9999, response)) return false;
+    if (ObserveNncsReply(10025, Bytes{1, 2, 3})) return false;
+    response[3] = 100; // not the NNCS mapping test
+    if (ObserveNncsReply(10025, response)) return false;
+    response[3] = 101;
+    response[8] = 192;
+    response[9] = 168;
+    response[10] = 1;
+    response[11] = 20;
+    if (ObserveNncsReply(10025, response)) return false;
+    return !GetObservedExternalIPv4().has_value();
+}
+
 bool TestObservedIpv4Validation() {
     using namespace Common::NextendoNatStationRewrite;
     ClearObservedExternalIPv4();
@@ -174,5 +208,6 @@ int main() {
     if (!TestMaskedLongFrame()) return 2;
     if (!TestNoRewriteForLocalOrUnsupportedTraffic()) return 3;
     if (!TestObservedIpv4Validation()) return 4;
+    if (!TestNncsReplyCapture()) return 5;
     return 0;
 }
