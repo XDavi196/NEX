@@ -91,7 +91,7 @@ internal object NextendoAccountTxtCodec {
         }
 
         val friendCode = fields["friend_code"].orEmpty()
-        require(friendCode.length <= 64 && friendCode.none(Char::isISOControl)) {
+        require(friendCode.length <= 64 && friendCode.none { it.isISOControl() }) {
             "O Friend Code do arquivo é inválido."
         }
 
