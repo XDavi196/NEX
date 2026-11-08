@@ -354,22 +354,22 @@ object NextendoAuthManager {
                 return@execute
             }
             val result = runCatching {
-                val oauthFriendList = NextendoSocialApi.fetchFriendList(session.accessToken)
-                if (hasValidGameToken(session)) {
+                val gameFriendList = if (hasValidGameToken(session)) {
                     runCatching {
                         val snapshot = NextendoAuthClient.fetchGameFriendSnapshot(session.nexGameToken)
                         NextendoNativeBridge.replaceFriendCache(snapshot.friends)
                         NextendoSocialApi.toFriendList(snapshot)
-                    }.getOrElse {
-                        // Account-level OAuth friends remain useful when the
-                        // game-facing route is unavailable; native cache stays empty.
+                    }.onFailure {
+                        // A failed game-facing route must not leave stale friends
+                        // from a previous account in the native HLE cache.
                         NextendoNativeBridge.clearFriendCache()
-                        oauthFriendList
-                    }
+                    }.getOrNull()
                 } else {
                     NextendoNativeBridge.clearFriendCache()
-                    oauthFriendList
+                    null
                 }
+
+                gameFriendList ?: NextendoSocialApi.fetchFriendList(session.accessToken)
             }
 
             mainHandler.post {
