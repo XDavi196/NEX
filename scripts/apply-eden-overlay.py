@@ -703,7 +703,20 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
         bsd_cpp,
         """    const auto [ret, bsd_errno] = Translate(descriptor.socket->RecvFrom(flags, message, p_addr_in));
 
-        // Restore original state""",
+    if (ret == 16 && bsd_errno == Errno::SUCCESS && p_addr_in != nullptr) {
+        const auto [local_address, local_errno] = descriptor.socket->GetSockName();
+        if (local_errno == Network::Errno::SUCCESS && local_address.portno != 0 &&
+            Common::NextendoNatStationRewrite::ObserveNncsReply(
+                addr_in.portno, local_address.portno,
+                std::span<const u8>(message.data(), static_cast<std::size_t>(ret)))) {
+            LOG_INFO(Service,
+                     "[NEX] Captured the public NAT mapping from both NNCS vantages "
+                     "on local UDP port {}",
+                     local_address.portno);
+        }
+    }
+
+    // Restore original state""",
         """    const auto [ret, bsd_errno] = Translate(descriptor.socket->RecvFrom(flags, message, p_addr_in));
 
         if (ret == 16 && bsd_errno == Errno::SUCCESS && p_addr_in != nullptr) {
