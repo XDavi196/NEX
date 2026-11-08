@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090a0e">
+  <meta name="description" content="Projetos, repositórios e compilações da XDavi196.">
+  <meta property="og:title" content="XDavi196 — Projects & Builds">
+  <meta property="og:description" content="Portal de projetos e releases experimentais da XDavi196.">
+  <title>XDavi196 — Projects & Builds</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home"><span class="brand-mark">XD</span><span><b>XDavi196</b><small>PROJECTS & BUILDS</small></span></a>
+    <nav aria-label="Navegação"><a href="#projects">Projetos</a><a href="#downloads">Downloads</a><a href="#forgejo">Forgejo</a><a href="#source">Código</a></nav>
+    <a class="github" href="https://github.com/XDavi196" target="_blank" rel="noopener">GitHub ↗</a>
+  </header>
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-copy">
+        <p class="eyebrow"><i></i> DEVELOPMENT HUB / XDAVI196</p>
+        <h1>Builds feitas<br><em>para ir além.</em></h1>
+        <p class="lead">Um portal central para os projetos da XDavi196. Acompanhe o desenvolvimento, veja o estado de cada compilação e encontre somente versões realmente publicadas.</p>
+        <div class="actions"><a class="btn primary" href="#projects">Explorar projetos ↓</a><a class="btn secondary" href="#downloads">Ver releases</a></div>
+      </div>
+      <div class="hero-console">
+        <div class="console-head"><span>PROJECT INDEX</span><span class="live"><i></i> PUBLIC CATALOG</span></div>
+        <div class="console-number">03 <small>projetos</small></div>
+        <div class="console-line"></div>
+        <div class="console-row"><span>Plataformas</span><b>Android / Windows</b></div>
+        <div class="console-row"><span>Distribuição</span><b>GitHub Releases</b></div>
+        <div class="console-row"><span>Espelho Forgejo</span><b class="pending">A configurar</b></div>
+        <small class="console-foot">SEM ROMS · SEM ARQUIVOS PROPRIETÁRIOS · SEM DOWNLOADS FICTÍCIOS</small>
+      </div>
+      <span class="hero-index">01 / BUILDS PORTAL</span>
+    </section>
+
+    <section class="section" id="projects">
+      <div class="section-heading"><div><p class="eyebrow">01 — PROJECT CATALOG</p><h2>Projetos em destaque</h2></div><p>Abra os repositórios e acompanhe o desenvolvimento de cada projeto.</p></div>
+      <article class="featured">
+        <div class="featured-art">
+          <span class="art-label">NATIVE ANDROID / C++</span>
+          <div class="voxel-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><span></span></div>
+          <div class="art-title">A LINK TO THE PAST<br>VOXEL RECOMP</div>
+        </div>
+        <div class="featured-copy">
+          <div class="tags"><span class="tag red">EM DESENVOLVIMENTO</span><span class="tag">ANDROID</span></div>
+          <h3>A Link to the Past<br><em>Voxel Recomp</em></h3>
+          <p>Projeto de recompilação do jogo original usando o runtime SNESRecomp, com o objetivo de substituir a apresentação 2D por um mundo 3D voxel preservando a lógica original.</p>
+          <div class="facts"><div><small>BASE TESTADA</small><b>Runtime SNES / PPU 2D experimental</b></div><div><small>PRÓXIMA ETAPA</small><b>Boot AOT com ROM USA 1.0</b></div></div>
+          <div class="callout"><b>Estado real:</b> ainda não é o jogo voxel completo. O código C AOT específico é gerado localmente a partir da ROM compatível do próprio usuário. Nenhuma ROM acompanha o projeto.</div>
+          <div class="links">
+            <a href="https://github.com/XDavi196/Compila-o-" target="_blank" rel="noopener">Repositório de compilação ↗</a>
+            <a href="https://github.com/XDavi196/Compila-o-/actions" target="_blank" rel="noopener">Builds e testes ↗</a>
+          </div>
+          <small class="private-note">O repositório GitHub Compila-o- está privado; é necessário ter acesso concedido pelo proprietário.</small>
+        </div>
+      </article>
+
+      <div class="project-grid">
+        <article class="project">
+          <div class="project-top"><span class="project-symbol red-symbol">N</span><span class="tag green">PREVIEW</span></div>
+          <small class="kicker">ANDROID · EMULADOR</small><h3>NEX</h3>
+          <p>Projeto Android baseado no Eden, com identidade própria e integração Nextendo em desenvolvimento.</p>
+          <div class="version"><span>Última versão pública</span><b id="nex-version">Consultando…</b></div>
+          <a href="https://github.com/XDavi196/NEX/releases" target="_blank" rel="noopener">Ver releases do NEX ↗</a>
+        </article>
+        <article class="project">
+          <div class="project-top"><span class="project-symbol blue-symbol">S</span><span class="tag">ANDROID · WINDOWS</span></div>
+          <small class="kicker">CATÁLOGO · INSTALADOR</small><h3>NEX Shop</h3>
+          <p>Catálogo e instalador de emuladores e ports, com suporte multiplataforma planejado.</p>
+          <div class="version"><span>Última versão pública</span><b id="shop-version">Consultando…</b></div>
+          <a href="https://github.com/XDavi196/NEX-Shop/releases" target="_blank" rel="noopener">Ver releases do NEX Shop ↗</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section downloads" id="downloads">
+      <div class="section-heading"><div><p class="eyebrow">02 — RELEASE CENTER</p><h2>Releases públicas</h2></div><p>As versões do NEX e NEX Shop são carregadas diretamente da API pública do GitHub.</p></div>
+      <div class="download-grid" id="release-grid">
+        <article class="release-placeholder"><small>A LINK TO THE PAST VOXEL RECOMP</small><h3>Sem APK público neste momento</h3><p>O repositório de compilação é privado. Uma versão será mostrada aqui quando houver um release público autorizado.</p><a href="https://github.com/XDavi196/Compila-o-/releases" target="_blank" rel="noopener">Consultar página de releases ↗</a></article>
+        <p id="release-loading">Carregando releases públicas…</p>
+      </div>
+      <div class="refresh-note"><i></i> Atualizado automaticamente ao abrir a página · GitHub Releases API</div>
+    </section>
+
+    <section class="forgejo-section" id="forgejo">
+      <div class="forgejo-mark">F</div>
+      <div class="forgejo-copy">
+        <p class="eyebrow">03 — GIT MIRROR</p>
+        <h2>Forgejo / espelho do repositório</h2>
+        <p>O portal está preparado para receber o endereço do repositório de compilação no Forgejo. Porém, <code>forgejo.org/releases</code> é a página de downloads das versões do próprio Forgejo — não é uma conta ou servidor onde criar o repositório da XDavi196.</p>
+        <p>Para hospedar o código, precisamos de uma instância real, por exemplo Codeberg (que utiliza Forgejo), ou de um servidor Forgejo próprio. O espelho ainda não foi conectado e nenhum código privado foi publicado.</p>
+      </div>
+      <div class="forgejo-actions"><a class="btn outline" href="https://forgejo.org/releases/" target="_blank" rel="noopener">Baixar Forgejo ↗</a><a class="btn secondary" href="https://codeberg.org/" target="_blank" rel="noopener">Codeberg / Forgejo ↗</a></div>
+    </section>
+
+    <section class="section source" id="source">
+      <div class="section-heading"><div><p class="eyebrow">04 — SOURCE CODE</p><h2>Repositórios</h2></div><p>Acesso rápido ao código-fonte e ao histórico de cada projeto.</p></div>
+      <div class="source-list">
+        <a href="https://github.com/XDavi196/Compila-o-" target="_blank" rel="noopener"><small>PRIVATE SOURCE</small><b>Compila-o-</b><span>Compilações e runtime SNES · privado</span><i>↗</i></a>
+        <a href="https://github.com/XDavi196/NEX" target="_blank" rel="noopener"><small>PUBLIC SOURCE</small><b>NEX</b><span>Emulador Android e integração Nextendo</span><i>↗</i></a>
+        <a href="https://github.com/XDavi196/NEX-Shop" target="_blank" rel="noopener"><small>PUBLIC SOURCE</small><b>NEX Shop</b><span>Catálogo e instalador</span><i>↗</i></a>
+      </div>
+    </section>
+  </main>
+  <footer><a class="brand" href="#home"><span class="brand-mark">XD</span><span><b>XDavi196</b><small>PROJECTS & BUILDS</small></span></a><p>Projetos independentes. Nomes e marcas de terceiros pertencem aos respectivos titulares.</p><a href="https://github.com/XDavi196" target="_blank" rel="noopener">GitHub ↗</a></footer>
+</body>
+</html>
