@@ -59,15 +59,6 @@ The account panel shows the signed-in player's identity, Friend Code, PID, grant
 
 The account panel also reads the public `/api/stats` endpoint and displays aggregate counts for online players, registered accounts and online games. This request is optional and has a short timeout; a stats outage does not block account sign-in.
 
-### Chat privado entre amigos (experimental)
-
-Ao tocar em um amigo aceito na lista do NEX, o aplicativo abre uma conversa privada com envio de mensagens, atualização automática, recibos de leitura, bloqueio e denúncia.
-
-**O chat não é um serviço oficial da Nextendo.** Ele usa o backend independente do Den2 (`https://2-29-6-216.sslip.io`), operado pelo desenvolvedor do Den2. Na primeira utilização, o NEX apresenta uma autorização explícita e informa que o serviço recebe o PID do jogador, os PIDs dos amigos, mensagens, recibos de leitura e ações de bloqueio/denúncia. Tokens OAuth, refresh tokens e o token de jogo `nx2.` não são enviados.
-
-O segredo aleatório de chat por instalação é criptografado com uma chave AES-GCM do Android Keystore. O recurso pode ser desativado no menu **Opções** da conversa. A desativação impede novos acessos pelo NEX, mas não apaga dados já armazenados no servidor externo; a exclusão deve ser solicitada ao operador do serviço.
-
-
 The documented API and the inspected public account-server source still disagree on some scopes, refresh-token behavior, game-token access and presence authorization. NEX follows the public OAuth contract and records safe diagnostics rather than falling back to private web-session authentication. See [the contract audit](docs/NEXTENDO_ONLINE_STATUS.md).
 
 ### Current online readiness
