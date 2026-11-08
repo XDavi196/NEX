@@ -66,7 +66,7 @@ The public profile currently associates the SMM2 title key `fdf6617f` with game-
 
 ## 4. NNCS, NAT and P2P
 
-NEX has a 16-byte NNCS probe codec, a two-vantage mapping classifier and a short-lived UDP socket keeper. The socket keeper preserves an existing host UDP mapping across a close/reopen sequence. It does not run live probes or complete P2P hole-punching.
+NEX has a 16-byte NNCS probe codec, a two-vantage mapping classifier, a bounded one-shot UDP probe client and a short-lived native UDP socket keeper. The probe client reuses one local socket for two explicitly configured endpoints and validates both response sources. The keeper preserves a game's UDP mapping across a close/reopen sequence. Neither component completes peer discovery, matchmaking signaling or P2P hole-punching. The SMM2 probe runner is not wired into the game's network lifecycle.
 
 Required title-specific information:
 
