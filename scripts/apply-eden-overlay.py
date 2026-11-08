@@ -1523,13 +1523,11 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     # Replace the inherited Eden/Yuzu logo shown above the Home Settings menu
     # with the NEX brand asset copied to drawable-nodpi earlier in this overlay.
     home_settings_layout = app_dir / "src/main/res/layout/fragment_home_settings.xml"
-    home_settings_text = home_settings_layout.read_text(encoding="utf-8")
     replace_once(
-        home_settings_text,
+        home_settings_layout,
         'android:src="@drawable/ic_yuzu"',
         'android:src="@drawable/nex_logo"',
     )
-    home_settings_layout.write_text(home_settings_text, encoding="utf-8")
 
     games_fragment = app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/GamesFragment.kt"
     games_text = games_fragment.read_text(encoding="utf-8")
