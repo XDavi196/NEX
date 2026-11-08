@@ -12,21 +12,19 @@ This document separates NEX-owned implementation work from values and service be
 
 Do not add a client secret, another emulator's credential, or any service-side secret to the APK.
 
-## 1. BAAS game authentication — explicitly blocked by Nextendo policy
+## 1. Citron-compatible BAAS game authentication — signer key required
 
-NEX contains an RS256 JWT builder, an AuthenticationInfo DataHolder encoder and an Eden ACC cache bridge as protocol/test scaffolding. These components are not a production authentication path. The earlier per-installation Android Keystore/JWK proposal is superseded and must not be used to try to register client-generated keys.
+NEX now implements the public BAAS id_token format used by Nextendo's Citron client. The profile uses the Citron values iss=https://e0d67c509fb203858ebcb2fe3f88c2aa.baas.nintendo.com, aud=ed9e2f05d286f7b8, jku=https://e0d67c509fb203858ebcb2fe3f88c2aa.baas.nintendo.com/1.0.0/certificates and kid=nextendo-baas-key-1. The payload includes the Citron Nintendo-device metadata and binds the exact Nextendo-issued nx2. game token in nnex. It never places the OAuth access token in nnex.
 
-The Nextendo founder explicitly told the NEX project:
+**The private signing key is not in the public Citron source.** Citron loads it from the operator-provided NEXTENDO_BAAS_SIGNING_KEY environment variable or nextendo_baas.pem; its locally auto-generated fallback only creates a different RSA identity and must not be assumed to match the live JWKS. The Nextendo baas-jwks service publishes the public JWK corresponding to the same private key used by the signer. A valid signature therefore requires the matching private key and the matching kid/public JWK pair.
 
-- Client-generated public keys will not be registered in the Nextendo JWKS.
-- Third-party RS256 BAAS tokens signed by client applications will not be accepted.
-- The JWKS is not open to per-installation registrations.
-- Game tokens are issued by Nextendo's own servers after the player signs in with a Nextendo account.
-- There is currently no third-party client certification process and no third-party BAAS token contract, including a jku/claims specification, to implement.
+NEX adds **Importar chave BAAS** to the Nextendo menu. The user must select a PEM supplied through an authorized Nextendo channel. NEX checks that its derived RSA public key matches the exact nextendo-baas-key-1 entry at the HTTPS JWKS endpoint, using the configured exact-host route and ordinary TLS verification. Only after that check does it encrypt the PEM with Android Keystore AES-GCM and activate the signer. NEX does not generate a replacement key, expose the PEM, copy a DEN/Citron private key from another installation, or fall back to an OAuth token when the nx2. game token is unavailable.
 
-This is a service-side trust restriction, not a missing Client ID or a missing Android Keystore setting. Do not generate a new client-held BAAS signing key, do not publish a locally generated JWK, do not send the retired per-installation registration request as a proposed solution, and do not copy DEN/Citron's local RSA fallback or any other emulator's signing material. NEX's ACC runtime must remain fail-closed and must not provide a client-generated BAAS JWT to the emulated game.
+This format compatibility does **not** by itself authorize the NEX application to use Citron's BAAS identity. The Nextendo founder previously stated that third-party client-generated BAAS tokens are not accepted and that per-installation JWK registration is unavailable. The Citron integration therefore uses only the fixed Nextendo JWKS identity; the operator must still confirm that this signer may be used by NEX's public Client ID nxc_yAdR-14bOEq7 and that the NEX API credential/attestation contract permits it. A successful local JWKS match proves only that the correct public key is published; it does not prove that a game accepts the resulting id_token or completes LoginEx.
 
-The prerequisite for future work is a new, official Nextendo server-side mechanism that issues or authorizes a game-ready credential for NEX. If the policy changes, Nextendo must provide the supported flow, how the server binds the credential to the NEX application/account/game token, the permitted claims, expiry/refresh contract, and the LoginEx/ACC integration requirements. Until then, BAAS/LoginEx game authentication cannot be completed by NEX.
+DEN is not a different trust mechanism: its public ACC implementation also uses RS256, the same fixed BAAS values and an externally supplied PEM with a local auto-generated fallback. Falling back to DEN would not resolve a missing or mismatched signing key. Its OAuth-token fallback for nnex is deliberately not ported.
+
+**Validation status:** implementation and local signature/JWKS matching tests are being added. Live BAAS acceptance, ACC/AuthenticationInfo, LoginEx, secure-session and in-game multiplayer still require tests against the Nextendo deployment with the authorized key and two accounts.
 
 ## 2. Client attestation and OAuth/API contract
 
@@ -105,6 +103,6 @@ For service-side support, send only a token-free diagnostic: exact UTC timestamp
 
 NEX now has an Android Keystore-backed network configuration screen and an exact-host multi-title auth/DAUTH DNS installer. This closes the client-side plumbing for main-server hostname routing, but it does not supply production addresses or complete the title login path.
 
-NEX can continue implementing and testing the already-owned DataHolder serialization, ACC cache delivery boundary, exact-host DNS routing, TLS/SNI handling, guest socket integration and NAT client logic. NEX cannot invent BAAS trust, a third-party attestation credential, production IPs, certificate deployment data or missing server-side SMM2 matchmaking behavior. The client-side BAAS cache remains empty until Nextendo provides an approved server-issued game-authentication mechanism.
+NEX now builds the Citron-compatible BAAS id_token only after an operator-authorized PEM is imported and its public key matches the live Nextendo JWKS. The game-visible cache remains empty until a valid unexpired nx2. token and a verified Citron signer are both available. The local JWKS match is not server-side acceptance approval. NEX still cannot invent third-party API attestation, production IPs, certificate deployment data or missing server-side SMM2 matchmaking behavior.
 
 The previous per-installation JWK registration proposal is retired following the founder's explicit response. The file docs/NEXTENDO_BAAS_REGISTRATION_REQUEST.md is retained only as a historical record and must not be sent as a current request.
