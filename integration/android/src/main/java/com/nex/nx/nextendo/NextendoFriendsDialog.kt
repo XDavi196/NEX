@@ -29,6 +29,7 @@ object NextendoFriendsDialog {
         onRefresh: () -> Unit
     ) {
         if (activity.isFinishing || activity.isDestroyed) return
+        NextendoChatNotifications.rememberFriends(result.friends)
 
         val density = activity.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
