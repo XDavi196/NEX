@@ -68,7 +68,7 @@ class NextendoAccountImportActivity : Activity() {
                         val message = if (outcome.gameTokenReady) {
                             "Conta DEN/Citron importada. O NEX obteve uma credencial de jogo usando seu Client ID."
                         } else {
-                            "Conta importada e validada. A Nextendo ainda não liberou um token de jogo para o Client ID do NEX."
+                            "Conta importada e validada, mas o token de jogo não foi obtido: ${outcome.gameTokenDiagnostic}. O multiplayer exige uma credencial de jogo autorizada para o Client ID do NEX."
                         }
                         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                     },
