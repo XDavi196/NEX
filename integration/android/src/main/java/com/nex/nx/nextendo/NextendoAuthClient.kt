@@ -30,6 +30,7 @@ object NextendoAuthClient {
     private const val TOKEN_URL = "$BASE_URL/api/oauth/token"
     private const val NEX_TOKEN_URL = "$BASE_URL/api/nex-token"
     private const val USERINFO_URL = "$BASE_URL/api/oauth/userinfo"
+    private const val MAX_BINARY_RESPONSE_BYTES = 64 * 1024 * 1024
 
     // Exact scopes shown by the current NEX URL generated in the Nextendo portal.
     const val SCOPES = "identity friends presence profil game.matchmaking emulator.status"
@@ -292,6 +293,9 @@ object NextendoAuthClient {
             .put("status", status)
             .put("app_field", appField)
             .put("app_id", appId)
+            // DEN/Citron's friend card reads app_name; NEX's newer parser also
+            // accepts app_detail. Publish both labels for mixed client versions.
+            .put("app_name", appDetail)
             .put("app_detail", appDetail)
             .toString()
             .toByteArray(StandardCharsets.UTF_8)
@@ -305,6 +309,139 @@ object NextendoAuthClient {
             ),
             body = body
         )
+    }
+
+    /**
+     * Calls an account endpoint with NEX's OAuth bearer token and NEX's own
+     * Client-ID header. Paths are restricted to the fixed Nextendo API origin.
+     */
+    internal fun requestAccountJson(
+        path: String,
+        accessToken: String,
+        method: String = "GET",
+        body: ByteArray? = null
+    ): String {
+        requireAccountToken(accessToken)
+        validateAccountApiPath(path)
+        val headers = linkedMapOf("Authorization" to "Bearer $accessToken")
+        if (body != null) {
+            headers["Content-Type"] = "application/json; charset=utf-8"
+        }
+        return request(
+            url = "$BASE_URL$path",
+            method = method,
+            headers = headers,
+            body = body
+        )
+    }
+
+    /** Public image paths only; never follows a server-supplied avatar URL. */
+    internal fun requestPublicBytes(path: String): ByteArray {
+        val validAvatarPath = Regex("^/api/avatar\\?pid=[1-9][0-9]{0,18}$").matches(path)
+        val validGalleryPath = Regex("^/avatars/[A-Za-z0-9_-]{1,80}\\.jpg$").matches(path)
+        require(validAvatarPath || validGalleryPath) {
+            "Apenas caminhos públicos de avatar Nextendo são permitidos."
+        }
+        return requestBytes("$BASE_URL$path", accessToken = null, method = "GET", body = null)
+    }
+
+    /** Binary account transfer for BCAT and cloud-save endpoints. */
+    internal fun requestAccountBytes(
+        path: String,
+        accessToken: String,
+        method: String = "GET",
+        body: ByteArray? = null
+    ): ByteArray {
+        requireAccountToken(accessToken)
+        validateAccountApiPath(path)
+        require(method == "GET" || method == "POST") {
+            "Método inválido para transferência binária Nextendo."
+        }
+        return requestBytes(
+            url = "$BASE_URL$path",
+            accessToken = accessToken,
+            method = method,
+            body = body
+        )
+    }
+
+    private fun requireAccountToken(accessToken: String) {
+        require(accessToken.isNotBlank() && !accessToken.startsWith("nx2.")) {
+            "Esta operação exige a sessão OAuth da conta NEX, não o token de jogo nx2."
+        }
+    }
+
+    private fun validateAccountApiPath(path: String) {
+        require(
+            path.startsWith("/api/") &&
+                !path.contains("..") &&
+                path.none { it == '\\r' || it == '\\n' || it == '\\u0000' } &&
+                !path.startsWith("//")
+        ) {
+            "O caminho da API Nextendo não é permitido."
+        }
+    }
+
+    private fun requestBytes(
+        url: String,
+        accessToken: String?,
+        method: String,
+        body: ByteArray?
+    ): ByteArray {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = method
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            connection.useCaches = false
+            connection.instanceFollowRedirects = false
+            connection.setRequestProperty("Accept", "application/octet-stream, image/jpeg, application/zip")
+            connection.setRequestProperty(CLIENT_ID_HEADER, CLIENT_ID)
+            if (!accessToken.isNullOrBlank()) {
+                connection.setRequestProperty("Authorization", "Bearer $accessToken")
+            }
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/octet-stream")
+                connection.setFixedLengthStreamingMode(body.size)
+                connection.outputStream.use { it.write(body) }
+            }
+
+            val status = connection.responseCode
+            if (status == HttpURLConnection.HTTP_NO_CONTENT) return byteArrayOf()
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val bytes = stream?.use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(8 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    require(output.size() + count <= MAX_BINARY_RESPONSE_BYTES) {
+                        "A resposta binária Nextendo excedeu o limite de tamanho."
+                    }
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray()
+            } ?: byteArrayOf()
+
+            if (status !in 200..299) {
+                val errorText = runCatching {
+                    val errorJson = JSONObject(String(bytes, StandardCharsets.UTF_8))
+                    errorJson.optString("error_description")
+                        .ifBlank { errorJson.optString("error") }
+                }.getOrNull().orEmpty()
+                throw NextendoException(
+                    status,
+                    errorText.ifBlank { "Nextendo request failed (HTTP $status)." }
+                )
+            }
+            require(bytes.size <= MAX_BINARY_RESPONSE_BYTES) {
+                "A resposta binária Nextendo excedeu o limite de tamanho."
+            }
+            return bytes
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun parseOAuthTokens(response: String): OAuthTokens =
