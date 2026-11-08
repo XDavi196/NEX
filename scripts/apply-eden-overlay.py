@@ -137,7 +137,8 @@ def main() -> None:
         '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
         '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n'
         '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n'
-        '#include "core/internal_network/network.h"\n',
+        '#include "core/internal_network/network.h"\n'
+        '#include "core/internal_network/nextendo_prudp_observer.h"\n',
     )
     native_jni_anchor = """JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getAllUsers(
         JNIEnv* env,
