@@ -67,7 +67,7 @@ object NextendoSocialApi {
     fun fetchGameFriendList(gameToken: String): FriendList =
         toFriendList(NextendoAuthClient.fetchGameFriendSnapshot(gameToken))
 
-    fun toFriendList(snapshot: NextendoGameFriendSnapshot): FriendList =
+    internal fun toFriendList(snapshot: NextendoGameFriendSnapshot): FriendList =
         FriendList(
             friends = snapshot.friends.map(::toSocialFriend),
             requests = snapshot.requests.map(::toSocialFriend)
