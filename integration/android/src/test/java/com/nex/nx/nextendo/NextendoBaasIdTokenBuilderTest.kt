@@ -72,7 +72,7 @@ class NextendoBaasIdTokenBuilderTest {
             header["jku"].toString().trim('"')
         )
         assertEquals("nx2.test-server-issued-token", payload["nnex"].toString().trim('"'))
-        assertEquals(null, payload["jku"])
+        assertEquals("https://baas.test.invalid/1.0.0/certificates", payload["jku"].toString().trim('"'))
         assertEquals("https://baas.test.invalid/issuer", payload["iss"].toString().trim('"'))
         assertEquals("true", payload["hm"].toString())
         assertEquals(
