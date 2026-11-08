@@ -27,13 +27,39 @@ std::vector<std::uint8_t> MakePrudpSyn(bool acknowledgement) {
     return packet;
 }
 
+std::vector<std::uint8_t> MakePrudpConnect() {
+    // CONNECT carries the support option and the 16-byte lite-signature option.
+    return {
+        0x80, 24, 0, 0,
+        0x12, 0x34, 0x56, 0,
+        0x01, 0,
+        2, 0,
+        0, 4, 5, 0x56, 0x34, 0x12,
+        128, 16,
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+    };
+}
+
 std::vector<std::uint8_t> MakeWebSocketFrame(const std::vector<std::uint8_t>& payload,
-                                            bool masked) {
-    assert(payload.size() < 126);
-    std::vector<std::uint8_t> frame{0x82,
-                                    static_cast<std::uint8_t>(payload.size() |
-                                                              (masked ? 0x80 : 0))};
+                                            bool masked, bool final_frame = true,
+                                            std::uint8_t opcode = 0x2) {
+    std::vector<std::uint8_t> frame{
+        static_cast<std::uint8_t>((final_frame ? 0x80 : 0x00) | opcode)};
     const std::uint8_t mask[4]{0x11, 0x22, 0x33, 0x44};
+    const std::uint8_t mask_bit = masked ? 0x80 : 0x00;
+    if (payload.size() < 126) {
+        frame.push_back(static_cast<std::uint8_t>(payload.size() | mask_bit));
+    } else if (payload.size() <= 0xFFFF) {
+        frame.push_back(static_cast<std::uint8_t>(126 | mask_bit));
+        frame.push_back(static_cast<std::uint8_t>(payload.size() >> 8));
+        frame.push_back(static_cast<std::uint8_t>(payload.size()));
+    } else {
+        frame.push_back(static_cast<std::uint8_t>(127 | mask_bit));
+        const auto length = static_cast<std::uint64_t>(payload.size());
+        for (int shift = 56; shift >= 0; shift -= 8) {
+            frame.push_back(static_cast<std::uint8_t>(length >> shift));
+        }
+    }
     if (masked) {
         frame.insert(frame.end(), std::begin(mask), std::end(mask));
     }
@@ -96,11 +122,24 @@ int main() {
     assert(recent[1].from_client == false);
     assert(recent[1].type == 0);
 
+    // A CONNECT request is captured as metadata without retaining its 16-byte signature.
+    observer.SetServerName("g22306d00-lp1.s.n.srv.nintendo.net");
+    assert(observer.ObserveOutbound(
+        reinterpret_cast<const std::uint8_t*>(request.data()), request.size()).empty());
+    const auto connect = MakePrudpConnect();
+    const auto connect_frame = MakeWebSocketFrame(connect, true);
+    packets = observer.ObserveOutbound(connect_frame.data(), connect_frame.size());
+    assert(packets.size() == 1);
+    assert(packets[0].type == 1);
+    assert(packets[0].minor_version == 5);
+    assert(packets[0].supported_functions == 0x123456);
+    assert(packets[0].payload_bytes == 0);
+
     observer.SetServerName("example.com");
     assert(observer.ObserveOutbound(masked.data(), masked.size()).empty());
 
     recent = Common::NextendoPrudpObserver::GetRecentPackets();
-    assert(recent.size() == 2);
+    assert(recent.size() == 3);
     Common::NextendoPrudpObserver::ClearRecentPackets();
     assert(Common::NextendoPrudpObserver::GetRecentPackets().empty());
 
@@ -115,6 +154,41 @@ int main() {
     assert(recent.size() == 32);
     assert(recent.back().from_client);
     assert(recent.back().type == 0);
+    Common::NextendoPrudpObserver::ClearRecentPackets();
+
+    // Split a binary WebSocket message across an initial and continuation frame.
+    Common::NextendoPrudpObserver framing_observer;
+    framing_observer.SetServerName("g22306d00-lp1.s.n.srv.nintendo.net");
+    assert(framing_observer.ObserveOutbound(
+        reinterpret_cast<const std::uint8_t*>(request.data()), request.size()).empty());
+    const auto fragment_packet = MakePrudpSyn(false);
+    const std::size_t split = 7;
+    const std::vector<std::uint8_t> first_part(
+        fragment_packet.begin(), fragment_packet.begin() + static_cast<std::ptrdiff_t>(split));
+    const std::vector<std::uint8_t> second_part(
+        fragment_packet.begin() + static_cast<std::ptrdiff_t>(split), fragment_packet.end());
+    const auto first_fragment = MakeWebSocketFrame(first_part, true, false, 0x2);
+    const auto continuation = MakeWebSocketFrame(second_part, true, true, 0x0);
+    assert(framing_observer.ObserveOutbound(
+        first_fragment.data(), first_fragment.size()).empty());
+    packets = framing_observer.ObserveOutbound(continuation.data(), continuation.size());
+    assert(packets.size() == 1);
+    assert(packets[0].type == 0);
+
+    // A 16-bit extended WebSocket length must still expose only PRUDP metadata.
+    framing_observer.SetServerName("g22306d00-lp1.s.n.srv.nintendo.net");
+    assert(framing_observer.ObserveOutbound(
+        reinterpret_cast<const std::uint8_t*>(request.data()), request.size()).empty());
+    auto extended_packet = MakePrudpSyn(false);
+    constexpr std::uint16_t extended_payload_size = 130;
+    extended_packet[2] = static_cast<std::uint8_t>(extended_payload_size);
+    extended_packet[3] = static_cast<std::uint8_t>(extended_payload_size >> 8);
+    extended_packet.insert(extended_packet.end(), extended_payload_size, 0x5A);
+    const auto extended_frame = MakeWebSocketFrame(extended_packet, true);
+    packets = framing_observer.ObserveOutbound(extended_frame.data(), extended_frame.size());
+    assert(packets.size() == 1);
+    assert(packets[0].type == 0);
+    assert(packets[0].payload_bytes == extended_payload_size);
     Common::NextendoPrudpObserver::ClearRecentPackets();
 
     return 0;
