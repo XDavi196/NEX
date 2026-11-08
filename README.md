@@ -92,6 +92,8 @@ When reporting a problem, include the NEX release number, device model, Android 
 
 ## Development documentation
 
+- [XDavi196 Projects & Builds portal](https://xdavi196.github.io/NEX/builds/) (GitHub Pages site source: `docs/builds/`)
+
 - [Android authentication and Nextendo account integration](docs/NEXTENDO_ANDROID.md)
 - [NEX architecture and source integration](docs/ARCHITECTURE.md)
 - [Current integration pull request](https://github.com/XDavi196/NEX/pull/1)
