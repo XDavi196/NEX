@@ -34,6 +34,7 @@ public:
         std::uint8_t minor_version{};
         std::uint32_t supported_functions{};
         std::uint16_t payload_bytes{};
+        bool from_client{};
     };
 
     void SetServerName(std::string hostname) {
@@ -45,17 +46,33 @@ public:
     }
 
     std::vector<PacketInfo> ObserveOutbound(const std::uint8_t* data, std::size_t size) {
-        return Observe(outbound, data, size);
+        return Observe(outbound, data, size, true);
     }
 
     std::vector<PacketInfo> ObserveInbound(const std::uint8_t* data, std::size_t size) {
-        return Observe(inbound, data, size);
+        return Observe(inbound, data, size, false);
+    }
+
+    /** Returns a bounded process-wide snapshot of handshake metadata only. */
+    static std::vector<PacketInfo> GetRecentPackets() {
+        std::lock_guard lock{recent_mutex};
+        return recent_packets;
+    }
+
+    /** Clears metadata when the linked NEX account changes or disconnects. */
+    static void ClearRecentPackets() {
+        std::lock_guard lock{recent_mutex};
+        recent_packets.clear();
     }
 
 private:
     static constexpr std::size_t MaxBufferedBytes = 2 * 1024 * 1024;
     static constexpr std::size_t MaxFrameBytes = 1024 * 1024;
     static constexpr std::size_t HeaderBytes = 12;
+    static constexpr std::size_t MaxRecentPackets = 32;
+
+    inline static std::mutex recent_mutex;
+    inline static std::vector<PacketInfo> recent_packets;
 
     struct StreamState {
         bool http_headers_complete{};
@@ -110,8 +127,18 @@ private:
         return std::string::npos;
     }
 
+    static void RecordRecentPackets(const std::vector<PacketInfo>& packets) {
+        std::lock_guard lock{recent_mutex};
+        for (const auto& packet : packets) {
+            recent_packets.push_back(packet);
+            if (recent_packets.size() > MaxRecentPackets) {
+                recent_packets.erase(recent_packets.begin());
+            }
+        }
+    }
+
     std::vector<PacketInfo> Observe(StreamState& state, const std::uint8_t* data,
-                                    std::size_t size) {
+                                    std::size_t size, bool from_client) {
         std::lock_guard lock{mutex};
         std::vector<PacketInfo> packets;
         if (!enabled || state.disabled || data == nullptr || size == 0) {
@@ -225,6 +252,12 @@ private:
                       state.bytes.begin() + static_cast<std::ptrdiff_t>(frame_size), 0);
             state.bytes.erase(state.bytes.begin(),
                               state.bytes.begin() + static_cast<std::ptrdiff_t>(frame_size));
+        }
+        for (auto& packet : packets) {
+            packet.from_client = from_client;
+        }
+        if (!packets.empty()) {
+            RecordRecentPackets(packets);
         }
         return packets;
     }
