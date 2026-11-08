@@ -47,7 +47,7 @@ Still missing:
 - Production BAAS signer and NEX JWKS registration, provisioned `kid`/`jku` and issuer/audience/subject values, client-attestation material, and wiring of the JWT + `AuthenticationInfo` DataHolder into Eden ACC/LoginEx.
 - The live SMM2 auth hostname/service IP and DNS/TLS mapping. The public SMM2 profile now supplies the public PRUDP title key and version settings; the secure WSS endpoint must come from the StationURL advertised by LoginEx.
 - The secure PRUDP CONNECT ticket/check payload derived from LoginEx, complete SMM2 RMC methods and matchmaking. The PRUDP-Lite transport remains a tested module, not a live title session.
-- NAT/P2P socket ownership, keepalive, discovery and hole-punching.
+- Automatic wiring of the NNCS probe into the guest game's NAT lifecycle, SMM2 endpoint provisioning, periodic keepalive, peer discovery, matchmaking signaling and UDP hole-punching.
 - End-to-end testing with two accounts and a supported game.
 
 A successful OAuth login or retrieval of an `nx2.` token does not by itself prove multiplayer works. See [the online status checklist](../../docs/NEXTENDO_ONLINE_STATUS.md).
