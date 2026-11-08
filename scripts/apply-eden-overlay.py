@@ -67,7 +67,7 @@ def main() -> None:
             "</application>",
             '        <activity android:name="' + import_activity + '" '
             'android:exported="false" '
-            'android:theme="@android:style/Theme.Translucent.NoTitleBar" />\\n'
+            'android:theme="@android:style/Theme.Translucent.NoTitleBar" />\n'
             "    </application>",
         )
 
