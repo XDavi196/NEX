@@ -173,6 +173,17 @@ object NextendoFriendsDialog {
                     texts,
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 )
+                if (!isRequest && friend.pid > 0L) {
+                    addView(
+                        TextView(activity).apply {
+                            text = "CHAT ›"
+                            textSize = 10f
+                            setTypeface(typeface, android.graphics.Typeface.BOLD)
+                            setTextColor(NEX_RED)
+                            setPadding(dp(5), 0, dp(2), 0)
+                        }
+                    )
+                }
             }.also { row ->
                 val params = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -180,6 +191,17 @@ object NextendoFriendsDialog {
                 )
                 params.bottomMargin = dp(7)
                 row.layoutParams = params
+                if (!isRequest && friend.pid > 0L) {
+                    row.isClickable = true
+                    row.isFocusable = true
+                    row.setOnClickListener {
+                        NextendoChatDialog.open(
+                            activity,
+                            friend,
+                            result.friends.map { it.pid }
+                        )
+                    }
+                }
             }
         }
 
