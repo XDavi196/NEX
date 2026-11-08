@@ -1,6 +1,6 @@
 # NEX — Super Mario Maker 2 Nextendo profile
 
-Updated: 7 November 2026.
+Updated: 8 November 2026.
 
 This document separates values confirmed in the public SMM2 server source from deployment values that must be discovered at runtime. It does not claim that NEX is already connected to the live service.
 

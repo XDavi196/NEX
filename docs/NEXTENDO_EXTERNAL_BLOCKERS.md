@@ -14,18 +14,22 @@ Do not add a client secret, another emulator's credential, or any service-side s
 
 ## 1. BAAS id_token and JWK publication
 
-NEX already contains the RS256 compact-JWT builder, the `nnex` game-token claim, the `AuthenticationInfo` DataHolder encoder and the Eden ACC cache bridge. The Android client now also creates a per-installation RSA-2048 signing key inside Android Keystore with a non-exportable private key, derives its `kid` from an RFC 7638 public JWK thumbprint, signs using SHA256withRSA and exports a public-only JWKS JSON for registration. The app exposes a button in **Configurar rede** to copy that public JWKS. A provisioned claim provider is implemented with injected `iss`, `aud`, subject mapping and a bounded token lifetime; it caps `exp` at the current server-issued `nx2.` token expiry. The runtime still refuses to expose a BAAS token by default.
+NEX contains the RS256 compact-JWT builder, the `nnex` game-token claim, the `AuthenticationInfo` DataHolder encoder and the Eden ACC cache bridge. It creates a per-installation RSA-2048 key in Android Keystore; the private key is non-exportable. The `kid` is the RFC 7638 thumbprint of the public RSA JWK. The settings screen now copies a support-ready registration JSON with NEX's public application identity and public JWK, not private signing material.
 
-Important distinction: the public Ryujinx-Nextendo README documents a BAAS RSA signing key supplied at runtime (`NEXTENDO_BAAS_SIGNING_KEY`); it does not say that the private BAAS key must be issued by Nextendo. The public `baas-jwks` service publishes the matching public JWK from the same RSA key, with a matching `kid`. Therefore the unresolved issue is the NEX-specific key lifecycle and, especially, how the matching public key is made available at the `jku` URL used by the game's BAAS verification flow.
+NEX also has `NextendoBaasJwksVerifier`: after Nextendo supplies the correct HTTPS `jku` URL and registers/publishes the key, NEX fetches the JWKS with platform TLS validation and verifies exact `kid`, `n` and `e` equality. The provider cannot be installed from a merely local JWK export. Even a successful JWKS match does not establish service acceptance of the `iss`, `aud`, `sub` or other claims; Nextendo must confirm those separately.
+
+**Official-source constraint:** the public [NextendoNetwork/baas-jwks README](https://github.com/NextendoNetwork/baas-jwks) says the service publishes the public JWK derived from the same RSA private key used by the client to sign the BAAS token. Its [main.go](https://github.com/NextendoNetwork/baas-jwks/blob/main/main.go) loads one signing key from the server-side `BAAS_SIGNING_KEY` path/environment variable and publishes that public key under configured key IDs. The public code does not expose a client-facing API for registering arbitrary per-installation keys. NEX therefore cannot claim a per-device JWK is registered until Nextendo confirms the supported registration mechanism or provisions an approved NEX-specific signing arrangement.
 
 Before enabling the runtime provider, confirm:
 
-1. Whether NEX may use its own RSA key pair and `kid`, or must use a Nextendo-managed key registration.
-2. The exact `jku` hostname and path for NEX, and how the matching public JWK is registered or hosted.
-3. The exact required JWT header and claims: `alg`, `kid`, `typ`, `jku`, `iss`, `aud`, `sub`/PID mapping, `hm`, `iat`, `exp`, and any title/version claims such as `tv`.
-4. Whether the key can be generated and kept in Android Keystore, and whether the guest's BAAS request can reach the public JWK route through the configured exact-host DNS/TLS path.
+1. Whether Nextendo accepts a distinct RSA key pair and `kid` per NEX installation, or requires a single NEX application key held by an approved signing service.
+2. The exact HTTPS `jku` hostname/path and the supported way to register or publish NEX's public JWK there.
+3. Whether the existing `baas-jwks` deployment can serve multiple independently generated public keys, or whether Nextendo must provide a separate NEX JWKS deployment/registration API.
+4. The exact JWT header and claims: `alg`, `kid`, `typ`, `jku`, `iss`, `aud`, `sub`/PID mapping, `hm`, `iat`, `exp`, and any title/version claims such as `tv`.
+5. Whether an Android Keystore RSA-2048 non-exportable key is accepted for NEX game authentication and whether the guest's BAAS verifier can reach the registered public JWK route with the expected TLS/SNI behavior.
+6. The rotation/revocation procedure and whether device-specific registration is permitted.
 
-The private RSA key must not be committed to Git, printed to logs, embedded in CI output, or copied from another emulator. A local throwaway key is not production-ready unless its matching public JWK is reachable and accepted by the title/service. Each NEX installation has a distinct key; the operator must register the exact public JWK exported from the device at the shared/provisioned JWKS endpoint. Exporting the JWK does not publish it. The `jku`, `kid`, issuer, audience, subject mapping and client-attestation requirements must be confirmed before `installAndroidKeystoreProvider` is called.
+The private RSA key must not be committed to Git, printed to logs, embedded in CI output, or copied from another emulator. A local key is not production-ready unless its matching public JWK is hosted at the confirmed `jku` and accepted by the title/service. NEX now exports a support-ready request and can verify the exact public key returned by a configured HTTPS JWKS endpoint. This check proves key publication only; it does not prove acceptance of the remaining JWT claims. The provider must not be installed until Nextendo confirms the claims contract and the exact key is published.
 
 Public references:
 - https://github.com/NextendoNetwork/Ryujinx-Nextendo
@@ -110,3 +114,19 @@ For service-side support, send only a token-free diagnostic: exact UTC timestamp
 NEX now has an Android Keystore-backed network configuration screen and an exact-host multi-title auth/DAUTH DNS installer. This closes the client-side plumbing for main-server hostname routing, but it does not supply production addresses or complete the title login path.
 
 NEX can implement and test its Android Keystore signer, JWT/DataHolder serialization, ACC delivery, DNS route installation, guest socket integration and NAT client logic. NEX cannot truthfully fill production IPs, certificate deployment data, live `jku` registration, third-party attestation requirements or missing server-side SMM2 matchmaking behavior without confirmation from Nextendo or a verified live handshake.
+
+
+## 6. BAAS registration request prepared in NEX
+
+The NEX **Configurar rede** screen now has **Copiar solicitação de registro BAAS**. It generates the per-installation key in Android Keystore if needed and copies a JSON request containing:
+
+- NEX Android package ID and public OAuth Client ID;
+- algorithm RS256 and RSA-2048 key type/size;
+- the RFC 7638 `kid` / thumbprint;
+- the public-only JWK Set (`kty`, `use`, `alg`, `kid`, `n`, `e`);
+- an explicit statement that no private key is included;
+- the server-side questions listed above.
+
+This is a registration request, not an automatic registration API call or approval receipt. Submit it only through a verified Nextendo developer/support channel. Do not send a private key, OAuth token, `nx2.` token or BAAS JWT.
+
+After Nextendo publishes the exact public JWK, the NEX verifier can test the HTTPS `jku` response. It refuses a different key under the same `kid`, missing keys, HTTP/non-HTTPS endpoints, redirects and JWKS documents that include private RSA members. Runtime activation still requires the externally confirmed issuer/audience/subject contract.

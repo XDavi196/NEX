@@ -59,13 +59,18 @@ internal class NextendoAndroidKeystoreBaasSigner private constructor(
             )
         }
 
-        /**
-         * Creates or loads the per-installation key and returns only its public JWK Set.
-         * Safe to share with the Nextendo operator for registration; no private
-         * parameters or signing capability are returned.
-         */
+        /** Creates or loads the per-installation key and returns its public JWK Set. */
         fun exportOrCreatePublicJwks(): String =
             NextendoBaasJwk.from(loadOrCreateKeyMaterial().publicKey).toJwksJson()
+
+        /**
+         * Exports a support-ready registration request with public metadata only.
+         * The private key remains non-exportable in Android Keystore.
+         */
+        fun exportOrCreateRegistrationRequest(): String =
+            NextendoBaasRegistrationRequest.build(
+                NextendoBaasJwk.from(loadOrCreateKeyMaterial().publicKey)
+            )
 
         private fun loadOrCreateKeyMaterial(): KeyMaterial {
             var store = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -104,7 +109,7 @@ internal class NextendoAndroidKeystoreBaasSigner private constructor(
             val uri = runCatching { URI(value) }.getOrNull()
             require(
                 uri != null &&
-                    uri.scheme.equals("https", ignoreCase = true) &&
+                    uri.scheme?.equals("https", ignoreCase = true) == true &&
                     !uri.host.isNullOrBlank() &&
                     uri.userInfo == null &&
                     uri.fragment == null

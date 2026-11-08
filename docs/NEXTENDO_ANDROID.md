@@ -1,6 +1,6 @@
 # Nextendo Network integration — Android (NEX)
 
-Updated: 7 November 2026.
+Updated: 8 November 2026.
 
 This document describes the code present in the NEX branch and separates it from the game-network work that still depends on Nextendo's service contract and NEX-specific credentials.
 
@@ -149,4 +149,12 @@ The launcher uses NEX adaptive-icon resources with the original artwork inset in
 
 ## BAAS signing boundary
 
-The Android integration now contains a NEX-owned compact-JWT builder boundary for the documented \`nnex\` claim. It accepts a complete claim set from a verified NEX provisioning provider and a \`NextendoBaasSigner\` interface for RS256. It does not embed or generate a private key, invent issuer/audience/JWKS values, or connect to ACC until Nextendo provisions the client-specific signer and claim contract. Tests use a fake signer only for serialization and fail-closed validation.
+The Android integration now creates a per-installation RSA-2048 key inside Android Keystore with a non-exportable private key. The matching public JWK uses its RFC 7638 thumbprint as `kid`. The app does not copy a key from DEN and never exports private RSA parameters.
+
+The **Configurar rede → Copiar solicitação de registro BAAS** action exports a support-ready JSON with NEX's public application identity and the public JWK only. It is a request, not a registration receipt. The public key must be added to the approved Nextendo JWKS endpoint before it can be used for a game BAAS token.
+
+The same screen accepts the HTTPS `jku` supplied by Nextendo and can verify the JWKS publication. `NextendoBaasJwksVerifier` uses platform TLS validation, refuses redirects and oversized documents, and confirms that exactly one JWKS entry matches the local `kid`, modulus and exponent. It also rejects private RSA members in a purported public JWKS. A verified publication proof is required before the Android Keystore provider can be installed.
+
+**External confirmation is still required:** the public `NextendoNetwork/baas-jwks` service source loads a server-side RSA key from `BAAS_SIGNING_KEY` and derives the published public JWK from that key; the public repository does not document a per-installation registration API. Nextendo must confirm whether NEX can register independent Android Keystore keys or must use another approved signing arrangement, and provide the accepted `iss`, `aud`, `sub` mapping, claim profile and any client-attestation requirements.
+
+Verifying that a JWKS endpoint serves the correct public key proves publication only. It does not prove that the live Nextendo game service accepts the BAAS token. No production provider is installed in the current branch; the runtime remains fail-closed and does not send a production BAAS JWT to Eden ACC until the key publication and claim contract are verified.

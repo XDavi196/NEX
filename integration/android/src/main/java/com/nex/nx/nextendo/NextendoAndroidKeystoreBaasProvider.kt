@@ -1,5 +1,6 @@
 package com.nex.nx.nextendo
 
+import java.net.URI
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -51,24 +52,36 @@ internal class NextendoAndroidKeystoreBaasProvider(
 
     companion object {
         /**
-         * Use only after Nextendo has confirmed the NEX issuer, audience,
-         * subject mapping, claim semantics and registered this exact public JWK
-         * at the supplied URL. This method does not contact or register with
-         * Nextendo; it only creates/loads the Android Keystore signer.
+         * Creates the signer only after the configured HTTPS JWKS endpoint has
+         * been fetched and verified to serve this exact installation's public key.
+         * Nextendo must separately confirm the issuer/audience/subject contract;
+         * a matching JWKS response alone does not establish game-service acceptance.
          */
-        fun createAfterJwksRegistration(
-            jwksUrl: String,
+        fun createAfterVerifiedJwksPublication(
+            registration: NextendoBaasJwksVerifier.VerifiedRegistration,
             issuer: String,
             audience: String,
             subjectForSession: (NextendoSessionStore.Session) -> String,
             idTokenLifetimeSeconds: Long
         ): NextendoAndroidKeystoreBaasProvider {
-            require(issuer.isNotBlank()) { "The NEX BAAS issuer is missing." }
+            val issuerUri = runCatching { URI(issuer) }.getOrNull()
+            require(
+                issuerUri != null &&
+                    issuerUri.scheme?.equals("https", ignoreCase = true) == true &&
+                    !issuerUri.host.isNullOrBlank() &&
+                    issuerUri.userInfo == null &&
+                    issuerUri.fragment == null
+            ) { "The NEX BAAS issuer must be the HTTPS issuer confirmed by Nextendo." }
             require(audience.isNotBlank()) { "The NEX BAAS audience is missing." }
             require(idTokenLifetimeSeconds in MIN_TOKEN_LIFETIME_SECONDS..MAX_TOKEN_LIFETIME_SECONDS) {
                 "The BAAS id_token lifetime must be between 60 seconds and 24 hours."
             }
-            val signer = NextendoAndroidKeystoreBaasSigner.createOrLoad(jwksUrl)
+
+            val signer = NextendoAndroidKeystoreBaasSigner.createOrLoad(registration.jwksUrl)
+            require(registration.matches(signer.publicJwk)) {
+                "The verified BAAS JWKS registration does not match this installation's Android Keystore key."
+            }
+
             return NextendoAndroidKeystoreBaasProvider(
                 signer = signer,
                 issuer = issuer,

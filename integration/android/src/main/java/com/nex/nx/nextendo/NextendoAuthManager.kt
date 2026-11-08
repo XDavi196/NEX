@@ -326,29 +326,76 @@ object NextendoAuthManager {
             setSingleLine(true)
             setText(saved?.natIpv4.orEmpty())
         }
-        val exportPublicKey = Button(activity).apply {
-            text = "Copiar JWK pública para registro"
-            setOnClickListener {
-                runCatching { NextendoBaasRuntime.exportAndroidKeystorePublicJwks() }
-                    .onSuccess { publicJwks ->
-                        val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE)
-                            as ClipboardManager
-                        clipboard.setPrimaryClip(
-                            ClipData.newPlainText("NEX BAAS public JWKS", publicJwks)
+        val jwksUrlInput = EditText(activity).apply {
+            hint = "HTTPS BAAS JWKS URL fornecida pela Nextendo"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_URI or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setSingleLine(true)
+        }
+        val exportPublicKey = Button(activity)
+        exportPublicKey.text = "Copiar solicitação de registro BAAS"
+        exportPublicKey.setOnClickListener {
+            runCatching { NextendoBaasRuntime.exportAndroidKeystoreRegistrationRequest() }
+                .onSuccess { registrationRequest ->
+                    val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE)
+                        as ClipboardManager
+                    clipboard.setPrimaryClip(
+                        ClipData.newPlainText(
+                            "NEX BAAS public-key registration request",
+                            registrationRequest
                         )
-                        Toast.makeText(
-                            activity,
-                            "JWK pública copiada. Envie à Nextenda para registro. A chave privada não é exportada.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                    )
+                    Toast.makeText(
+                        activity,
+                        "Solicitação pública copiada. Envie à equipe Nextendo. Isso não registra a chave automaticamente; a chave privada não é exportada.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                .onFailure { error ->
+                    Toast.makeText(
+                        activity,
+                        error.message ?: "Não foi possível gerar a solicitação BAAS.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+        }
+        val verifyJwksPublication = Button(activity)
+        verifyJwksPublication.text = "Verificar publicação da JWK"
+        verifyJwksPublication.setOnClickListener {
+            val jwksUrl = jwksUrlInput.text.toString().trim()
+            if (jwksUrl.isBlank()) {
+                Toast.makeText(
+                    activity,
+                    "Informe primeiro a URL HTTPS da JWKS fornecida pela Nextendo.",
+                    Toast.LENGTH_LONG
+                ).show()
+            } else {
+                verifyJwksPublication.isEnabled = false
+                executor.execute {
+                    val result = runCatching {
+                        NextendoBaasRuntime.verifyAndroidKeystoreJwksPublication(jwksUrl)
                     }
-                    .onFailure { error ->
-                        Toast.makeText(
-                            activity,
-                            error.message ?: "Não foi possível gerar a JWK pública.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                    mainHandler.post {
+                        verifyJwksPublication.isEnabled = true
+                        result.fold(
+                            onSuccess = {
+                                Toast.makeText(
+                                    activity,
+                                    "A JWKS publica a chave exata deste dispositivo. Ainda falta a confirmação das claims BAAS pela Nextendo.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            },
+                            onFailure = { error ->
+                                Toast.makeText(
+                                    activity,
+                                    error.message ?: "Não foi possível confirmar a publicação da JWK.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
                     }
+                }
             }
         }
         val content = LinearLayout(activity).apply {
@@ -376,13 +423,28 @@ object NextendoAuthManager {
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             )
+            addView(
+                jwksUrlInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(
+                verifyJwksPublication,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
         }
 
         AlertDialog.Builder(activity)
-            .setTitle("Servidores Nextendo")
+            .setTitle("Servidores e BAAS Nextendo")
             .setMessage(
                 "Informe os dois IPv4 fornecidos pela Nextendo. Eles precisam ser diferentes. " +
-                    "O NEX não presume IPs de produção."
+                    "A verificação BAAS usa somente a URL HTTPS de JWKS confirmada pela equipe Nextendo. " +
+                    "Copiar a solicitação não registra a chave."
             )
             .setView(content)
             .setPositiveButton("Salvar e aplicar") { _, _ ->
