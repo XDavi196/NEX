@@ -18,6 +18,9 @@ using IPv4 = std::array<std::uint8_t, 4>;
 
 inline std::mutex observed_ip_mutex;
 inline std::optional<IPv4> observed_external_ip;
+inline std::optional<IPv4> pending_external_ip;
+inline std::array<std::optional<IPv4>, 2> observed_nncs_responders{};
+inline std::uint8_t observed_nncs_vantage_mask = 0;
 
 inline bool IsPrivateOrReserved(const IPv4& ip) {
     const auto a = ip[0];
@@ -65,19 +68,20 @@ inline std::optional<IPv4> ParsePublicIPv4(std::string_view value) {
     return result;
 }
 
-inline bool SetObservedExternalIPv4(std::string_view value) {
-    const auto parsed = ParsePublicIPv4(value);
-    if (!parsed) return false;
-    std::lock_guard lock{observed_ip_mutex};
-    observed_external_ip = *parsed;
-    return true;
+inline void ResetObservedNncsStateLocked() {
+    observed_external_ip.reset();
+    pending_external_ip.reset();
+    observed_nncs_responders = {};
+    observed_nncs_vantage_mask = 0;
 }
 
 /**
- * Records the NAT mapping from a real guest NNCS reply received by BSD::RecvFrom.
- * The reply is the 16-byte, big-endian {test id, external port, external IPv4,
- * responder IPv4} record. The NAT rewrite must never be enabled by a separate
- * app-owned socket: it needs the mapping of the UDP socket the game actually uses.
+ * Captures a reply from one of the two NNCS vantage ports using the guest game's
+ * actual BSD UDP socket. The two replies must report the same public IPv4 and
+ * come from distinct responder addresses before Station URL rewriting is enabled.
+ *
+ * NNCS response layout (four big-endian u32 values):
+ *   test id (101), external mapped port, external IPv4, responder IPv4.
  */
 inline bool ObserveNncsReply(std::uint16_t source_port,
                              std::span<const std::uint8_t> response) {
@@ -95,17 +99,46 @@ inline bool ObserveNncsReply(std::uint16_t source_port,
     if (external_port == 0 || external_port > 65535U) return false;
 
     const IPv4 address{response[8], response[9], response[10], response[11]};
-    if (IsPrivateOrReserved(address)) return false;
+    const IPv4 responder{response[12], response[13], response[14], response[15]};
+    if (IsPrivateOrReserved(address) || responder == IPv4{0, 0, 0, 0} ||
+        responder == IPv4{255, 255, 255, 255}) {
+        return false;
+    }
 
+    const std::size_t vantage = source_port == 10025 ? 0U : 1U;
+    const std::uint8_t bit = static_cast<std::uint8_t>(1U << vantage);
     std::lock_guard lock{observed_ip_mutex};
-    observed_external_ip = address;
-    return true;
+
+    if (pending_external_ip.has_value() && *pending_external_ip != address) {
+        ResetObservedNncsStateLocked();
+    }
+    if (observed_nncs_responders[vantage].has_value() &&
+        *observed_nncs_responders[vantage] != responder) {
+        ResetObservedNncsStateLocked();
+    }
+
+    pending_external_ip = address;
+    observed_nncs_responders[vantage] = responder;
+    observed_nncs_vantage_mask = static_cast<std::uint8_t>(observed_nncs_vantage_mask | bit);
+
+    if (observed_nncs_vantage_mask != 0x03U) {
+        return false;
+    }
+    if (!observed_nncs_responders[0].has_value() ||
+        !observed_nncs_responders[1].has_value() ||
+        *observed_nncs_responders[0] == *observed_nncs_responders[1]) {
+        ResetObservedNncsStateLocked();
+        return false;
+    }
+
+    observed_external_ip = pending_external_ip;
+    return observed_external_ip.has_value();
 }
 
 
 inline void ClearObservedExternalIPv4() {
     std::lock_guard lock{observed_ip_mutex};
-    observed_external_ip.reset();
+    ResetObservedNncsStateLocked();
 }
 
 inline std::optional<IPv4> GetObservedExternalIPv4() {
