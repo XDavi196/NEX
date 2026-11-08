@@ -454,12 +454,12 @@ object NextendoAuthManager {
             val sessionResult = runCatching { refreshSessionIfNeeded(activity) }
             val session = sessionResult.getOrNull()
             val profileResult = if (session != null) {
-                runCatching { NextendoAccountExtrasApi.fetchProfile(session.accessToken) }
+                runCatching { NextendoAccountExtrasApi.fetchProfile(requireValidGameToken(session)) }
             } else {
                 Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
             }
             val historyResult = if (session != null) {
-                runCatching { NextendoAccountExtrasApi.fetchHistory(session.accessToken) }
+                runCatching { NextendoAccountExtrasApi.fetchHistory(requireValidGameToken(session)) }
             } else {
                 Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
             }
@@ -511,7 +511,7 @@ object NextendoAuthManager {
                 executor.execute {
                     val result = runCatching {
                         val session = refreshSessionIfNeeded(activity)
-                        NextendoAccountExtrasApi.setUsername(session.accessToken, name)
+                        NextendoAccountExtrasApi.setUsername(requireValidGameToken(session), name)
                         NextendoSessionStore.saveAccountIdentity(
                             activity,
                             pid = session.pid,
@@ -558,7 +558,7 @@ object NextendoAuthManager {
                     val result = runCatching {
                         val session = refreshSessionIfNeeded(activity)
                         NextendoAccountExtrasApi.updateProfile(
-                            accessToken = session.accessToken,
+                            gameToken = requireValidGameToken(session),
                             consoleNickname = nickname
                         )
                     }
@@ -595,12 +595,12 @@ object NextendoAuthManager {
             val sessionResult = runCatching { refreshSessionIfNeeded(activity) }
             val session = sessionResult.getOrNull()
             val lobbyResult = if (session != null) {
-                runCatching { NextendoAccountExtrasApi.fetchMyLobby(session.accessToken) }
+                runCatching { NextendoAccountExtrasApi.fetchMyLobby(requireValidGameToken(session)) }
             } else {
                 Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
             }
             val recentResult = if (session != null) {
-                runCatching { NextendoAccountExtrasApi.fetchRecentPlayers(session.accessToken) }
+                runCatching { NextendoAccountExtrasApi.fetchRecentPlayers(requireValidGameToken(session)) }
             } else {
                 Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
             }
@@ -637,7 +637,6 @@ object NextendoAuthManager {
         val reasonInput = EditText(activity).apply {
             hint = "Motivo (ex.: abuso, fraude, assédio)"
             setSingleLine(true)
-            setText("abuse")
         }
         val commentInput = EditText(activity).apply {
             hint = "Detalhes opcionais (máximo 1.200 caracteres)"
@@ -665,7 +664,7 @@ object NextendoAuthManager {
                     val result = runCatching {
                         val session = refreshSessionIfNeeded(activity)
                         NextendoAccountExtrasApi.reportPlayer(
-                            accessToken = session.accessToken,
+                            gameToken = requireValidGameToken(session),
                             targetPid = targetPid,
                             reason = reason,
                             comment = comment
@@ -1131,6 +1130,11 @@ object NextendoAuthManager {
      * Refreshes the rotating OAuth session when a refresh token is available.
      * The new refresh token is persisted immediately.
      */
+    private fun requireValidGameToken(session: NextendoSessionStore.Session): String {
+        if (!hasValidGameToken(session)) throw MissingOnlineGameTokenException()
+        return session.nexGameToken
+    }
+
     private fun hasValidGameToken(session: NextendoSessionStore.Session): Boolean {
         val now = System.currentTimeMillis() / 1000L
         return session.nexGameToken.startsWith("nx2.") &&
