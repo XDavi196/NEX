@@ -61,6 +61,7 @@ internal object NextendoBaasJwksVerifier {
                 "O JWKS BAAS não retornou HTTP 200 (HTTP ${response.code})."
             }
             val body = response.body
+                ?: throw IllegalArgumentException("O endpoint JWKS BAAS retornou uma resposta sem corpo.")
             val document = body.byteStream().use(::readBoundedUtf8)
             return verifyDocument(jwksUrl, document, expected)
         }
