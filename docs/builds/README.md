@@ -19,3 +19,8 @@ O site usa apenas HTML, CSS e JavaScript estáticos; não precisa compilar o sit
 ## Forgejo
 
 `https://forgejo.org/releases/` distribui os binários do próprio Forgejo. Não é uma instância para hospedar repositórios de terceiros. Para criar o espelho `Compila-o-`, é necessário escolher uma instância Forgejo concreta e criar o repositório de destino. Codeberg utiliza Forgejo, mas não oferece hospedagem privada; como `Compila-o-` está privado, manter essa privacidade exige uma instância própria ou outro provedor que aceite repos privados. Tornar o código público requer autorização explícita e revisão da licença. Nenhuma cópia do repositório privado foi enviada para outro serviço.
+
+
+## Portal Compila-o-
+
+Página dedicada inspirada na organização de releases do Forgejo: `docs/builds/compila-o/`. Ela apresenta a build Android #57 como build de CI verificada, mas não como release pública. O repositório original continua privado e nenhum código ou ROM é exposto. URL esperada: `https://xdavi196.github.io/NEX/builds/compila-o/`.
