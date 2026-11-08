@@ -11,7 +11,7 @@ NEX continues to use its own public OAuth client identity:
 - Redirect URI: `com.nex.nx://oauth/callback`
 - Authorization Code + PKCE (S256); no client secret is embedded in the APK.
 
-No DEN2/Citron Client ID, session file, OAuth token, game token, private key or attestation material is reused.
+No DEN2/Citron Client ID, build secret, game token, private key or attestation material is reused. NEX supports an explicit user-selected import of DEN/Citron's nextendo_account.txt; the bearer session is validated with Nextendo and re-encrypted by Android Keystore. NEX continues using its own Client ID for all API requests and requests a fresh game token through that client.
 
 The OAuth session, game-facing `nx2.` token, account friends API and OAuth presence heartbeat remain separate credential paths. An OAuth access token is not substituted for a game token.
 
