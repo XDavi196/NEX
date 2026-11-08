@@ -5,9 +5,9 @@ import android.content.Context
 /**
  * Serializes OAuth refresh-token rotation for the Android app.
  *
- * The account screen and presence heartbeat share the same rotating refresh
- * token. A single synchronized path prevents both workers from trying to
- * redeem the same refresh token at the same time.
+ * The account screen, presence heartbeat and game-token recovery share the
+ * same rotating refresh token. A single synchronized path prevents multiple
+ * workers from redeeming the same refresh token concurrently.
  */
 object NextendoSessionRefresher {
     @Synchronized
@@ -28,20 +28,55 @@ object NextendoSessionRefresher {
             return current
         }
 
-        // Some published third-party OAuth responses contain no refresh_token.
-        // Never try to redeem an empty credential or silently invent a replacement.
+        return refreshCurrentSession(appContext, current)
+    }
+
+    /**
+     * Recovers from an API 401 by refreshing only if the rejected access token
+     * is still the one persisted. If another worker already rotated it, this
+     * returns the newer session instead of redeeming the old refresh token.
+     */
+    @Synchronized
+    fun refreshAfterUnauthorized(
+        context: Context,
+        rejectedAccessToken: String
+    ): NextendoSessionStore.Session {
+        require(rejectedAccessToken.isNotBlank()) {
+            "The rejected OAuth access token is empty."
+        }
+
+        val appContext = context.applicationContext
+        val current = NextendoSessionStore.load(appContext)
+            ?: throw IllegalStateException("Nenhuma conta Nextendo está conectada.")
+
+        if (current.accessToken != rejectedAccessToken) {
+            return current
+        }
+
+        return refreshCurrentSession(appContext, current)
+    }
+
+    /**
+     * The synchronized caller holds the lock through token exchange and
+     * persistence. The server may rotate refresh tokens, so save the complete
+     * response before another worker can read the session.
+     */
+    private fun refreshCurrentSession(
+        context: Context,
+        current: NextendoSessionStore.Session
+    ): NextendoSessionStore.Session {
         if (current.refreshToken.isBlank()) {
             throw IllegalStateException(
-                "A sessão Nextendo expirou e não há refresh_token disponível. Entre novamente na sua conta."
+                "A sessão Nextendo expirou ou foi recusada e não há refresh_token disponível. Entre novamente na sua conta."
             )
         }
 
-        // Keep the synchronized section through the network exchange and token
-        // persistence: refresh tokens rotate, so the old value must not be reused.
         val refreshed = NextendoAuthClient.refreshAccessToken(current.refreshToken)
-        NextendoSessionStore.saveOAuthTokens(appContext, refreshed)
+        NextendoSessionStore.saveOAuthTokens(context, refreshed)
 
-        return NextendoSessionStore.load(appContext)
-            ?: throw IllegalStateException("Não foi possível recuperar a sessão Nextendo atualizada.")
+        return NextendoSessionStore.load(context)
+            ?: throw IllegalStateException(
+                "Não foi possível recuperar a sessão Nextendo atualizada."
+            )
     }
 }
