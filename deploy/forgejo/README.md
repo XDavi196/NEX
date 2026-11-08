@@ -119,3 +119,8 @@ docker compose up -d
 ## Important limitation
 
 The GitHub repository can store this deployment configuration, but it cannot create DNS records, provide a public server, or turn on a self-hosted Forgejo instance by itself. A domain and server must be supplied/configured by the owner before the NEX Forgejo URL becomes publicly accessible.
+
+
+## Temporary GitHub Codespaces host
+
+To run this Forgejo instance on GitHub's Linux Codespaces environment without a separate VPS, follow [CODESPACES.md](CODESPACES.md). It launches a temporary Forgejo service on forwarded port 3000. This is for preview/testing only: the Codespace stops after inactivity and has a 12-hour maximum lifetime. For a permanent public host, use the Docker Compose + Caddy deployment above on an always-on server.
