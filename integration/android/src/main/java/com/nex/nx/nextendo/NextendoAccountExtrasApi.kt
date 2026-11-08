@@ -66,16 +66,16 @@ internal object NextendoAccountExtrasApi {
     private val titleIdPattern = Regex("^[0-9A-Fa-f]{16}$")
 
     /** Reads the account's current lobby. This reports server state; it does not create a room. */
-    fun fetchMyLobby(accessToken: String): Lobby {
+    fun fetchMyLobby(gameToken: String): Lobby {
         return parseMyLobby(
-            NextendoAuthClient.requestAccountJson("/api/my-lobby", accessToken)
+            NextendoAuthClient.requestGameAccountJson("/api/my-lobby", gameToken)
         )
     }
 
     /** Lists recent encounters. No player IP address is requested or stored. */
-    fun fetchRecentPlayers(accessToken: String): List<LobbyPlayer> {
+    fun fetchRecentPlayers(gameToken: String): List<LobbyPlayer> {
         return parseRecentPlayers(
-            NextendoAuthClient.requestAccountJson("/api/recent-players", accessToken)
+            NextendoAuthClient.requestGameAccountJson("/api/recent-players", gameToken)
         )
     }
 
@@ -94,7 +94,7 @@ internal object NextendoAccountExtrasApi {
     }
 
     fun reportPlayer(
-        accessToken: String,
+        gameToken: String,
         targetPid: Long,
         reason: String,
         comment: String
@@ -111,17 +111,17 @@ internal object NextendoAccountExtrasApi {
                 "comment" to JsonPrimitive(normalizedComment)
             )
         )
-        NextendoAuthClient.requestAccountJson(
+        NextendoAuthClient.requestGameAccountJson(
             path = "/api/report-player",
-            accessToken = accessToken,
+            gameToken = gameToken,
             method = "POST",
             body = body.toString().toByteArray(Charsets.UTF_8)
         )
     }
 
-    fun fetchProfile(accessToken: String): Profile {
+    fun fetchProfile(gameToken: String): Profile {
         return parseProfile(
-            NextendoAuthClient.requestAccountJson("/api/profile", accessToken)
+            NextendoAuthClient.requestGameAccountJson("/api/profile", gameToken)
         )
     }
 
@@ -131,7 +131,7 @@ internal object NextendoAccountExtrasApi {
      * A null parameter means "leave unchanged"; an empty string explicitly clears it.
      */
     fun updateProfile(
-        accessToken: String,
+        gameToken: String,
         consoleNickname: String? = null,
         imageBase64: String? = null,
         miiBase64: String? = null,
@@ -155,7 +155,7 @@ internal object NextendoAccountExtrasApi {
             }
         }
 
-        val current = fetchProfile(accessToken)
+        val current = fetchProfile(gameToken)
         val body = linkedMapOf<String, JsonElement>()
         fun preserve(key: String, changed: String?, existing: String) {
             val value = changed ?: existing
@@ -167,35 +167,35 @@ internal object NextendoAccountExtrasApi {
         preserve("avatar", avatarId, current.avatarId)
         preserve("color", colorHex, current.colorHex)
 
-        NextendoAuthClient.requestAccountJson(
+        NextendoAuthClient.requestGameAccountJson(
             path = "/api/profile",
-            accessToken = accessToken,
+            gameToken = gameToken,
             method = "POST",
             body = JsonObject(body).toString().toByteArray(Charsets.UTF_8)
         )
     }
 
-    fun setUsername(accessToken: String, username: String) {
+    fun setUsername(gameToken: String, username: String) {
         val normalized = username.trim()
         require(Regex("^[A-Za-z0-9_-]{3,16}$").matches(normalized)) {
             "O nome da conta deve ter de 3 a 16 caracteres: letras, números, _ ou -."
         }
         val body = JsonObject(mapOf("Username" to JsonPrimitive(normalized)))
-        NextendoAuthClient.requestAccountJson(
+        NextendoAuthClient.requestGameAccountJson(
             path = "/api/username",
-            accessToken = accessToken,
+            gameToken = gameToken,
             method = "PUT",
             body = body.toString().toByteArray(Charsets.UTF_8)
         )
     }
 
-    fun fetchHistory(accessToken: String): List<HistoryEntry> {
+    fun fetchHistory(gameToken: String): List<HistoryEntry> {
         return parseHistory(
-            NextendoAuthClient.requestAccountJson("/api/history", accessToken)
+            NextendoAuthClient.requestGameAccountJson("/api/history", gameToken)
         )
     }
 
-    fun syncHistory(accessToken: String, entries: List<HistoryEntry>) {
+    fun syncHistory(gameToken: String, entries: List<HistoryEntry>) {
         require(entries.size <= 2_000) { "O histórico contém entradas demais para sincronizar." }
         val items = entries.map { entry ->
             require(titleIdPattern.matches(entry.titleId)) { "Um Title ID do histórico é inválido." }
@@ -213,17 +213,17 @@ internal object NextendoAccountExtrasApi {
             JsonObject(values)
         }
         val body = JsonObject(mapOf("history" to JsonArray(items)))
-        NextendoAuthClient.requestAccountJson(
+        NextendoAuthClient.requestGameAccountJson(
             path = "/api/history",
-            accessToken = accessToken,
+            gameToken = gameToken,
             method = "PUT",
             body = body.toString().toByteArray(Charsets.UTF_8)
         )
     }
 
-    fun downloadBcatSeed(accessToken: String, titleId: String): ByteArray {
+    fun downloadBcatSeed(gameToken: String, titleId: String): ByteArray {
         val id = normalizedTitleId(titleId)
-        return NextendoAuthClient.requestAccountBytes("/api/bcat/$id", accessToken)
+        return NextendoAuthClient.requestGameAccountBytes("/api/bcat/$id", gameToken)
     }
 
     fun hashBcatSeedHex(data: ByteArray): String {
@@ -239,19 +239,19 @@ internal object NextendoAccountExtrasApi {
     }
 
     /** Returns null when the server reports that no cloud save exists yet. */
-    fun pullSave(accessToken: String, titleId: String): ByteArray? {
+    fun pullSave(gameToken: String, titleId: String): ByteArray? {
         val id = normalizedTitleId(titleId)
-        val bytes = NextendoAuthClient.requestAccountBytes("/api/save/$id", accessToken)
+        val bytes = NextendoAuthClient.requestGameAccountBytes("/api/save/$id", gameToken)
         return bytes.takeIf { it.isNotEmpty() }
     }
 
-    fun pushSave(accessToken: String, titleId: String, data: ByteArray): SaveUploadResult {
+    fun pushSave(gameToken: String, titleId: String, data: ByteArray): SaveUploadResult {
         val id = normalizedTitleId(titleId)
         require(data.isNotEmpty()) { "O save está vazio; o upload foi cancelado." }
         return try {
-            val response = NextendoAuthClient.requestAccountBytes(
+            val response = NextendoAuthClient.requestGameAccountBytes(
                 path = "/api/save/$id",
-                accessToken = accessToken,
+                gameToken = gameToken,
                 method = "POST",
                 body = data
             )
