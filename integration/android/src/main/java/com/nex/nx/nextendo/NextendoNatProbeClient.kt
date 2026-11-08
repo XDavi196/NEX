@@ -79,7 +79,7 @@ internal class NextendoNatProbeClient(
         val tracker = NextendoNatProbeTracker(endpoints.map { it.vantageId }.toSet())
         tracker.begin()
         val responses = linkedMapOf<String, NextendoNatProbeCodec.Response>()
-        val request = NextendoNatProbeCodec.encodeRequest(MAPPING_PROBE_MESSAGE_TYPE)
+        val request = NextendoNatProbeCodec.encodeRequest(MAPPING_PROBE_MESSAGE_TYPE.toLong())
 
         DatagramSocket().use { socket ->
             val localPort = socket.localPort
@@ -122,7 +122,7 @@ internal class NextendoNatProbeClient(
 
                 val response = NextendoNatProbeCodec.decodeResponse(
                     packet.data.copyOf(packet.length),
-                    expectedTestId = MAPPING_PROBE_MESSAGE_TYPE
+                    expectedTestId = MAPPING_PROBE_MESSAGE_TYPE.toLong()
                 )
                 responses[source.endpoint.vantageId] = response
                 tracker.record(source.endpoint.vantageId, response)
