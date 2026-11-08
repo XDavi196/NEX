@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.webp" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121">Get the latest verified experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.178">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
- > **Please read before installing:** NEX is an experimental preview. The latest verified APK is **alpha.121** (source commit `88df712f`); its native friend-cache tests, Android Nextendo unit tests, optimized APK build and prerelease publication passed. Alpha.121 includes the PRUDP-Lite transport, adaptive NEX icon, BAAS builder and public SMM2 client profile, but predates the newer ACC bridge and LoginEx/ticket codecs now on the development branch. In-game online multiplayer is not ready.
+ > **Please read before installing:** NEX is an experimental preview. The latest published and verified APK is **alpha.178** (source commit `4f46281a`); its native and Android Nextendo tests, optimized APK build, artifact upload and prerelease publication passed. Alpha.178 includes the Eden ACC BAAS cache bridge, LoginEx/ticket codecs, secure CONNECT proof and the standalone two-vantage UDP probe client. It predates the newer multi-title DNS routing and OkHttp resolver changes currently being validated by Actions run #190. In-game multiplayer is not ready.
 
 ## What NEX is
 
@@ -41,7 +41,7 @@ The first in-game validation target is **Super Mario Maker 2**. Nextendo publish
 
 ### Where to find it
 
-The verified `v0.1.0-alpha.121` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
+The verified `v0.1.0-alpha.178` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
 
 ### Connecting your account
 
@@ -65,17 +65,17 @@ The documented API and the inspected public account-server source still disagree
 
 The development branch now includes a native Eden ACC BAAS-token cache bridge, a fail-closed Android signing-provider boundary, SMM2 LoginEx request/response codecs, client-ticket decryption, secure CONNECT proof construction and an explicit auth/secure WSS coordinator. The ACC stubs no longer return a dummy zero-filled token buffer: they serve compact JWT bytes only when a provisioned NEX signer has populated the cache.
 
-The new path is not live yet. There is no NEX production BAAS signer/JWKS/attestation provider, no confirmed SMM2 production hostname or DNS/SNI route, and the WSS coordinator is not wired into the guest game's native socket lifecycle. Complete game RMC methods, matchmaking, live NAT sockets, peer discovery/P2P and two-device testing are still outstanding.
+The branch now also contains an Android Keystore-backed network configuration screen for the Nextendo main IPv4 and a separate NAT-vantage IPv4, exact-host DNS routes for several NEX titles and DAUTH, and matching exact-host DNS for the standalone OkHttp PRUDP WSS client. Those changes do not invent production IPs or disable certificate checks. The separate WSS coordinator is still not invoked by the guest game's native network lifecycle. A production BAAS signer/JWKS and any required third-party attestation remain unprovisioned; complete per-title RMC/matchmaking, live NNCS keepalives, peer discovery, UDP hole-punching and two-device validation are still outstanding.
 
-The Nextendo compatibility page lists Super Mario Maker 2 as **Experimental / In preparation (70%)**, with matchmaking and presence untested. Even a completed NEX client integration therefore needs a live SMM2 service test before it can be announced as working. See [the online implementation status](docs/NEXTENDO_ONLINE_STATUS.md).
+The current Nextendo compatibility entry lists Super Mario Maker 2 as **Experimental / In preparation (70%)**: Course World is the stated online feature, while matchmaking and presence remain untested. The NEX client therefore cannot promise SMM2 versus/co-op matchmaking simply because account login, DNS or Course World works. See [the online implementation status](docs/NEXTENDO_ONLINE_STATUS.md).
 
 ## Downloads
 
 The latest verified Android APK is the experimental prerelease:
 
-**[NEX v0.1.0-alpha.121 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.121/NEX-Android-v0.2.0-rc1-optimized.apk)
+**[NEX v0.1.0-alpha.178 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.178)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.178/NEX-Android-v0.2.0-rc1-optimized.apk)
 
-The release includes `SHA256SUMS.txt`. Alpha.121 is built from commit `88df712f`; it contains the PRUDP-Lite transport, NEX branding, BAAS builder and public SMM2 profile. It does **not** contain the newer ACC bridge and LoginEx/ticket codecs now in the development branch, and it does not provide working in-game multiplayer. Those additions are being validated by Actions run #135.
+The release includes `SHA256SUMS.txt`. Alpha.178 is built from commit `4f46281a`; it contains the ACC bridge, BAAS signing boundary, SMM2 LoginEx/ticket codecs and the standalone two-vantage UDP probe client. It does **not** contain the newer shared multi-title DNS routing/configuration changes from the current development branch, and it does not provide working in-game multiplayer. Those latest source changes are being validated by [Actions run #190](https://github.com/XDavi196/NEX/actions/runs/42437984166).
 
 This is an experimental preview, not a stable or online-ready release.
 
