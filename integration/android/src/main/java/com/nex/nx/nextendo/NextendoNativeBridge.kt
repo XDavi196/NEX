@@ -65,16 +65,6 @@ internal object NextendoNativeBridge {
         runCatching { NativeLibrary.clearNextendoDnsRedirects() }
     }
 
-    /** Installs an external IPv4 only after the two-vantage NNCS probe agrees. */
-    fun updateObservedExternalIpv4(ipv4: String) {
-        require(NextendoNetworkAddress.isValidIpv4(ipv4)) {
-            "O endereço IPv4 observado pela NNCS é inválido."
-        }
-        require(NativeLibrary.updateNextendoObservedExternalIpv4(ipv4)) {
-            "A camada nativa recusou o endereço externo NAT."
-        }
-    }
-
     fun clearObservedExternalIpv4() {
         runCatching { NativeLibrary.clearNextendoObservedExternalIpv4() }
     }
