@@ -73,6 +73,36 @@ inline bool SetObservedExternalIPv4(std::string_view value) {
     return true;
 }
 
+/**
+ * Records the NAT mapping from a real guest NNCS reply received by BSD::RecvFrom.
+ * The reply is the 16-byte, big-endian {test id, external port, external IPv4,
+ * responder IPv4} record. The NAT rewrite must never be enabled by a separate
+ * app-owned socket: it needs the mapping of the UDP socket the game actually uses.
+ */
+inline bool ObserveNncsReply(std::uint16_t source_port,
+                             std::span<const std::uint8_t> response) {
+    if ((source_port != 10025 && source_port != 10125) || response.size() != 16) {
+        return false;
+    }
+    const auto read_be32 = [&response](std::size_t offset) -> std::uint32_t {
+        return (static_cast<std::uint32_t>(response[offset]) << 24) |
+               (static_cast<std::uint32_t>(response[offset + 1]) << 16) |
+               (static_cast<std::uint32_t>(response[offset + 2]) << 8) |
+               static_cast<std::uint32_t>(response[offset + 3]);
+    };
+    if (read_be32(0) != 101U) return false;
+    const auto external_port = read_be32(4);
+    if (external_port == 0 || external_port > 65535U) return false;
+
+    const IPv4 address{response[8], response[9], response[10], response[11]};
+    if (IsPrivateOrReserved(address)) return false;
+
+    std::lock_guard lock{observed_ip_mutex};
+    observed_external_ip = address;
+    return true;
+}
+
+
 inline void ClearObservedExternalIPv4() {
     std::lock_guard lock{observed_ip_mutex};
     observed_external_ip.reset();
