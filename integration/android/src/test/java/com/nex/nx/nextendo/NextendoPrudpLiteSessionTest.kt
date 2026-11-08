@@ -76,6 +76,93 @@ class NextendoPrudpLiteSessionTest {
         )
     }
 
+
+    @Test
+    fun retransmitsInitialSynAfterPublishedFiveSecondTimeout() {
+        val config = config()
+        val session = NextendoPrudpLiteSession(config)
+        val first = session.start(nowMs = 1_000L).outboundFrames.single()
+
+        assertTrue(session.tick(nowMs = 5_999L).outboundFrames.isEmpty())
+        val retry = session.tick(nowMs = 6_000L).outboundFrames.single()
+        assertArrayEquals(first, retry)
+        assertEquals(NextendoPrudpLiteCodec.TYPE_SYN,
+            NextendoPrudpLiteCodec.decode(retry).packets.single().type)
+        session.close()
+    }
+
+    @Test
+    fun retransmitsConnectUntilConnectAcknowledgementArrives() {
+        val config = config()
+        val session = NextendoPrudpLiteSession(config)
+        session.start(nowMs = 1_000L)
+
+        val synAck = NextendoPrudpLiteCodec.Packet(
+            type = NextendoPrudpLiteCodec.TYPE_SYN,
+            flags = NextendoPrudpLiteCodec.FLAG_ACK or NextendoPrudpLiteCodec.FLAG_HAS_SIZE,
+            sourceType = config.serverDestinationType,
+            destinationType = config.clientSourceType,
+            sourcePort = config.serverDestinationPort,
+            destinationPort = config.clientSourcePort,
+            packetId = 0,
+            minorVersion = 5,
+            supportedFunctions = 0,
+            connectionSignature = ByteArray(16) { (it + 1).toByte() }
+        )
+        val connect = session.receive(
+            NextendoPrudpLiteCodec.encode(synAck),
+            nowMs = 1_100L
+        ).outboundFrames.single()
+
+        assertTrue(session.tick(nowMs = 6_099L).outboundFrames.isEmpty())
+        assertArrayEquals(
+            connect,
+            session.tick(nowMs = 6_100L).outboundFrames.single()
+        )
+
+        val connectAck = NextendoPrudpLiteCodec.Packet(
+            type = NextendoPrudpLiteCodec.TYPE_CONNECT,
+            flags = NextendoPrudpLiteCodec.FLAG_ACK or NextendoPrudpLiteCodec.FLAG_HAS_SIZE,
+            sourceType = config.serverDestinationType,
+            destinationType = config.clientSourceType,
+            sourcePort = config.serverDestinationPort,
+            destinationPort = config.clientSourcePort,
+            packetId = 1
+        )
+        session.receive(NextendoPrudpLiteCodec.encode(connectAck), nowMs = 6_200L)
+        assertTrue(session.tick(nowMs = 20_000L).outboundFrames.isEmpty())
+        session.close()
+    }
+
+    @Test
+    fun retransmitsReliableDataUntilItsAckIsReceived() {
+        val config = config()
+        val session = NextendoPrudpLiteSession(config)
+        connect(session, config)
+
+        val rmc = NextendoRmcCodec.encodeRequest(
+            protocolId = NextendoSmm2DataStore.PROTOCOL_ID,
+            methodId = NextendoSmm2DataStore.GET_USERS.toLong(),
+            callId = 50L
+        )
+        val first = session.sendRmc(rmc, nowMs = 10_000L).outboundFrames.single()
+        assertTrue(session.tick(nowMs = 14_999L).outboundFrames.isEmpty())
+        assertArrayEquals(first, session.tick(nowMs = 15_000L).outboundFrames.single())
+
+        val ack = NextendoPrudpLiteCodec.Packet(
+            type = NextendoPrudpLiteCodec.TYPE_DATA,
+            flags = NextendoPrudpLiteCodec.FLAG_ACK,
+            sourceType = config.serverDestinationType,
+            destinationType = config.clientSourceType,
+            sourcePort = config.serverDestinationPort,
+            destinationPort = config.clientSourcePort,
+            packetId = 1
+        )
+        session.receive(NextendoPrudpLiteCodec.encode(ack), nowMs = 15_100L)
+        assertTrue(session.tick(nowMs = 30_000L).outboundFrames.isEmpty())
+        session.close()
+    }
+
     @Test
     fun signsConnectWithTheRuntimeAccessKeyAndServerConnectionSignature() {
         val signature = ByteArray(16) { it.toByte() }
