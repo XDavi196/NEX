@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
 

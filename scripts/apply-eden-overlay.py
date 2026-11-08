@@ -694,9 +694,9 @@ void ClearParkedNextendoUdpSockets() {
     ssl_backend = eden / "src/core/hle/service/ssl/ssl_backend_openssl.cpp"
     replace_once(
         ssl_backend,
-        '#include "core/internal_network/network.h"\\n',
-        '#include "core/internal_network/network.h"\\n'
-        '#include "core/internal_network/nextendo_prudp_observer.h"\\n',
+        '#include "core/internal_network/network.h"\n',
+        '#include "core/internal_network/network.h"\n'
+        '#include "core/internal_network/nextendo_prudp_observer.h"\n',
     )
     replace_once(
         ssl_backend,
