@@ -67,35 +67,16 @@ internal object NextendoAccountExtrasApi {
 
     /** Reads the account's current lobby. This reports server state; it does not create a room. */
     fun fetchMyLobby(accessToken: String): Lobby {
-        val root = parseObject(
-            NextendoAuthClient.requestAccountJson("/api/my-lobby", accessToken),
-            "lobby"
-        )
-        val isInLobby = root.boolean("in_lobby") ?: false
-        if (!isInLobby) {
-            return Lobby(false, "", "", "", "", 0L, 0, 0, emptyList())
-        }
-        val lobbyData = root["lobby"] as? JsonObject
-        return Lobby(
-            inLobby = true,
-            titleId = root.string("title_id"),
-            type = lobbyData?.string("type").orEmpty(),
-            state = lobbyData?.string("state").orEmpty(),
-            stateCode = lobbyData?.string("state_code").orEmpty(),
-            id = lobbyData?.long("id") ?: 0L,
-            count = lobbyData?.int("count") ?: 0,
-            max = lobbyData?.int("max") ?: 0,
-            players = parsePlayers(root["players"] as? JsonArray)
+        return parseMyLobby(
+            NextendoAuthClient.requestAccountJson("/api/my-lobby", accessToken)
         )
     }
 
     /** Lists recent encounters. No player IP address is requested or stored. */
     fun fetchRecentPlayers(accessToken: String): List<LobbyPlayer> {
-        val root = parseObject(
-            NextendoAuthClient.requestAccountJson("/api/recent-players", accessToken),
-            "recent players"
+        return parseRecentPlayers(
+            NextendoAuthClient.requestAccountJson("/api/recent-players", accessToken)
         )
-        return parsePlayers(root["players"] as? JsonArray)
     }
 
     /** Public avatar lookup by numeric PID only; server-provided avatar URLs are never followed. */
@@ -139,18 +120,8 @@ internal object NextendoAccountExtrasApi {
     }
 
     fun fetchProfile(accessToken: String): Profile {
-        val root = parseObject(
-            NextendoAuthClient.requestAccountJson("/api/profile", accessToken),
-            "profile"
-        )
-        val profile = root["profile"] as? JsonObject
-        return Profile(
-            username = root.string("username"),
-            imageBase64 = profile?.string("image").orEmpty(),
-            consoleNickname = profile?.string("name").orEmpty(),
-            miiBase64 = profile?.string("mii").orEmpty(),
-            avatarId = profile?.string("avatar").orEmpty(),
-            colorHex = profile?.string("color").orEmpty()
+        return parseProfile(
+            NextendoAuthClient.requestAccountJson("/api/profile", accessToken)
         )
     }
 
@@ -219,24 +190,9 @@ internal object NextendoAccountExtrasApi {
     }
 
     fun fetchHistory(accessToken: String): List<HistoryEntry> {
-        val root = parseObject(
-            NextendoAuthClient.requestAccountJson("/api/history", accessToken),
-            "history"
+        return parseHistory(
+            NextendoAuthClient.requestAccountJson("/api/history", accessToken)
         )
-        val entries = (root["history"] as? JsonArray).orEmpty().mapNotNull { element ->
-            val item = element as? JsonObject ?: return@mapNotNull null
-            val titleId = item.string("title_id")
-            val seconds = item.long("seconds") ?: return@mapNotNull null
-            if (!titleIdPattern.matches(titleId) || seconds < 0L) return@mapNotNull null
-            HistoryEntry(
-                titleId = titleId.uppercase(),
-                name = item.string("name"),
-                iconBase64 = item.string("icon"),
-                seconds = seconds,
-                lastPlayed = item.string("last_played")
-            )
-        }
-        return entries.sortedByDescending { it.lastPlayed }.take(2_000)
     }
 
     fun syncHistory(accessToken: String, entries: List<HistoryEntry>) {
@@ -321,6 +277,61 @@ internal object NextendoAccountExtrasApi {
             "O Title ID deve conter exatamente 16 dígitos hexadecimais."
         }
         return normalized.uppercase()
+    }
+
+    internal fun parseMyLobby(response: String): Lobby {
+        val root = parseObject(response, "lobby")
+        if (root.boolean("in_lobby") != true) {
+            return Lobby(false, "", "", "", "", 0L, 0, 0, emptyList())
+        }
+        val lobbyData = root["lobby"] as? JsonObject
+        return Lobby(
+            inLobby = true,
+            titleId = root.string("title_id"),
+            type = lobbyData?.string("type").orEmpty(),
+            state = lobbyData?.string("state").orEmpty(),
+            stateCode = lobbyData?.string("state_code").orEmpty(),
+            id = lobbyData?.long("id") ?: 0L,
+            count = (lobbyData?.int("count") ?: 0).coerceAtLeast(0),
+            max = (lobbyData?.int("max") ?: 0).coerceAtLeast(0),
+            players = parsePlayers(root["players"] as? JsonArray)
+        )
+    }
+
+    internal fun parseRecentPlayers(response: String): List<LobbyPlayer> {
+        val root = parseObject(response, "recent players")
+        return parsePlayers(root["players"] as? JsonArray)
+    }
+
+    internal fun parseProfile(response: String): Profile {
+        val root = parseObject(response, "profile")
+        val profile = root["profile"] as? JsonObject
+        return Profile(
+            username = root.string("username"),
+            imageBase64 = profile?.string("image").orEmpty(),
+            consoleNickname = profile?.string("name").orEmpty(),
+            miiBase64 = profile?.string("mii").orEmpty(),
+            avatarId = profile?.string("avatar").orEmpty(),
+            colorHex = profile?.string("color").orEmpty()
+        )
+    }
+
+    internal fun parseHistory(response: String): List<HistoryEntry> {
+        val root = parseObject(response, "history")
+        val entries = (root["history"] as? JsonArray).orEmpty().mapNotNull { element ->
+            val item = element as? JsonObject ?: return@mapNotNull null
+            val titleId = item.string("title_id")
+            val seconds = item.long("seconds") ?: return@mapNotNull null
+            if (!titleIdPattern.matches(titleId) || seconds < 0L) return@mapNotNull null
+            HistoryEntry(
+                titleId = titleId.uppercase(),
+                name = item.string("name"),
+                iconBase64 = item.string("icon"),
+                seconds = seconds,
+                lastPlayed = item.string("last_played")
+            )
+        }
+        return entries.sortedByDescending { it.lastPlayed }.take(2_000)
     }
 
     private fun parsePlayers(array: JsonArray?): List<LobbyPlayer> =
