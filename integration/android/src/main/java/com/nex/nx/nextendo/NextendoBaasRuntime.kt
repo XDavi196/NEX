@@ -1,6 +1,8 @@
 package com.nex.nx.nextendo
 
 import android.content.Context
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Owns the Citron-compatible BAAS id_token boundary between the encrypted NEX
@@ -19,6 +21,9 @@ internal object NextendoBaasRuntime {
     @Volatile
     var diagnostic: String = "citron_signing_key_missing"
         private set
+
+    private val validationExecutor = Executors.newSingleThreadExecutor()
+    private val validationInProgress = AtomicBoolean(false)
 
     /**
      * Imports and validates the fixed Nextendo/Citron signer key. The supplied
@@ -80,7 +85,8 @@ internal object NextendoBaasRuntime {
             return
         }
 
-        val provider = provisioningProvider ?: run {
+        val provider = provisioningProvider
+        if (provider == null) {
             val pem = runCatching {
                 NextendoSessionStore.loadBaasSigningKeyPem(appContext)
             }.getOrNull()
@@ -88,15 +94,41 @@ internal object NextendoBaasRuntime {
                 clearCache("citron_signing_key_missing")
                 return
             }
-            val restored = runCatching {
-                NextendoCitronBaasProvider(NextendoCitronBaasSigner.fromPem(pem))
-            }.getOrElse {
-                clearCache("citron_signing_key_invalid")
-                return
+
+            // A saved PEM is not trusted forever: after process restart, verify
+            // that the same kid/modulus/exponent is still live in the official
+            // JWKS before signing and publishing a new ACC id_token.
+            clearCache("citron_jwks_validation_pending")
+            if (validationInProgress.compareAndSet(false, true)) {
+                validationExecutor.execute {
+                    val validated = runCatching { createCitronProvider(appContext, pem) }
+                    validationInProgress.set(false)
+                    validated.fold(
+                        onSuccess = { restoredProvider ->
+                            val latest = runCatching {
+                                NextendoSessionStore.load(appContext)
+                            }.getOrNull()
+                            if (
+                                latest != null &&
+                                latest.pid == session.pid &&
+                                latest.nexGameToken == session.nexGameToken &&
+                                latest.nexGameTokenExpiresAtEpochSeconds > System.currentTimeMillis() / 1000L
+                            ) {
+                                provisioningProvider = restoredProvider
+                                diagnostic = "citron_baas_key_verified"
+                                refresh(appContext, latest)
+                            } else {
+                                clearCache("account_changed_during_baas_validation")
+                            }
+                        },
+                        onFailure = {
+                            provisioningProvider = null
+                            clearCache("citron_jwks_mismatch_or_unavailable")
+                        }
+                    )
+                }
             }
-            provisioningProvider = restored
-            diagnostic = "citron_baas_key_restored"
-            restored
+            return
         }
 
         runCatching {
