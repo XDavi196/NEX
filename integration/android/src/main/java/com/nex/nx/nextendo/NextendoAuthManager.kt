@@ -579,6 +579,12 @@ object NextendoAuthManager {
                                 )
                             )
                         ).probe()
+                        if (probe.classification.type == NextendoNatProbeTracker.NatType.UNKNOWN) {
+                            throw IllegalStateException(
+                                "As duas respostas NNCS não identificaram dois pontos válidos. " +
+                                    "O NAT rewrite permaneceu desativado."
+                            )
+                        }
                         val externalIpv4 = probe.classification.externalAddress?.hostAddress
                             ?: throw IllegalStateException(
                                 "Os dois pontos NNCS não concordaram no IPv4 externo. " +
@@ -657,6 +663,8 @@ object NextendoAuthManager {
                     val config = readConfig()
                     NextendoNetworkConfigStore.save(activity, config)
                     NextendoNetworkRouting.apply(config)
+                    // Any endpoint change requires a fresh two-vantage probe.
+                    NextendoNativeBridge.clearObservedExternalIpv4()
                 }.onSuccess {
                     Toast.makeText(
                         activity,
