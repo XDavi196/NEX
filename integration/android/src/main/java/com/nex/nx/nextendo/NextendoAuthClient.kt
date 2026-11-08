@@ -206,16 +206,65 @@ object NextendoAuthClient {
      * Retrieves the richer game-facing friend snapshot. This route is protected
      * by a Nextendo-issued nx2. game token, not by an OAuth access token.
      */
-    internal fun fetchGameFriends(gameToken: String): List<NextendoGameFriend> {
-        require(gameToken.startsWith("nx2.")) {
-            "A valid Nextendo nx2. game token is required for game friend data."
-        }
+    internal fun fetchGameFriends(gameToken: String): List<NextendoGameFriend> =
+        fetchGameFriendSnapshot(gameToken).friends
+
+    /** Fetches both accepted friends and incoming requests using the server-issued nx2 token. */
+    internal fun fetchGameFriendSnapshot(gameToken: String): NextendoGameFriendSnapshot {
+        requireGameToken(gameToken)
         val response = request(
             url = "$BASE_URL/api/friends",
             method = "GET",
             headers = mapOf("Authorization" to "Bearer $gameToken")
         )
-        return NextendoGameFriendParser.parse(response)
+        return NextendoGameFriendParser.parseSnapshot(response)
+    }
+
+    /** Sends a friend request by the player's public Switch-style friend code. */
+    internal fun addFriendByCode(gameToken: String, friendCode: String) {
+        requireGameToken(gameToken)
+        val normalized = friendCode.trim().uppercase()
+        require(Regex("^SW-[0-9]{4}-[0-9]{4}-[0-9]{4}$").matches(normalized)) {
+            "Use o código de amigo no formato SW-1234-5678-9012."
+        }
+        postGameJson(
+            "/api/friends",
+            gameToken,
+            JSONObject().put("friend_code", normalized)
+        )
+    }
+
+    internal fun acceptFriendRequest(gameToken: String, pid: Long) =
+        postFriendPid("/api/friends/accept", gameToken, pid)
+
+    internal fun declineFriendRequest(gameToken: String, pid: Long) =
+        postFriendPid("/api/friends/decline", gameToken, pid)
+
+    internal fun removeFriend(gameToken: String, pid: Long) =
+        postFriendPid("/api/friends/remove", gameToken, pid)
+
+    private fun postFriendPid(path: String, gameToken: String, pid: Long) {
+        requireGameToken(gameToken)
+        require(pid > 0L) { "O PID do amigo é inválido." }
+        postGameJson(path, gameToken, JSONObject().put("pid", pid))
+    }
+
+    private fun postGameJson(path: String, gameToken: String, json: JSONObject) {
+        request(
+            url = "$BASE_URL$path",
+            method = "POST",
+            headers = mapOf(
+                "Authorization" to "Bearer $gameToken",
+                "Content-Type" to "application/json; charset=utf-8"
+            ),
+            body = json.toString().toByteArray(StandardCharsets.UTF_8)
+        )
+    }
+
+    private fun requireGameToken(gameToken: String) {
+        require(gameToken.startsWith("nx2.") && gameToken.length > 4) {
+            "Esta operação exige um token de jogo nx2. emitido pela Nextendo."
+        }
     }
 
     /**
