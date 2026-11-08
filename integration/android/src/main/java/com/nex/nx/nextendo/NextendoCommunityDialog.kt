@@ -19,8 +19,6 @@ internal object NextendoCommunityDialog {
         lobbyError: String?,
         recentError: String?,
         onRefresh: () -> Unit,
-        onAddFriend: (String) -> Unit,
-        onReportPlayer: (Long) -> Unit
     ) {
         if (activity.isFinishing || activity.isDestroyed) return
         val density = activity.resources.displayMetrics.density
@@ -62,18 +60,6 @@ internal object NextendoCommunityDialog {
                 label(identity, 13f).apply { maxLines = 3 },
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             )
-            if (player.known && !player.isMe && player.friendCode.isNotBlank()) {
-                row.addView(Button(activity).apply {
-                    text = "Adicionar"
-                    setOnClickListener { onAddFriend(player.friendCode) }
-                })
-            }
-            if (player.known && !player.isMe) {
-                row.addView(Button(activity).apply {
-                    text = "Reportar"
-                    setOnClickListener { onReportPlayer(player.pid) }
-                })
-            }
             root.addView(row)
             root.addView(android.view.View(activity).apply {
                 setBackgroundColor(0xFF303947.toInt())

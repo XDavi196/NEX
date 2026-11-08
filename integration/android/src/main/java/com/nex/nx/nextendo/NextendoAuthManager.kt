@@ -582,106 +582,24 @@ object NextendoAuthManager {
             .show()
     }
 
-    /** Opens the DEN2-style current-lobby and recent-player view. */
+    /**
+     * Shows the community panel, but the current public Nextendo account server
+     * does not expose DEN2's /api/my-lobby, /api/recent-players or /api/report-player
+     * routes. Do not issue requests to guessed/private endpoints.
+     */
     fun openCommunity(activity: Activity) {
-        val stored = runCatching { NextendoSessionStore.load(activity) }.getOrNull()
-        if (stored == null) {
+        if (runCatching { NextendoSessionStore.load(activity) }.getOrNull() == null) {
             startLogin(activity)
             return
         }
-
-        executor.execute {
-            val sessionResult = runCatching { refreshSessionIfNeeded(activity) }
-            val session = sessionResult.getOrNull()
-            val lobbyResult = if (session != null) {
-                runCatching { NextendoAccountExtrasApi.fetchMyLobby(requireValidGameToken(session)) }
-            } else {
-                Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
-            }
-            val recentResult = if (session != null) {
-                runCatching { NextendoAccountExtrasApi.fetchRecentPlayers(requireValidGameToken(session)) }
-            } else {
-                Result.failure(sessionResult.exceptionOrNull() ?: IllegalStateException("Sessão indisponível."))
-            }
-
-            mainHandler.post {
-                if (activity.isFinishing || activity.isDestroyed) return@post
-                if (session == null) {
-                    showSessionRecoveryDialog(
-                        activity,
-                        sessionResult.exceptionOrNull()?.message.orEmpty()
-                    )
-                    return@post
-                }
-                NextendoCommunityDialog.show(
-                    activity = activity,
-                    lobby = lobbyResult.getOrNull(),
-                    recentPlayers = recentResult.getOrDefault(emptyList()),
-                    lobbyError = lobbyResult.exceptionOrNull()?.let(NextendoRequestDiagnostic::fromFailure),
-                    recentError = recentResult.exceptionOrNull()?.let(NextendoRequestDiagnostic::fromFailure),
-                    onRefresh = { openCommunity(activity) },
-                    onAddFriend = { friendCode ->
-                        runGameFriendAction(activity, "Pedido de amizade enviado.") { token ->
-                            NextendoSocialApi.addFriendByCode(token, friendCode)
-                        }
-                    },
-                    onReportPlayer = { pid -> showReportPlayerDialog(activity, pid) }
-                )
-            }
-        }
-    }
-
-    private fun showReportPlayerDialog(activity: Activity, targetPid: Long) {
-        if (activity.isFinishing || activity.isDestroyed || targetPid <= 0L) return
-        val reasonInput = EditText(activity).apply {
-            hint = "Motivo (ex.: abuso, fraude, assédio)"
-            setSingleLine(true)
-        }
-        val commentInput = EditText(activity).apply {
-            hint = "Detalhes opcionais (máximo 1.200 caracteres)"
-            minLines = 3
-            maxLines = 5
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        }
-        val content = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            val inset = (20 * resources.displayMetrics.density).toInt()
-            setPadding(inset, 0, inset, 0)
-            addView(reasonInput)
-            addView(commentInput)
-        }
-        AlertDialog.Builder(activity)
-            .setTitle("Denunciar jogador")
-            .setMessage("A denúncia será enviada à Nextendo pela sua conta. Não inclua senhas ou tokens.")
-            .setView(content)
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Enviar denúncia") { _, _ ->
-                val reason = reasonInput.text.toString()
-                val comment = commentInput.text.toString()
-                executor.execute {
-                    val result = runCatching {
-                        val session = refreshSessionIfNeeded(activity)
-                        NextendoAccountExtrasApi.reportPlayer(
-                            gameToken = requireValidGameToken(session),
-                            targetPid = targetPid,
-                            reason = reason,
-                            comment = comment
-                        )
-                    }
-                    mainHandler.post {
-                        if (activity.isFinishing || activity.isDestroyed) return@post
-                        val message = result.fold(
-                            onSuccess = { "Denúncia enviada à Nextendo." },
-                            onFailure = { error ->
-                                error.message ?: NextendoRequestDiagnostic.fromFailure(error)
-                            }
-                        )
-                        Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
-                    }
-                }
-            }
-            .show()
+        NextendoCommunityDialog.show(
+            activity = activity,
+            lobby = null,
+            recentPlayers = emptyList(),
+            lobbyError = "A API /api/my-lobby ainda não está publicada no servidor público Nextendo.",
+            recentError = "A API /api/recent-players ainda não está publicada no servidor público Nextendo.",
+            onRefresh = { openCommunity(activity) }
+        )
     }
 
     /** Displays accepted friends and incoming requests returned by the game-facing API. */

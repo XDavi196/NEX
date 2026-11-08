@@ -66,57 +66,14 @@ internal object NextendoAccountExtrasApi {
     private val titleIdPattern = Regex("^[0-9A-Fa-f]{16}$")
 
     /** Reads the account's current lobby. This reports server state; it does not create a room. */
-    fun fetchMyLobby(gameToken: String): Lobby {
-        return parseMyLobby(
-            NextendoAuthClient.requestGameAccountJson("/api/my-lobby", gameToken)
-        )
-    }
-
     /** Lists recent encounters. No player IP address is requested or stored. */
-    fun fetchRecentPlayers(gameToken: String): List<LobbyPlayer> {
-        return parseRecentPlayers(
-            NextendoAuthClient.requestGameAccountJson("/api/recent-players", gameToken)
-        )
-    }
-
     /** Public avatar lookup by numeric PID only; server-provided avatar URLs are never followed. */
-    fun fetchAvatarByPid(pid: Long): ByteArray {
-        require(pid > 0L) { "O PID do avatar é inválido." }
-        return NextendoAuthClient.requestPublicBytes("/api/avatar?pid=$pid")
-    }
-
     /** Public gallery avatar lookup with a path-safe server avatar identifier. */
     fun fetchGalleryAvatar(avatarId: String): ByteArray {
         require(Regex("^[A-Za-z0-9_-]{1,80}$").matches(avatarId)) {
             "O identificador do avatar Nextendo é inválido."
         }
         return NextendoAuthClient.requestPublicBytes("/avatars/$avatarId.jpg")
-    }
-
-    fun reportPlayer(
-        gameToken: String,
-        targetPid: Long,
-        reason: String,
-        comment: String
-    ) {
-        require(targetPid > 0L) { "O PID do jogador é inválido." }
-        val normalizedReason = reason.trim()
-        val normalizedComment = comment.trim()
-        require(normalizedReason.length in 2..48) { "Selecione um motivo válido para a denúncia." }
-        require(normalizedComment.length <= 1_200) { "O comentário excede 1.200 caracteres." }
-        val body = JsonObject(
-            mapOf(
-                "target_pid" to JsonPrimitive(targetPid),
-                "reason" to JsonPrimitive(normalizedReason),
-                "comment" to JsonPrimitive(normalizedComment)
-            )
-        )
-        NextendoAuthClient.requestGameAccountJson(
-            path = "/api/report-player",
-            gameToken = gameToken,
-            method = "POST",
-            body = body.toString().toByteArray(Charsets.UTF_8)
-        )
     }
 
     fun fetchProfile(gameToken: String): Profile {

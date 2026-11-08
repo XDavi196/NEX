@@ -53,12 +53,12 @@ internal object NextendoAccountToolsDialog {
         val editName = MaterialButton(activity).apply {
             text = "Alterar nome da conta"
             isAllCaps = false
-            setOnClickListener(onChangeUsername)
+            setOnClickListener { onChangeUsername() }
         }
         val editNickname = MaterialButton(activity).apply {
             text = "Alterar nickname do console"
             isAllCaps = false
-            setOnClickListener(onChangeConsoleNickname)
+            setOnClickListener { onChangeConsoleNickname() }
         }
         root.addView(editName, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(46)
