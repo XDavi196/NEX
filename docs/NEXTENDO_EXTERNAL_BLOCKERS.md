@@ -70,7 +70,7 @@ NEX has a 16-byte NNCS probe codec, a two-vantage mapping classifier, a bounded 
 
 Required title-specific information:
 
-- SMM2 NNCS hostnames and UDP ports for both probe vantage points.
+- SMM2 NNCS hostnames and UDP ports for both probe vantage points, including confirmation that message type 101 and the current 16-byte exchange match the deployed SMM2 service.
 - The public addresses returned by those two vantage points; they must be distinct for the classification to be meaningful.
 - Probe request/response timing, retry and keepalive requirements for SMM2.
 - Whether SMM2 uses the public NNCS flow documented for other titles or a different title-specific exchange.
