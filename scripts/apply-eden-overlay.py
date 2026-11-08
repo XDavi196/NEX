@@ -83,6 +83,18 @@ def main() -> None:
             "    </application>",
         )
 
+    data_manager_activity = "com.nex.nx.nextendo.NextendoDataManagerActivity"
+    manifest_text = manifest.read_text(encoding="utf-8")
+    if data_manager_activity not in manifest_text:
+        replace_once(
+            manifest,
+            "</application>",
+            '        <activity android:name="' + data_manager_activity + '" '
+            'android:exported="false" '
+            'android:label="NEX Nextendo Data Manager" />\n'
+            "    </application>",
+        )
+
     # Add the NEX native friend-cache API to Eden's Kotlin/JNI boundary.
     native_library = app_dir / "src/main/java/org/yuzu/yuzu_emu/NativeLibrary.kt"
     replace_once(
