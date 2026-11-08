@@ -18,7 +18,17 @@ internal class NextendoSmm2SessionClient(
     suppliedConfig: Config,
     private val events: Events,
     private val httpClient: OkHttpClient = OkHttpClient()
-) : AutoCloseable {
+ ) : AutoCloseable {
+    constructor(
+        suppliedConfig: Config,
+        events: Events,
+        networkConfig: NextendoNetworkConfigStore.Config
+    ) : this(
+        suppliedConfig = suppliedConfig,
+        events = events,
+        httpClient = NextendoHttpClientFactory.create(networkConfig)
+    )
+
     data class Config(
         val authHostname: String,
         val authStation: NextendoSmm2Profile.PrudpStationParameters,
