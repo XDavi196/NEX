@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.longOrNull
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.Base64
@@ -55,6 +56,11 @@ internal object NextendoBaasIdTokenBuilder {
         requireHttpsUrl(signer.jwksUrl, "jku")
         requireNonBlankStringClaim(claims, "aud")
         requireNonBlankStringClaim(claims, "sub")
+        val issuedAt = requirePositiveIntegerClaim(claims, "iat")
+        val expiresAt = requirePositiveIntegerClaim(claims, "exp")
+        require(expiresAt > issuedAt) {
+            "The NEX BAAS exp claim must be later than iat."
+        }
         require(claims["hm"] == JsonPrimitive(true)) {
             "The NEX BAAS hm claim must match the public AuthenticationInfo contract."
         }
@@ -102,6 +108,21 @@ internal object NextendoBaasIdTokenBuilder {
         ) {
             "The NEX BAAS $name must be an HTTPS URL provisioned for NEX."
         }
+    }
+
+    private fun requirePositiveIntegerClaim(
+        claims: Map<String, JsonElement>,
+        name: String
+    ): Long {
+        val primitive = claims[name] as? JsonPrimitive
+        require(primitive != null && !primitive.isString) {
+            "The NEX BAAS $name claim must be a positive integer."
+        }
+        val value = primitive.longOrNull
+        require(value != null && value > 0L) {
+            "The NEX BAAS $name claim must be a positive integer."
+        }
+        return value
     }
 
     private fun requireNonBlankStringClaim(

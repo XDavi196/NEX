@@ -26,7 +26,9 @@ class NextendoBaasIdTokenBuilderTest {
         "aud" to JsonPrimitive("nex-test-audience"),
         "sub" to JsonPrimitive("test-subject"),
         "jti" to JsonPrimitive("test-jti"),
-        "hm" to JsonPrimitive(true)
+        "hm" to JsonPrimitive(true),
+        "iat" to JsonPrimitive(1_800_000_000L),
+        "exp" to JsonPrimitive(1_800_003_600L)
     )
 
     @Test
@@ -107,6 +109,38 @@ class NextendoBaasIdTokenBuilderTest {
         invalid {
             NextendoBaasIdTokenBuilder.build(
                 claims() + ("iss" to JsonPrimitive("http://baas.test.invalid/issuer")),
+                "nx2.test-server-issued-token",
+                TestSigner()
+            )
+        }
+    }
+
+    @Test
+    fun rejectsMissingMalformedOrInvertedLifetimeClaims() {
+        invalid {
+            NextendoBaasIdTokenBuilder.build(
+                claims() - "iat",
+                "nx2.test-server-issued-token",
+                TestSigner()
+            )
+        }
+        invalid {
+            NextendoBaasIdTokenBuilder.build(
+                claims() + ("iat" to JsonPrimitive("1800000000")),
+                "nx2.test-server-issued-token",
+                TestSigner()
+            )
+        }
+        invalid {
+            NextendoBaasIdTokenBuilder.build(
+                claims() + ("exp" to JsonPrimitive(1_800_000_000L)),
+                "nx2.test-server-issued-token",
+                TestSigner()
+            )
+        }
+        invalid {
+            NextendoBaasIdTokenBuilder.build(
+                claims() + ("exp" to JsonPrimitive(1_799_999_999L)),
                 "nx2.test-server-issued-token",
                 TestSigner()
             )
