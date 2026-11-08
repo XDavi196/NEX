@@ -4,6 +4,20 @@ Updated: 7 November 2026.
 
 A successful APK build proves that the configured Android source and native toolchain compile. It does not prove that the live account service, BAAS, SMM2 game service or multiplayer works.
 
+## Current verification — 7 November 2026
+
+- Latest completed Android release: [NEX v0.1.0-alpha.162](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.162), from [Actions run #162](https://github.com/XDavi196/NEX/actions/runs/42416822761), source `a6061018ee9e7959b17dc7cf05cff52fe5db4b8a`. The APK build and its native/Kotlin test steps passed.
+- APK SHA-256: `de4b265c79ee977e2822b91ee5f424ca3a2781679508f8280dfe1b6f7f3e10a8`.
+- The alpha.162 APK predates the PRUDP retransmission and keepalive changes described below. It is an experimental preview, not a multiplayer-ready build.
+- Current branch head when this note was recorded: `6475a9db4efe48dda5646e85de879e313259741b`.
+- [Actions run #163](https://github.com/XDavi196/NEX/actions/runs/42430674923), source `17caac1e3aaac100492a2afc32d3d55b1428a5f9`: native tests and Kotlin unit tests passed; Android APK build was still running when this status was recorded.
+- [Actions run #167](https://github.com/XDavi196/NEX/actions/runs/42430837577), source `6475a9db4efe48dda5646e85de879e313259741b`, is the validation run for the complete retransmission + keepalive implementation. Do not treat it as passed until GitHub Actions reports success.
+- The latest PRUDP changes add 5-second retransmission of unacknowledged SYN, CONNECT and reliable DATA frames, plus a 5-second idle PING. The WSS transport drives the session timer every 250 ms. These changes improve the client transport only; they do not implement matchmaking or player-to-player gameplay.
+- Nextendo's public game compatibility registry lists SMM2 as Experimental, with matchmaking and presence untested, at 70% support for game version 3.0.3. The listed 70% reflects Course World features; it is not evidence that multiplayer rooms work.
+
+A successful build or protocol unit test does not prove live login, matchmaking or a two-player SMM2 match. The alpha.162 APK is not a verified multiplayer release.
+
+
 ## Verified build evidence
 
 - Latest verified Android APK: [NEX v0.1.0-alpha.121](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121), from successful [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607).
