@@ -64,13 +64,14 @@ object NextendoSocialApi {
      * this response also includes incoming friend requests and the game presence
      * fields consumed by the guest friend service.
      */
-    fun fetchGameFriendList(gameToken: String): FriendList {
-        val snapshot = NextendoAuthClient.fetchGameFriendSnapshot(gameToken)
-        return FriendList(
+    fun fetchGameFriendList(gameToken: String): FriendList =
+        toFriendList(NextendoAuthClient.fetchGameFriendSnapshot(gameToken))
+
+    fun toFriendList(snapshot: NextendoGameFriendSnapshot): FriendList =
+        FriendList(
             friends = snapshot.friends.map(::toSocialFriend),
             requests = snapshot.requests.map(::toSocialFriend)
         )
-    }
 
     fun addFriendByCode(gameToken: String, friendCode: String) =
         NextendoAuthClient.addFriendByCode(gameToken, friendCode)
