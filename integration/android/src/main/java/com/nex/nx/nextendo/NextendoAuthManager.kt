@@ -3,6 +3,9 @@ package com.nex.nx.nextendo
 import android.app.Activity
 import androidx.appcompat.app.AlertDialog
 import android.widget.Toast
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.content.Context
@@ -347,6 +350,31 @@ object NextendoAuthManager {
             setSingleLine(true)
             setText(saved?.natIpv4.orEmpty())
         }
+        val exportPublicKey = Button(activity).apply {
+            text = "Copiar JWK pública para registro"
+            setOnClickListener {
+                runCatching { NextendoBaasRuntime.exportAndroidKeystorePublicJwks() }
+                    .onSuccess { publicJwks ->
+                        val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE)
+                            as ClipboardManager
+                        clipboard.setPrimaryClip(
+                            ClipData.newPlainText("NEX BAAS public JWKS", publicJwks)
+                        )
+                        Toast.makeText(
+                            activity,
+                            "JWK pública copiada. Envie à Nextenda para registro. A chave privada não é exportada.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    .onFailure { error ->
+                        Toast.makeText(
+                            activity,
+                            error.message ?: "Não foi possível gerar a JWK pública.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
+        }
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             val inset = (20 * resources.displayMetrics.density).toInt()
@@ -360,6 +388,13 @@ object NextendoAuthManager {
             )
             addView(
                 natInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(
+                exportPublicKey,
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
