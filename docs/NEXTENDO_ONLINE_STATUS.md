@@ -20,19 +20,18 @@ A successful build or protocol unit test does not prove live login, matchmaking 
 
 ## Verified build evidence
 
-- Latest verified Android APK: [NEX v0.1.0-alpha.121](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.121), from successful [Actions run #121](https://github.com/XDavi196/NEX/actions/runs/42401376607).
-- Direct APK: [Download alpha.121](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.121/NEX-Android-v0.2.0-rc1-optimized.apk). APK size 27,285,729 bytes; release includes `SHA256SUMS.txt`.
-- Run #121 built source commit `88df712fa09c83b4a4b8fbd1d02af20eeac9ff1e`. Native tests, Kotlin tests, Android optimized APK build, artifact upload and prerelease publication all passed. This APK includes the BAAS builder and public SMM2 profile but predates the ACC bridge, LoginEx/ticket codecs and session coordinator.
-- [Run #132](https://github.com/XDavi196/NEX/actions/runs/42405574408) passed the native friend-cache/BAAS-cache test and all Kotlin/Nextendo unit tests, and is still building the Android Optimized APK from commit `3359151b51fd88632fc642f2ead204ef669acac0`. It predates the AuthenticationInfo framing correction and account-switch cache clear; no APK from this run is verified.
-- Runs #133 and #134 were automatically cancelled/superseded as newer commits entered the single-branch concurrency queue; these are not test failures.
-- [Run #135](https://github.com/XDavi196/NEX/actions/runs/42406074897) is pending. It includes the corrected single-Buffer AuthenticationInfo DataHolder framing, explicit native `<algorithm>` include and immediate BAAS cache clearing on account switch.
-- Current branch: `nex/eden-v0.2.0-rc1-nextendo`, head `4e21ddcf3f4aa7a29235b75ec49971bee4c8fa76`.
-- Pinned Eden source: `v0.2.0-rc1`, commit `8e373eb714aa01117ec885680477501cdb572112`.
-- Android application ID: `com.nex.nx`.
-- OAuth callback: `com.nex.nx://oauth/callback`.
-- NEX public OAuth Client ID: `nxc_yAdR-14bOEq7`.
+- Latest completed Android release: [NEX v0.1.0-alpha.162](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.162), from [Actions run #162](https://github.com/XDavi196/NEX/actions/runs/42416822761), source `a6061018ee9e7959b17dc7cf05cff52fe5db4b8a`. The APK build and native/Kotlin test steps passed.
+- APK SHA-256: `de4b265c79ee977e2822b91ee5f424ca3a2781679508f8280dfe1b6f7f3e10a8`.
+- Alpha.162 predates the PRUDP retry/keepalive commits and the SMM2 auth hostname default. It is not a multiplayer-ready release.
+- Current branch: `nex/eden-v0.2.0-rc1-nextendo`; latest recorded head: `71db3dee455c55937ab35ed443949afdb3e54c8b`.
+- [Actions run #163](https://github.com/XDavi196/NEX/actions/runs/42430674923), source `17caac1e3aaac100492a2afc32d3d55b1428a5f9`: native tests and Kotlin tests passed; Android optimized APK build was still running at the last successful status poll.
+- [Actions run #169](https://github.com/XDavi196/NEX/actions/runs/42431525325), source `71db3dee455c55937ab35ed443949afdb3e54c8b`, is the queued validation run for PRUDP retransmission, idle PING keepalive and the SMM2 auth hostname profile. It must complete successfully before the newest source can be called build-verified.
+- Earlier runs cancelled by the branch concurrency queue were superseded builds, not code/test failures.
+- The latest PRUDP harness changes add a 5-second retransmission timer for unacknowledged SYN, CONNECT and reliable DATA, and a 5-second idle PING. The WSS adapter drives the timer every 250 ms. **This Kotlin PRUDP client remains an integration/test harness and is not wired into the guest SMM2 network stack.** These tests do not demonstrate that in-game PRUDP packets are being retried.
+- Nextendo's public compatibility registry lists SMM2 as Experimental / In preparation (70%) and specifically marks matchmaking and presence as untested for game version 3.0.3. Course World support does not prove a multiplayer room can be created or joined.
 
-A successful build proves that the selected source compiles and its automated tests pass. It does not prove that the live account APIs, BAAS signer, SMM2 server, or multiplayer path work end to end.
+A successful build or protocol unit test does not prove live login, matchmaking, NAT traversal, peer discovery or a two-player SMM2 match. Do not distribute alpha.162 as a multiplayer-ready build.
+
 
 ## Implemented in NEX
 
