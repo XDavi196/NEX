@@ -490,132 +490,6 @@ object NextendoAuthManager {
             setSingleLine(true)
             setText(saved?.natIpv4.orEmpty())
         }
-        val primaryNncsPortInput = EditText(activity).apply {
-            hint = "Porta NNCS do ponto principal (oficial)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setSingleLine(true)
-            setText(saved?.primaryNncsPort?.toString().orEmpty())
-        }
-        val secondaryNncsPortInput = EditText(activity).apply {
-            hint = "Porta NNCS do segundo ponto (oficial)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            setSingleLine(true)
-            setText(saved?.secondaryNncsPort?.toString().orEmpty())
-        }
-
-        fun readConfig(): NextendoNetworkConfigStore.Config {
-            val primaryText = primaryNncsPortInput.text.toString().trim()
-            val secondaryText = secondaryNncsPortInput.text.toString().trim()
-            val primaryPort = primaryText.takeIf { it.isNotEmpty() }?.toIntOrNull()
-            val secondaryPort = secondaryText.takeIf { it.isNotEmpty() }?.toIntOrNull()
-            require(primaryText.isEmpty() || primaryPort != null) {
-                "A porta NNCS principal precisa ser um número entre 1 e 65535."
-            }
-            require(secondaryText.isEmpty() || secondaryPort != null) {
-                "A segunda porta NNCS precisa ser um número entre 1 e 65535."
-            }
-            return NextendoNetworkConfigStore.Config(
-                serverIpv4 = serverInput.text.toString().trim(),
-                natIpv4 = natInput.text.toString().trim(),
-                primaryNncsPort = primaryPort,
-                secondaryNncsPort = secondaryPort
-            )
-        }
-
-        val probeNatButton = Button(activity).apply {
-            text = "Testar NAT e registrar IPv4 externo"
-            setOnClickListener {
-                val config = runCatching { readConfig() }.getOrElse { error ->
-                    Toast.makeText(
-                        activity,
-                        error.message ?: "Configure os dois pontos NNCS.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@setOnClickListener
-                }
-                val primaryPort = config.primaryNncsPort
-                val secondaryPort = config.secondaryNncsPort
-                if (primaryPort == null || secondaryPort == null) {
-                    Toast.makeText(
-                        activity,
-                        "Informe as duas portas NNCS fornecidas oficialmente pela Nextenda.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@setOnClickListener
-                }
-                val savedConfig = runCatching {
-                    NextendoNetworkConfigStore.save(activity, config)
-                }
-                if (savedConfig.isFailure) {
-                    Toast.makeText(
-                        activity,
-                        savedConfig.exceptionOrNull()?.message
-                            ?: "Não foi possível salvar a configuração NNCS.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    return@setOnClickListener
-                }
-
-                // Never keep an old external mapping when a new probe is requested.
-                NextendoNativeBridge.clearObservedExternalIpv4()
-                Toast.makeText(
-                    activity,
-                    "Testando os dois pontos NNCS pela mesma porta UDP local...",
-                    Toast.LENGTH_SHORT
-                ).show()
-                executor.execute {
-                    val result = runCatching {
-                        val probe = NextendoNatProbeClient(
-                            endpoints = listOf(
-                                NextendoNatProbeClient.Endpoint(
-                                    "primary",
-                                    config.serverIpv4,
-                                    primaryPort
-                                ),
-                                NextendoNatProbeClient.Endpoint(
-                                    "secondary",
-                                    config.natIpv4,
-                                    secondaryPort
-                                )
-                            )
-                        ).probe()
-                        if (probe.classification.type == NextendoNatProbeTracker.NatType.UNKNOWN) {
-                            throw IllegalStateException(
-                                "As duas respostas NNCS não identificaram dois pontos válidos. " +
-                                    "O NAT rewrite permaneceu desativado."
-                            )
-                        }
-                        val externalIpv4 = probe.classification.externalAddress?.hostAddress
-                            ?: throw IllegalStateException(
-                                "Os dois pontos NNCS não concordaram no IPv4 externo. " +
-                                    "O endereço não foi aplicado ao tráfego P2P."
-                            )
-                        NextendoNativeBridge.updateObservedExternalIpv4(externalIpv4)
-                        probe
-                    }
-                    mainHandler.post {
-                        if (activity.isFinishing || activity.isDestroyed) return@post
-                        result.fold(
-                            onSuccess = { probe ->
-                                val message = "NNCS validado (" +
-                                    probe.classification.type.name + "). " +
-                                    "IPv4 externo registrado para a correção das Station URLs."
-                                Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
-                            },
-                            onFailure = { error ->
-                                Toast.makeText(
-                                    activity,
-                                    error.message
-                                        ?: "Falha no teste NNCS. O NAT rewrite ficou desativado.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
         val exportBackup = Button(activity).apply {
             text = "Exportar backup criptografado da conta"
             setOnClickListener { showExportSessionBackupDialog(activity) }
@@ -628,15 +502,7 @@ object NextendoAuthManager {
             orientation = LinearLayout.VERTICAL
             val inset = (20 * resources.displayMetrics.density).toInt()
             setPadding(inset, inset / 2, inset, 0)
-            listOf(
-                serverInput,
-                natInput,
-                primaryNncsPortInput,
-                secondaryNncsPortInput,
-                probeNatButton,
-                exportBackup,
-                importBackup
-            ).forEach { view ->
+            listOf(serverInput, natInput, exportBackup, importBackup).forEach { view ->
                 addView(
                     view,
                     LinearLayout.LayoutParams(
@@ -650,25 +516,29 @@ object NextendoAuthManager {
         AlertDialog.Builder(activity)
             .setTitle("Servidores e backup da conta")
             .setMessage(
-                "Use somente os dois IPv4 e as portas NNCS fornecidos oficialmente pela Nextenda. " +
-                    "O teste usa a mesma porta UDP local para consultar os dois pontos; somente " +
-                    "uma resposta externa coerente habilita a correção de Station URLs. " +
-                    "Não há portas padrão presumidas. O backup da conta contém credenciais de sessão, " +
-                    "é criptografado e não é compatível com arquivos de outros clientes. " +
-                    "Este teste não substitui a autorização BAAS/LoginEx nem confirma matchmaking."
+                "Informe somente os dois IPv4 fornecidos oficialmente pela Nextendo. " +
+                    "O NEX redireciona os hostnames de serviço mantendo o hostname original para TLS/SNI. " +
+                    "A detecção NAT acontece automaticamente nas respostas NNCS recebidas pelo socket UDP " +
+                    "do próprio jogo; não usamos um socket separado que altere o mapeamento de portas. " +
+                    "A correção de Station URLs só é ativada depois de respostas válidas dos dois pontos. " +
+                    "Isso não substitui a autorização BAAS/LoginEx nem confirma que o matchmaking SMM2 " +
+                    "do servidor esteja operacional. O backup contém credenciais de sessão e não deve ser compartilhado."
             )
             .setView(content)
             .setPositiveButton("Salvar e aplicar") { _, _ ->
                 runCatching {
-                    val config = readConfig()
+                    val config = NextendoNetworkConfigStore.Config(
+                        serverIpv4 = serverInput.text.toString().trim(),
+                        natIpv4 = natInput.text.toString().trim()
+                    )
                     NextendoNetworkConfigStore.save(activity, config)
                     NextendoNetworkRouting.apply(config)
-                    // Any endpoint change requires a fresh two-vantage probe.
+                    // A new route config needs fresh NNCS observations from the game itself.
                     NextendoNativeBridge.clearObservedExternalIpv4()
                 }.onSuccess {
                     Toast.makeText(
                         activity,
-                        "Rotas DNS Nextendo aplicadas. Configure as duas portas oficiais para testar NAT/P2P.",
+                        "Rotas DNS Nextendo aplicadas. O NEX aguardará as respostas NNCS do jogo para habilitar a correção NAT.",
                         Toast.LENGTH_LONG
                     ).show()
                 }.onFailure { error ->
@@ -685,7 +555,7 @@ object NextendoAuthManager {
                 NextendoNativeBridge.clearObservedExternalIpv4()
                 Toast.makeText(
                     activity,
-                    "Rotas e endereço externo NAT removidos.",
+                    "Rotas e estado de NAT removidos.",
                     Toast.LENGTH_SHORT
                 ).show()
             }
