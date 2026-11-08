@@ -44,28 +44,51 @@ class NextendoGameFriendParserTest {
     }
 
     @Test
-    fun ignoresRecordsWithoutValidPresenceOrBinaryField() {
-        val friends = NextendoGameFriendParser.parse(
+    fun retainsFriendsWithoutPresenceAndMarksPresenceUnknown() {
+        val snapshot = NextendoGameFriendParser.parseSnapshot(
             """{"friends":[
-                {"pid":1,"name":"Missing presence"},
-                {"pid":2,"name":"Unknown status","presence":{"status":9}},
-                {"pid":3,"name":"Malformed base64","presence":{"status":2,"app_field":"***="}},
-                {"pid":4,"name":"Wrong field type","presence":{"status":1,"app_field":true}},
-                {"pid":5,"name":"Valid empty field","presence":{"status":1,"app_field":""}}
+                {"pid":1,"name":"No presence"},
+                {"pid":2,"name":"Online","presence":{"status":1,"app_field":""}}
             ]}"""
         )
 
-        assertEquals(listOf(5L), friends.map { it.pid })
-        assertTrue(friends.single().appField.isEmpty())
+        assertEquals(2, snapshot.friends.size)
+        assertEquals(-1, snapshot.friends.first { it.pid == 1L }.presenceStatus)
+        assertEquals(1, snapshot.friends.first { it.pid == 2L }.presenceStatus)
     }
 
     @Test
-    fun missingNsaUsesTheDocumentedNextendoPidMapping() {
-        val friends = NextendoGameFriendParser.parse(
-            """{"friends":[{"pid":1800000002,"username":"Friend","presence":{"status":1}}]}"""
+    fun parsesIncomingRequestsWithoutInventingPresence() {
+        val snapshot = NextendoGameFriendParser.parseSnapshot(
+            """{"friends":[],"requests":[
+                {"pid":1800000003,"username":"Incoming","friend_code":"SW-1234-5678-9012"}
+            ]}"""
         )
-        assertEquals(1, friends.size)
-        assertEquals(1800000002L, friends.single().networkServiceAccountId)
+
+        assertTrue(snapshot.friends.isEmpty())
+        assertEquals(1, snapshot.requests.size)
+        assertEquals(1800000003L, snapshot.requests.single().pid)
+        assertEquals("Incoming", snapshot.requests.single().username)
+        assertEquals("SW-1234-5678-9012", snapshot.requests.single().friendCode)
+        assertEquals(-1, snapshot.requests.single().presenceStatus)
+    }
+
+    @Test
+    fun ignoresMalformedRecordsAndInvalidPresenceOrBinaryField() {
+        val snapshot = NextendoGameFriendParser.parseSnapshot(
+            """{"friends":[
+                null,
+                {"pid":0,"username":"ZeroPid"},
+                {"pid":2,"username":"Unknown status","presence":{"status":9}},
+                {"pid":3,"name":"Malformed base64","presence":{"status":2,"app_field":"***="}},
+                {"pid":4,"name":"Wrong field type","presence":{"status":1,"app_field":true}},
+                {"pid":5,"name":"Valid empty field","presence":{"status":1,"app_field":""}}
+            ],"requests":[{"pid":"not-a-number","username":"BadPid"}]}"""
+        )
+
+        assertEquals(listOf(5L), snapshot.friends.map { it.pid })
+        assertTrue(snapshot.friends.single().appField.isEmpty())
+        assertTrue(snapshot.requests.isEmpty())
     }
 
     @Test
