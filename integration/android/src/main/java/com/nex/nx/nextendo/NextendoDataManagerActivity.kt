@@ -84,14 +84,37 @@ internal class NextendoDataManagerActivity : Activity() {
         return value.uppercase()
     }
 
-    private fun withSession(block: (NextendoSessionStore.Session) -> Unit) {
-        val session = runCatching { NextendoSessionStore.load(this) }.getOrNull()
-        if (session == null) {
-            Toast.makeText(this, "A sessão Nextendo não está disponível.", Toast.LENGTH_LONG).show()
-            return
+    private fun sessionForGameApi(): NextendoSessionStore.Session {
+        var session = NextendoSessionRefresher.getValidSession(this, 60L)
+        val now = System.currentTimeMillis() / 1000L
+        if (
+            !session.nexGameToken.startsWith("nx2.") ||
+            session.nexGameTokenExpiresAtEpochSeconds <= now
+        ) {
+            val gameToken = try {
+                NextendoAuthClient.fetchNexGameToken(session.accessToken)
+            } catch (error: NextendoAuthClient.NextendoException) {
+                if (error.httpStatus != 401) throw error
+                val refreshed = NextendoSessionRefresher.refreshAfterUnauthorized(
+                    context = this,
+                    rejectedAccessToken = session.accessToken
+                )
+                NextendoAuthClient.fetchNexGameToken(refreshed.accessToken)
+            }
+            NextendoSessionStore.saveNexGameToken(this, gameToken)
+            session = NextendoSessionStore.load(this)
+                ?: throw IllegalStateException("A sessão Nextendo não está disponível.")
         }
+        require(
+            session.nexGameToken.startsWith("nx2.") &&
+                session.nexGameTokenExpiresAtEpochSeconds > System.currentTimeMillis() / 1000L
+        ) { "A conta ainda não tem um token de jogo nx2. válido." }
+        return session
+    }
+
+    private fun withSession(block: (NextendoSessionStore.Session) -> Unit) {
         executor.execute {
-            runCatching { block(session) }.onFailure { error ->
+            runCatching { block(sessionForGameApi()) }.onFailure { error ->
                 runOnUiThread {
                     Toast.makeText(
                         this,
@@ -106,7 +129,7 @@ internal class NextendoDataManagerActivity : Activity() {
     private fun downloadSave() {
         val id = currentTitleId() ?: return
         withSession { session ->
-            val bytes = NextendoAccountExtrasApi.pullSave(session.accessToken, id)
+            val bytes = NextendoAccountExtrasApi.pullSave(session.nexGameToken, id)
                 ?: throw IllegalStateException("Não existe save na nuvem ou a Nextendo não retornou dados.")
             runOnUiThread { prepareExport(bytes, "$id-cloud-save.bin", PendingExport.SAVE) }
         }
@@ -121,7 +144,7 @@ internal class NextendoDataManagerActivity : Activity() {
     private fun exportBcat() {
         val id = currentTitleId() ?: return
         withSession { session ->
-            val bytes = NextendoAccountExtrasApi.downloadBcatSeed(session.accessToken, id)
+            val bytes = NextendoAccountExtrasApi.downloadBcatSeed(session.nexGameToken, id)
             if (bytes.isEmpty()) throw IllegalStateException("A Nextendo não retornou um BCAT para esse Title ID.")
             runOnUiThread { prepareExport(bytes, "$id-bcat.zip", PendingExport.BCAT) }
         }
@@ -227,12 +250,11 @@ internal class NextendoDataManagerActivity : Activity() {
             bytes.fold(
                 onSuccess = { payload ->
                     val result = runCatching {
-                        val session = NextendoSessionStore.load(this)
-                            ?: throw IllegalStateException("A sessão Nextendo não está disponível.")
+                        val session = sessionForGameApi()
                         when (kind) {
                             PendingImport.SAVE -> {
                                 val outcome = NextendoAccountExtrasApi.pushSave(
-                                    session.accessToken, titleId!!, payload
+                                    session.nexGameToken, titleId!!, payload
                                 )
                                 if (!outcome.ok) {
                                     throw IllegalStateException(
@@ -253,7 +275,7 @@ internal class NextendoDataManagerActivity : Activity() {
                                 ) { "Selecione uma imagem JPEG válida." }
                                 val encoded = Base64.encodeToString(payload, Base64.NO_WRAP)
                                 NextendoAccountExtrasApi.updateProfile(
-                                    accessToken = session.accessToken,
+                                    gameToken = session.nexGameToken,
                                     imageBase64 = encoded
                                 )
                                 "Foto do perfil atualizada."
@@ -264,7 +286,7 @@ internal class NextendoDataManagerActivity : Activity() {
                                 }
                                 val encoded = Base64.encodeToString(payload, Base64.NO_WRAP)
                                 NextendoAccountExtrasApi.updateProfile(
-                                    accessToken = session.accessToken,
+                                    gameToken = session.nexGameToken,
                                     miiBase64 = encoded
                                 )
                                 "Mii atualizado."
