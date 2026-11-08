@@ -7,13 +7,11 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
 /**
- * Publishes the signed-in player's app/game presence.
+ * Publishes NEX app/game presence through the Nextendo account API.
  *
- * Nextendo expires presence unless the app sends a heartbeat at least every
- * 90 seconds. NEX sends one every 60 seconds, but only with an unexpired OAuth
- * access token that includes the player's presence scope. The nx2. game token
- * is never used for account-presence publishing. The Eden overlay calls
- * setGameActivity() from EmulationActivity using the current title-ID bridge.
+ * The deployed account-server's accountFromBearer path accepts the web-session
+ * credential or the server-issued nx2. token. OAuth access tokens are used only
+ * to obtain/refresh the nx2. token and must not be sent to /api/presence.
  */
 object NextendoPresencePublisher {
     private const val HEARTBEAT_SECONDS = 60L
@@ -43,7 +41,7 @@ object NextendoPresencePublisher {
     @Volatile
     private var lastPresenceDiagnostic: String = "ainda não testado"
 
-    /** Safe, token-free result of the last OAuth presence attempt. */
+    /** Safe, token-free result of the last presence attempt. */
     fun diagnostic(): String = lastPresenceDiagnostic
 
     private fun describeFailure(error: Throwable): String = when (error) {
@@ -54,7 +52,6 @@ object NextendoPresencePublisher {
         else -> "request_error"
     }
 
-    /** Start the heartbeat scheduler; publishing requires the OAuth presence scope. */
     fun start(context: Context) {
         synchronized(lock) {
             applicationContext = context.applicationContext
@@ -72,10 +69,8 @@ object NextendoPresencePublisher {
 
     /**
      * Set in-game presence from the emulator lifecycle.
-     *
-     * appFieldBase64 must be the real serialized game field when a title
-     * requires one. Leave it empty until the HLE implementation can supply it;
-     * do not fabricate Nintendo's binary AppKeyValueStorage data.
+     * appFieldBase64 must be the real serialized 0xC0 game field if a title
+     * requires one; it remains empty until the HLE implementation supplies it.
      */
     fun setGameActivity(
         context: Context,
@@ -91,17 +86,10 @@ object NextendoPresencePublisher {
         executor.execute { publishCurrentPresence() }
     }
 
-    /** Publish the actual Switch HOME Menu identity while qLaunch is active. */
     fun setHomeMenuActivity(context: Context) {
-        setGameActivity(
-            context,
-            HOME_MENU_TITLE_ID,
-            "HOME",
-            ""
-        )
+        setGameActivity(context, HOME_MENU_TITLE_ID, "HOME", "")
     }
 
-    /** Return to ordinary online status when no game or qLaunch is active. */
     fun clearGameActivity(context: Context) {
         gameTitleId = ""
         gameDetail = ""
@@ -110,23 +98,16 @@ object NextendoPresencePublisher {
         executor.execute { publishCurrentPresence() }
     }
 
-    /**
-     * Publish offline once, then stop the heartbeat. Call this when the user
-     * disconnects the Nextendo account.
-     */
+    /** Publish offline once, then stop the heartbeat. */
     fun stop(context: Context) {
         val appContext = context.applicationContext
-        // Capture the token before the caller clears the local session. Otherwise
-        // the queued offline request could run after logout and lose its credential.
-        val nowEpochSeconds = System.currentTimeMillis() / 1000L
-        val accessToken = runCatching {
+        val now = System.currentTimeMillis() / 1000L
+        val gameToken = runCatching {
             NextendoSessionStore.load(appContext)?.let { session ->
-                NextendoPresenceAuthorization.usableAccessToken(
-                    accessToken = session.accessToken,
-                    grantedScopes = session.grantedScopes,
-                    expiresAtEpochSeconds = session.accessTokenExpiresAtEpochSeconds,
-                    nowEpochSeconds = nowEpochSeconds
-                )
+                session.nexGameToken.takeIf {
+                    it.startsWith("nx2.") &&
+                        session.nexGameTokenExpiresAtEpochSeconds > now
+                }
             }
         }.getOrNull()
 
@@ -140,15 +121,15 @@ object NextendoPresencePublisher {
         gameTitleId = ""
         gameDetail = ""
         appFieldBase64 = ""
-        if (accessToken.isNullOrBlank()) {
-            lastPresenceDiagnostic = "offline_status_not_sent"
+        if (gameToken.isNullOrBlank()) {
+            lastPresenceDiagnostic = "offline_status_not_sent_game_token_unavailable"
             return
         }
 
         executor.execute {
             val result = runCatching {
                 NextendoAuthClient.postPresence(
-                    accessToken = accessToken,
+                    gameToken = gameToken,
                     status = 0,
                     appField = "",
                     appId = "",
@@ -162,6 +143,23 @@ object NextendoPresencePublisher {
         }
     }
 
+    private fun fetchGameTokenWithRecovery(
+        context: Context,
+        accessToken: String
+    ): NextendoAuthClient.NexGameToken {
+        return try {
+            NextendoAuthClient.fetchNexGameToken(accessToken)
+        } catch (error: NextendoAuthClient.NextendoException) {
+            if (error.httpStatus != 401) throw error
+            val refreshed = NextendoSessionRefresher.refreshAfterUnauthorized(
+                context = context,
+                rejectedAccessToken = accessToken
+            )
+            if (refreshed.accessToken == accessToken) throw error
+            NextendoAuthClient.fetchNexGameToken(refreshed.accessToken)
+        }
+    }
+
     private fun publishCurrentPresence() {
         if (!enabled) return
         val context = synchronized(lock) { applicationContext } ?: run {
@@ -171,25 +169,36 @@ object NextendoPresencePublisher {
         val sessionResult = runCatching {
             NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
         }
-        val session = sessionResult.getOrElse { error ->
+        var session = sessionResult.getOrElse { error ->
             lastPresenceDiagnostic = describeFailure(error)
             return
         }
 
-        // Follow the documented OAuth presence scope. The public account-server
-        // source currently disagrees and may reject this until its deployed contract
-        // is aligned; do not fall back to the game token.
-        val accessToken = NextendoPresenceAuthorization.usableAccessToken(
-            accessToken = session.accessToken,
-            grantedScopes = session.grantedScopes,
-            expiresAtEpochSeconds = session.accessTokenExpiresAtEpochSeconds,
-            nowEpochSeconds = System.currentTimeMillis() / 1000L
-        ) ?: run {
-            lastPresenceDiagnostic = if ("presence" !in session.grantedScopes) {
-                NextendoRequestDiagnostic.missingScope("presence")
-            } else {
-                "oauth_token_unavailable"
+        val now = System.currentTimeMillis() / 1000L
+        var gameToken = session.nexGameToken.takeIf {
+            it.startsWith("nx2.") && session.nexGameTokenExpiresAtEpochSeconds > now
+        }
+        if (gameToken == null) {
+            if ("game.matchmaking" !in session.grantedScopes) {
+                lastPresenceDiagnostic = NextendoRequestDiagnostic.missingScope("game.matchmaking")
+                return
             }
+            val tokenResult = runCatching {
+                fetchGameTokenWithRecovery(context, session.accessToken)
+            }
+            val fetched = tokenResult.getOrElse { error ->
+                lastPresenceDiagnostic = describeFailure(error)
+                return
+            }
+            NextendoSessionStore.saveNexGameToken(context, fetched)
+            session = runCatching { NextendoSessionStore.load(context) }.getOrNull() ?: session
+            gameToken = session.nexGameToken.takeIf {
+                it.startsWith("nx2.") &&
+                    session.nexGameTokenExpiresAtEpochSeconds > System.currentTimeMillis() / 1000L
+            }
+        }
+        val validGameToken = gameToken ?: run {
+            lastPresenceDiagnostic = "game_token_unavailable_or_expired"
             return
         }
 
@@ -197,7 +206,7 @@ object NextendoPresencePublisher {
         val inGame = titleId.isNotBlank()
         val presenceResult = runCatching {
             NextendoAuthClient.postPresence(
-                accessToken = accessToken,
+                gameToken = validGameToken,
                 status = if (inGame) 2 else 1,
                 appField = if (inGame) appFieldBase64 else "",
                 appId = if (inGame) titleId else "",
@@ -209,19 +218,11 @@ object NextendoPresencePublisher {
             onFailure = ::describeFailure
         )
 
-        // Friend data is a separate game-token contract. Never pass the OAuth
-        // access token to /api/friends; keep the last validated snapshot on failure.
-        val nowEpochSeconds = System.currentTimeMillis() / 1000L
-        val gameToken = session.nexGameToken.takeIf {
-            it.startsWith("nx2.") &&
-                session.nexGameTokenExpiresAtEpochSeconds > nowEpochSeconds
-        }
-        if (gameToken != null) {
+        // Friends and presence share the same nx2 account-service contract.
+        if (presenceResult.isSuccess) {
             runCatching {
-                NextendoAuthClient.fetchGameFriends(gameToken)
+                NextendoAuthClient.fetchGameFriends(validGameToken)
             }.onSuccess(NextendoNativeBridge::replaceFriendCache)
         }
-
-        // Network failures are retried on the next heartbeat; never log tokens.
     }
 }
