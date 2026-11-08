@@ -118,3 +118,10 @@ NEX uses Eden `v0.2.0-rc1` as its source baseline. Eden's code is licensed under
 - [Eden license](https://git.eden-emu.dev/eden-emu/eden/src/tag/v0.2.0-rc1/LICENSE.txt)
 
 NEX is provided as-is, without warranty. Features may be incomplete, unstable, or changed as development continues.
+
+
+## Self-hosted Forgejo mirror
+
+A deployment bundle for a dedicated NEX Forgejo instance is available in [deploy/forgejo](deploy/forgejo/README.md). It includes Docker Compose, Caddy HTTPS configuration, GitHub pull-mirror instructions, and a release synchronizer for release notes and APK assets.
+
+The intended URL format is `https://git.YOUR-DOMAIN/XDavi196/NEX/releases`. This is deployment configuration only: the Forgejo service is not publicly live until a server and a domain controlled by the project owner are configured.
