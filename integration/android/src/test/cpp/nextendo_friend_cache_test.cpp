@@ -22,6 +22,35 @@ int main() {
     assert(cache::Get().empty());
     assert(cache::GetPlayerPid() == 0);
 
+    cache::ClearLocalPresence();
+    const auto empty_presence = cache::GetLocalPresence();
+    assert(empty_presence.status == 0);
+    assert(std::all_of(empty_presence.app_field.begin(), empty_presence.app_field.end(),
+                       [](std::uint8_t value) { return value == 0; }));
+
+    std::array<std::uint8_t, cache::MaxAppFieldBytes> local_app_field{};
+    local_app_field[0] = 'M';
+    local_app_field[1] = 'o';
+    local_app_field[2] = 'd';
+    local_app_field[3] = 'e';
+    local_app_field[4] = 0;
+    local_app_field[5] = 'c';
+    local_app_field[6] = 'P';
+    local_app_field[7] = 'r';
+    local_app_field[8] = 'i';
+    local_app_field[9] = 'v';
+    local_app_field[10] = 'a';
+    local_app_field[11] = 't';
+    local_app_field[12] = 'e';
+    cache::SetLocalPresence(2, local_app_field);
+    const auto actual_game_presence = cache::GetLocalPresence();
+    assert(actual_game_presence.status == 2);
+    assert(actual_game_presence.app_field == local_app_field);
+    cache::SetLocalPresence(0, local_app_field);
+    assert(cache::GetLocalPresence().status == 1);
+    cache::ClearLocalPresence();
+    assert(cache::GetLocalPresence().status == 0);
+
     cache::SetPlayerPid(1800000001);
     assert(cache::GetPlayerPid() == 1800000001);
 

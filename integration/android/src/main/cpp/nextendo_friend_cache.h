@@ -32,6 +32,13 @@ inline std::mutex cache_mutex;
 inline std::vector<Entry> cache_entries;
 inline std::atomic<std::uint64_t> current_player_pid{0};
 
+struct LocalPresenceSnapshot {
+    std::uint32_t status{};
+    std::array<std::uint8_t, MaxAppFieldBytes> app_field{};
+};
+
+inline LocalPresenceSnapshot local_presence{};
+
 /** Publishes the signed-in NEX PID to ACC without coupling HLE calls to Android/HTTP. */
 inline void SetPlayerPid(std::uint64_t pid) {
     current_player_pid.store(pid, std::memory_order_release);
@@ -81,6 +88,25 @@ inline std::vector<Entry> GetNetworkFriends() {
         }),
         entries.end());
     return entries;
+}
+
+/** Stores only the bounded AppKeyValueStorage bytes sent by the emulated game. */
+inline void SetLocalPresence(
+    std::uint32_t status,
+    const std::array<std::uint8_t, MaxAppFieldBytes>& app_field) {
+    std::lock_guard lock{cache_mutex};
+    local_presence.status = std::clamp(status, 1U, 2U);
+    local_presence.app_field = app_field;
+}
+
+inline LocalPresenceSnapshot GetLocalPresence() {
+    std::lock_guard lock{cache_mutex};
+    return local_presence;
+}
+
+inline void ClearLocalPresence() {
+    std::lock_guard lock{cache_mutex};
+    local_presence = {};
 }
 
 inline void Clear() {

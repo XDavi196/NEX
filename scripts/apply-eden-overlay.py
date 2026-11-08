@@ -102,6 +102,8 @@ def main() -> None:
         "    external fun getAllUsers(): Array<String>?\n",
         "    external fun updateNextendoFriendCache(pids: LongArray, nsas: LongArray, appIds: LongArray, usernames: Array<String>, statuses: IntArray, appFields: Array<ByteArray>)\n"
         "    external fun clearNextendoFriendCache()\n"
+        "    external fun getNextendoLocalPresence(): ByteArray?\n"
+        "    external fun clearNextendoLocalPresence()\n"
         "    external fun updateNextendoIdentity(pid: Long)\n"
         "    external fun clearNextendoIdentity()\n"
         "    external fun updateNextendoBaasIdToken(idToken: ByteArray)\n"
@@ -388,6 +390,33 @@ JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoFriendCache(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Common::NextendoFriendCache::Clear();
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_getNextendoLocalPresence(
+    JNIEnv* env, [[maybe_unused]] jobject obj) {
+    constexpr jsize PayloadSize = 1 + 0xC0;
+    const auto snapshot = Common::NextendoFriendCache::GetLocalPresence();
+    std::vector<jbyte> bytes(static_cast<std::size_t>(PayloadSize));
+    bytes[0] = static_cast<jbyte>(snapshot.status);
+    for (std::size_t i = 0; i < snapshot.app_field.size(); ++i) {
+        bytes[i + 1] = static_cast<jbyte>(snapshot.app_field[i]);
+    }
+    jbyteArray result = env->NewByteArray(PayloadSize);
+    if (result == nullptr) return nullptr;
+    env->SetByteArrayRegion(result, 0, PayloadSize, bytes.data());
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(result);
+        return nullptr;
+    }
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoLocalPresence(
+    JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
+    Common::NextendoFriendCache::ClearLocalPresence();
 }
 
 JNIEXPORT void JNICALL
@@ -1086,6 +1115,18 @@ void ClearParkedNextendoUdpSockets() {
 namespace {
 using namespace Common::NextendoFriendHle;
 
+#pragma pack(push, 1)
+struct NextendoGuestPresenceImpl {
+    std::array<u8, 16> user_id{};
+    s64 last_time_online_timestamp{};
+    u32 status{};
+    u8 same_presence_group_application{};
+    std::array<u8, 3> unknown{};
+    std::array<u8, 0xC0> app_key_value{};
+};
+static_assert(sizeof(NextendoGuestPresenceImpl) == 0xE0);
+#pragma pack(pop)
+
 std::vector<u64> ReadNextendoPids(HLERequestContext& ctx) {
     constexpr std::size_t MaxRequestedIds = Common::NextendoFriendCache::MaxFriends;
     std::vector<u64> pids;
@@ -1304,6 +1345,25 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         IPC::ResponseBuilder rb{ctx, 3};
         rb.Push(ResultSuccess);
         rb.Push<u32>(static_cast<u32>(pids.size()));
+    }
+
+    // Mirrors DEN2: cache the real 0xC0 game AppKeyValueStorage bytes from nn::friends.
+    void UpdateUserPresence(HLERequestContext& ctx) {
+        if (ctx.CanReadBuffer() &&
+            ctx.GetReadBufferSize() >= sizeof(NextendoGuestPresenceImpl)) {
+            NextendoGuestPresenceImpl presence{};
+            std::memcpy(&presence, ctx.ReadBuffer().data(), sizeof(presence));
+            const auto status = std::clamp<std::uint32_t>(presence.status, 1U, 2U);
+            Common::NextendoFriendCache::SetLocalPresence(status, presence.app_key_value);
+            LOG_INFO(Service_Friend,
+                     "[NEX Nextendo] Captured guest presence status={} appFieldBytes={}",
+                     status, presence.app_key_value.size());
+        } else {
+            LOG_WARNING(Service_Friend,
+                        "[NEX Nextendo] UpdateUserPresence received no valid 0xE0 presence buffer");
+        }
+        IPC::ResponseBuilder rb{ctx, 2};
+        rb.Push(ResultSuccess);
     }
 
     void UpdateFriendInfo(HLERequestContext& ctx) {
@@ -1793,6 +1853,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         activity_import
         + "import com.nex.nx.nextendo.NextendoPresencePublisher\n"
         + "import com.nex.nx.nextendo.NextendoHistoryPublisher\n"
+        + "import com.nex.nx.nextendo.NextendoNativeBridge\n"
         + "import com.nex.nx.nextendo.NextendoAuthManager\n",
         1,
     )
@@ -1817,6 +1878,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
 """
     lifecycle_replacement = """    fun onEmulationStarted() {
         emulationViewModel.setEmulationStarted(true)
+        NextendoNativeBridge.clearLocalPresence()
         NativeLibrary.playTimeManagerStart()
 
         val currentTitleId = NativeLibrary.playTimeManagerGetCurrentTitleId()
@@ -1839,6 +1901,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
             NativeLibrary.playTimeManagerGetPlayTime(programId)
         }
         NextendoPresencePublisher.clearGameActivity(this)
+        NextendoNativeBridge.clearLocalPresence()
         if (status == 0 && emulationViewModel.programChanged.value == -1) {
 """
     if activity_text.count(lifecycle_anchor) != 1:

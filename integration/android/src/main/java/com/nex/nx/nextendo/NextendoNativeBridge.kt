@@ -37,6 +37,25 @@ internal object NextendoNativeBridge {
         }
     }
 
+    data class GuestPresence(
+        val status: Int,
+        val appField: ByteArray
+    )
+
+    /** Actual 0xC0 AppKeyValueStorage captured by nn::friends::UpdateUserPresence. */
+    fun guestPresenceSnapshot(): GuestPresence? {
+        val bytes = runCatching { NativeLibrary.getNextendoLocalPresence() }.getOrNull()
+            ?: return null
+        if (bytes.size != 1 + 0xC0) return null
+        val status = bytes[0].toInt() and 0xFF
+        if (status !in 0..2) return null
+        return GuestPresence(status, bytes.copyOfRange(1, bytes.size))
+    }
+
+    fun clearLocalPresence() {
+        runCatching { NativeLibrary.clearNextendoLocalPresence() }
+    }
+
     fun clearIdentity() {
         runCatching { NativeLibrary.clearNextendoIdentity() }
     }

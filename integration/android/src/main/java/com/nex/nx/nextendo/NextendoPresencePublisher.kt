@@ -1,6 +1,7 @@
 package com.nex.nx.nextendo
 
 import android.content.Context
+import android.util.Base64
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
@@ -79,6 +80,7 @@ object NextendoPresencePublisher {
         appFieldBase64: String = ""
     ) {
         require(titleId.isNotBlank()) { "A real game title ID is required for in-game presence." }
+        NextendoNativeBridge.clearLocalPresence()
         gameTitleId = titleId
         gameDetail = detail
         this.appFieldBase64 = appFieldBase64
@@ -94,6 +96,7 @@ object NextendoPresencePublisher {
         gameTitleId = ""
         gameDetail = ""
         appFieldBase64 = ""
+        NextendoNativeBridge.clearLocalPresence()
         start(context)
         executor.execute { publishCurrentPresence() }
     }
@@ -121,6 +124,7 @@ object NextendoPresencePublisher {
         gameTitleId = ""
         gameDetail = ""
         appFieldBase64 = ""
+        NextendoNativeBridge.clearLocalPresence()
         if (gameToken.isNullOrBlank()) {
             lastPresenceDiagnostic = "offline_status_not_sent_game_token_unavailable"
             return
@@ -204,11 +208,25 @@ object NextendoPresencePublisher {
 
         val titleId = gameTitleId
         val inGame = titleId.isNotBlank()
+        val guestPresence = if (inGame) {
+            NextendoNativeBridge.guestPresenceSnapshot()
+        } else {
+            null
+        }
+        val rawGuestAppField = guestPresence?.appField
+        val encodedGuestAppField = rawGuestAppField
+            ?.takeIf { bytes -> bytes.any { it != 0.toByte() } }
+            ?.let { bytes -> Base64.encodeToString(bytes, Base64.NO_WRAP) }
+        val presenceStatus = if (inGame) {
+            maxOf(1, guestPresence?.status?.coerceIn(1, 2) ?: 1)
+        } else {
+            1
+        }
         val presenceResult = runCatching {
             NextendoAuthClient.postPresence(
                 gameToken = validGameToken,
-                status = if (inGame) 2 else 1,
-                appField = if (inGame) appFieldBase64 else "",
+                status = presenceStatus,
+                appField = if (inGame) encodedGuestAppField ?: appFieldBase64 else "",
                 appId = if (inGame) titleId else "",
                 appDetail = if (inGame) gameDetail else ""
             )
