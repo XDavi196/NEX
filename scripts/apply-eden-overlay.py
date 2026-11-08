@@ -693,7 +693,8 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
 
         if (ret == 16 && bsd_errno == Errno::SUCCESS && p_addr_in != nullptr &&
             Common::NextendoNatStationRewrite::ObserveNncsReply(
-                addr_in.portno, std::span<const u8>(message.data(), message.size()))) {
+                addr_in.portno,
+                std::span<const u8>(message.data(), static_cast<std::size_t>(ret)))) {
             LOG_INFO(Service,
                      "[NEX] Captured the public NAT mapping from both NNCS vantages "
                      "on the game's UDP socket");
