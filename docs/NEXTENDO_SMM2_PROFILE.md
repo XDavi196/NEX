@@ -60,7 +60,8 @@ The public Nextendo SMM2 server source includes DataStore handlers for the playe
 - Connect the guest's actual DNS/socket path to those runtime values; validate ACC cache delivery and guest LoginEx with the provisioned token.
 - Validate the parsed LoginEx ticket and secure CONNECT against the live service. The local codecs already have synthetic wire-format tests.
 - Integrate the session lifecycle into the guest's network path, implement title-specific RMC methods and verify matchmaking.
-- Implement live NNCS/NAT sockets, UDP mapping preservation/keepalives, peer discovery, P2P hole-punch and cleanup.
+- Supply and verify the two SMM2 NNCS endpoints/ports and the deployed 16-byte probe contract. NEX now has a one-shot two-vantage UDP probe client, but it requires explicit runtime endpoints and is not called by the guest game's network lifecycle.
+- Integrate probe results with the guest's NAT lifecycle, then implement periodic keepalives, peer discovery, matchmaking signaling, P2P hole-punch and cleanup.
 - Test using two NEX accounts on two Android devices in a game whose live service reports matchmaking as supported.
 
 The profile and serializers are code-level progress. They do not establish that the production endpoint accepts NEX or that Super Mario Maker 2 multiplayer works. A complete test still requires two NEX accounts, two devices and an actual in-game match/session.
