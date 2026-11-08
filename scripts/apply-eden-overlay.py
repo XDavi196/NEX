@@ -69,6 +69,8 @@ def main() -> None:
         "    external fun clearNextendoBaasIdToken()\n"
         "    external fun updateNextendoDnsRedirect(hostname: String, ipv4: String): Boolean\n"
         "    external fun clearNextendoDnsRedirects()\n"
+        "    external fun getNextendoPrudpDiagnostics(): Array<String>?\n"
+        "    external fun clearNextendoPrudpDiagnostics()\n"
         "    external fun getAllUsers(): Array<String>?\n",
     )
 
@@ -126,7 +128,7 @@ def main() -> None:
     replace_once(
         native_cpp,
         "#include <codecvt>\n",
-        "#include <algorithm>\n#include <codecvt>\n",
+        "#include <algorithm>\n#include <codecvt>\n#include <string>\n",
     )
     replace_once(
         native_cpp,
@@ -141,7 +143,56 @@ def main() -> None:
         JNIEnv* env,
         [[maybe_unused]] jobject obj) {
 """
-    native_jni_bridge = r'''JNIEXPORT jboolean JNICALL
+    native_jni_bridge = r'''JNIEXPORT jobjectArray JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_getNextendoPrudpDiagnostics(
+    JNIEnv* env, [[maybe_unused]] jobject obj) {
+    const auto packets = Common::NextendoPrudpObserver::GetRecentPackets();
+    jclass string_class = env->FindClass("java/lang/String");
+    if (string_class == nullptr) {
+        return nullptr;
+    }
+    jobjectArray result = env->NewObjectArray(
+        static_cast<jsize>(packets.size()), string_class, nullptr);
+    env->DeleteLocalRef(string_class);
+    if (result == nullptr) {
+        return nullptr;
+    }
+
+    for (jsize index = 0; index < static_cast<jsize>(packets.size()); ++index) {
+        const auto& packet = packets[static_cast<std::size_t>(index)];
+        std::string line = packet.server_name;
+        line += packet.from_client ? " | OUT " : " | IN ";
+        line += packet.type == 0 ? "SYN" : "CONNECT";
+        line += " flags=" + std::to_string(packet.flags);
+        line += " src=" + std::to_string(packet.source_type) + ":" +
+                std::to_string(packet.source_port);
+        line += " dst=" + std::to_string(packet.destination_type) + ":" +
+                std::to_string(packet.destination_port);
+        line += " packet=" + std::to_string(packet.packet_id);
+        line += " minor=" + std::to_string(packet.minor_version);
+        line += " functions=" + std::to_string(packet.supported_functions);
+        line += " payload_bytes=" + std::to_string(packet.payload_bytes);
+
+        jstring value = env->NewStringUTF(line.c_str());
+        if (value == nullptr) {
+            return nullptr;
+        }
+        env->SetObjectArrayElement(result, index, value);
+        env->DeleteLocalRef(value);
+        if (env->ExceptionCheck()) {
+            return nullptr;
+        }
+    }
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoPrudpDiagnostics(
+    JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
+    Common::NextendoPrudpObserver::ClearRecentPackets();
+}
+
+JNIEXPORT jboolean JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoDnsRedirect(
     JNIEnv* env, [[maybe_unused]] jobject obj, jstring hostname, jstring ipv4) {
     if (hostname == nullptr || ipv4 == nullptr) {
