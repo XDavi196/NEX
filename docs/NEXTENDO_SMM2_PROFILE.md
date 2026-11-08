@@ -45,6 +45,14 @@ The auth connection uses WSS on port 443. The secure endpoint is advertised to t
 
 \`NextendoSmm2Profile\` builds WSS endpoints while retaining the supplied hostname for TLS hostname verification/SNI, and parses the secure StationURL. The destination hostname/IP and DNS mapping are still deployment-specific and have not been confirmed for the live Nextendo deployment. TLS certificate checks remain enabled.
 
+## Public auth hostname mapping
+
+The public game-server profile associates the SMM2 PRUDP title key `fdf6617f` with game-server ID `22306D00`. The Switch NEX auth hostname pattern yields `g22306D00-lp1.s.n.srv.nintendo.net`. NEX records this as `AUTH_HOSTNAME` and preserves it in the WSS URI for TLS SNI. This is only the hostname: the public repository does not publish the production Nextendo IPv4 destination, live certificate chain, or the NAT vantage address. The exact-host resolver therefore remains unconfigured until runtime infrastructure values are supplied.
+
+## What the public SMM2 server currently demonstrates
+
+The public Nextendo SMM2 server source includes DataStore handlers for the player's profile and user list, including `sync_user_profile(49)` and `get_users(48)`, which support Course World identity initialization. The public compatibility registry still marks matchmaking and presence as untested. NEX must not invent RMC method IDs, room payloads, or NAT probe ports to fill that gap; the server implementation must expose and verify the matching methods first.
+
 ## What remains before an SMM2 session can start
 
 - Provision the NEX BAAS signer, matching public JWK/JWKS URL, key ID, issuer, audience, subject/PID mapping and any required client-attestation material, then install the provider in the NEX runtime.
