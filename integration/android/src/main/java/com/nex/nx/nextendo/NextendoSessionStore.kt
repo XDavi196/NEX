@@ -122,6 +122,26 @@ object NextendoSessionStore {
         saveSession(context, current.copy(gameTokenDiagnostic = diagnostic))
     }
 
+    /**
+     * Exports the currently linked account as a portable, password-encrypted backup.
+     * The backup contains bearer tokens and must be kept private.
+     */
+    fun exportEncryptedBackup(context: Context, passphrase: CharArray): String {
+        val session = load(context)
+            ?: throw IllegalStateException("Nenhuma conta Nextendo está conectada ao NEX.")
+        return NextendoSessionBackupCodec.encode(session, passphrase)
+    }
+
+    /**
+     * Restores only NEX-format encrypted backups. The destination is re-encrypted
+     * with this installation's Android Keystore key before returning.
+     */
+    fun importEncryptedBackup(context: Context, backup: String, passphrase: CharArray) {
+        val restored = NextendoSessionBackupCodec.decode(backup, passphrase)
+        saveSession(context, restored)
+        clearPendingAuthorization(context)
+    }
+
     fun load(context: Context): Session? {
         val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
         val ivText = preferences.getString(SESSION_IV, null) ?: return null
