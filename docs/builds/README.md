@@ -18,4 +18,4 @@ O site usa apenas HTML, CSS e JavaScript estáticos; não precisa compilar o sit
 
 ## Forgejo
 
-`https://forgejo.org/releases/` distribui os binários do próprio Forgejo. Não é uma instância para hospedar repositórios de terceiros. Para criar o espelho `Compila-o-`, é necessário escolher uma instância Forgejo concreta (por exemplo, Codeberg ou um servidor próprio), criar o repositório de destino e conceder acesso de escrita ao espelho. Nenhuma cópia do repositório privado foi enviada para outro serviço.
+`https://forgejo.org/releases/` distribui os binários do próprio Forgejo. Não é uma instância para hospedar repositórios de terceiros. Para criar o espelho `Compila-o-`, é necessário escolher uma instância Forgejo concreta e criar o repositório de destino. Codeberg utiliza Forgejo, mas não oferece hospedagem privada; como `Compila-o-` está privado, manter essa privacidade exige uma instância própria ou outro provedor que aceite repos privados. Tornar o código público requer autorização explícita e revisão da licença. Nenhuma cópia do repositório privado foi enviada para outro serviço.
