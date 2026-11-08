@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08090d">
+  <meta name="description" content="NEX — emulador experimental para Android, baseado no Eden e com integração própria à Nextendo Network.">
+  <meta property="og:title" content="NEX — Next Experience">
+  <meta property="og:description" content="Conheça o projeto NEX, acompanhe as novidades e baixe as versões experimentais.">
+  <meta property="og:type" content="website">
+  <title>NEX — Next Experience</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="NEX início">
+      <span class="brand-mark">NEX<span>.</span></span>
+      <span class="brand-caption">NEXT EXPERIENCE</span>
+    </a>
+    <nav aria-label="Menu principal">
+      <a href="#project">Projeto</a>
+      <a href="#network">Nextendo</a>
+      <a href="#downloads">Downloads</a>
+      <a href="#about">Sobre</a>
+    </nav>
+    <a class="github-link" href="https://github.com/XDavi196/NEX" target="_blank" rel="noopener">GitHub <span>↗</span></a>
+  </header>
+
+  <main>
+    <section class="hero wrap" id="home">
+      <div class="hero-content">
+        <div class="eyebrow"><i></i> EMULADOR ANDROID · PROJETO INDEPENDENTE</div>
+        <h1>YOUR GAMES.<br><em>YOUR NEXT.</em></h1>
+        <p class="lead">Conheça o NEX: um projeto experimental para Android, baseado no Eden, com identidade própria e integração independente à Nextendo Network.</p>
+        <div class="hero-buttons">
+          <a class="btn primary" id="hero-download" href="https://github.com/XDavi196/NEX/releases/latest"><b>↓</b><span>Baixar NEX<small id="hero-version">Última versão disponível</small></span></a>
+          <a class="btn secondary" href="https://github.com/XDavi196/NEX/releases">Ver todas as versões <b>↗</b></a>
+        </div>
+        <p class="disclaimer">Builds experimentais. Compatibilidade e recursos ainda estão em desenvolvimento.</p>
+      </div>
+      <div class="hero-art" aria-label="Marca NEX">
+        <div class="art-grid"></div><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+        <div class="nex-logo">
+          <div>NEX</div>
+          <span class="logo-bars"><i></i><i></i><i></i></span>
+          <small>PLAY BEYOND</small>
+        </div>
+        <span class="art-tag top">NEX / ANDROID</span><span class="art-tag bottom">INDEPENDENT PROJECT</span>
+      </div>
+    </section>
+
+    <section class="stats wrap" aria-label="Informações do projeto">
+      <div><small>PLATAFORMA</small><strong>Android</strong><span>Celulares e tablets</span></div>
+      <div><small>BASE TÉCNICA</small><strong>Eden</strong><span>Fork independente</span></div>
+      <div><small>IDENTIDADE</small><strong>NEX</strong><span>Aplicativo próprio</span></div>
+      <div><small>ESTADO</small><strong><i class="state-dot"></i> Experimental</strong><span>Não é versão estável</span></div>
+    </section>
+
+    <section class="section wrap" id="project">
+      <div class="section-title">
+        <div><label>01 / O PROJETO</label><h2>Mais que uma cópia.<br><em>Uma identidade própria.</em></h2></div>
+        <p>O NEX utiliza o Eden como base técnica, mas mantém seu próprio aplicativo, identidade Android e implementação de serviços de rede.</p>
+      </div>
+      <div class="cards">
+        <article class="info-card featured"><span class="card-index">01</span><div class="card-symbol">◈</div><h3>Emulação Android</h3><p>Desenvolvimento voltado para celulares e tablets Android, com builds otimizados e melhorias contínuas.</p><small>BASE EDEN</small></article>
+        <article class="info-card"><span class="card-index">02</span><div class="card-symbol">⌘</div><h3>Identidade NEX</h3><p>Aplicativo independente, com nome, pacote Android e experiência visual próprios.</p><small>COM.NEX.NX</small></article>
+        <article class="info-card"><span class="card-index">03</span><div class="card-symbol">⌁</div><h3>Desenvolvimento aberto</h3><p>Acompanhe o código-fonte, as alterações e os arquivos publicados em cada versão.</p><small>OPEN SOURCE</small></article>
+      </div>
+    </section>
+
+    <section class="network" id="network">
+      <div class="network-inner wrap">
+        <div class="network-art"><div class="network-glyph">N<span>×</span></div><span>CONNECTED / NEX</span></div>
+        <div class="network-copy">
+          <label>02 / CONECTIVIDADE</label>
+          <h2>Nextendo<br><em>Network.</em></h2>
+          <p>O NEX está desenvolvendo sua integração própria com a Nextendo Network, incluindo autenticação de conta e recursos sociais oferecidos oficialmente pelo serviço.</p>
+          <div class="chips"><span>Conta</span><span>Amigos</span><span>Presença</span></div>
+          <small>Os recursos dependem dos serviços oficiais e de validação. O multiplayer dentro dos jogos ainda não está implementado nem confirmado.</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="section downloads wrap" id="downloads">
+      <div class="section-title">
+        <div><label>03 / DOWNLOADS</label><h2>Encontre sua<br><em>versão do NEX.</em></h2></div>
+        <p>As publicações são consultadas diretamente no GitHub. Uma nova release aparecerá aqui automaticamente quando for publicada pelo projeto.</p>
+      </div>
+      <div class="latest">
+        <div class="latest-head"><span><i></i> ÚLTIMA VERSÃO PUBLICADA</span><time id="latest-date">Consultando GitHub…</time></div>
+        <div class="latest-body">
+          <div><small>NEX / ANDROID</small><h3 id="latest-version">Carregando…</h3><p id="latest-description">Buscando a última versão publicada.</p></div>
+          <div class="download-action"><a class="btn primary" id="latest-download" href="https://github.com/XDavi196/NEX/releases/latest">Abrir release ↗</a><span id="latest-size">GitHub Releases</span></div>
+        </div>
+        <div id="release-assets" class="assets"></div>
+      </div>
+      <div class="list-heading"><h3>Versões recentes</h3><a href="https://github.com/XDavi196/NEX/releases" target="_blank" rel="noopener">Histórico completo ↗</a></div>
+      <div id="release-list" class="release-list" aria-live="polite"><p class="loading">Carregando publicações…</p></div>
+      <p class="warning"><b>ATENÇÃO:</b> as versões disponíveis podem ser experimentais. Leia as notas e verifique os arquivos antes de instalar.</p>
+    </section>
+
+    <section class="section wrap about" id="about">
+      <div><label>04 / SOBRE O NEX</label><h2>Em evolução.<br><em>Feito em público.</em></h2></div>
+      <div class="about-copy">
+        <p>O NEX é um fork independente baseado no Eden. Não é um produto oficial da equipe Eden nem da Nextendo. O projeto mantém sua própria identidade e credenciais de aplicação.</p>
+        <div class="about-links">
+          <a href="https://github.com/XDavi196/NEX" target="_blank" rel="noopener">Código-fonte <b>↗</b></a>
+          <a href="https://github.com/XDavi196/NEX/issues" target="_blank" rel="noopener">Relatar problema <b>↗</b></a>
+          <a href="https://github.com/XDavi196/NEX/releases" target="_blank" rel="noopener">Releases <b>↗</b></a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer wrap">
+    <a class="brand" href="#home"><span class="brand-mark">NEX<span>.</span></span><span class="brand-caption">NEXT EXPERIENCE</span></a>
+    <p>Projeto independente. Não afiliado oficialmente ao Eden ou à Nextendo.</p>
+    <small>© <span id="year"></span> NEX</small>
+  </footer>
+</body>
+</html>
