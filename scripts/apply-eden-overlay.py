@@ -1486,8 +1486,8 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     land_layout_text = land_layout_text.replace(
         landscape_gap, 'android:layout_width="8dp"'
     )
-    land_settings_anchor = '        <com.google.android.material.card.MaterialCardView\\n            android:id="@+id/settings_button"'
-    land_friends_entry = """        <com.google.android.material.card.MaterialCardView
+    land_settings_anchor = '        <com.google.android.material.card.MaterialCardView\n            android:id="@+id/settings_button"'
+    land_friends_entry = '''        <com.google.android.material.card.MaterialCardView
             android:id="@+id/friends_button"
             style="@style/EdenCard"
             android:layout_width="42dp"
@@ -1512,7 +1512,7 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
             android:layout_height="wrap_content" />
 
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/settings_button\\""" 
+            android:id="@+id/settings_button"'''
     if land_layout_text.count(land_settings_anchor) != 1:
         raise RuntimeError("Could not identify landscape Games settings button")
     land_layout_text = land_layout_text.replace(
