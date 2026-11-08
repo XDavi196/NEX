@@ -311,6 +311,20 @@ object NextendoAuthClient {
         )
     }
 
+    /** Public health ping; null represents HTTP/network failure. */
+    internal fun pingBackend(): Long? {
+        val started = System.nanoTime()
+        return runCatching {
+            request(
+                url = "$BASE_URL/api/health",
+                method = "GET",
+                connectTimeoutMs = 3_000,
+                readTimeoutMs = 3_000
+            )
+            ((System.nanoTime() - started) / 1_000_000L).coerceAtMost(Int.MAX_VALUE.toLong())
+        }.getOrNull()
+    }
+
     /**
      * Calls an account endpoint with NEX's OAuth bearer token and NEX's own
      * Client-ID header. Paths are restricted to the fixed Nextendo API origin.
