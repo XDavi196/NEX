@@ -21,7 +21,7 @@ DEN2 declares a separate Client ID, nxc_z_fetCuVO1qx, in src/web_service/nextend
 | Project/source | What the public source shows | NEX implementation decision |
 |---|---|---|
 | DEN2 — src/web_service/nextendo_api.cpp | Separate application Client ID, browser OAuth/PKCE, token exchange/refresh and account/game-token API requests | Keep NEX's own Client ID and its existing PKCE callback and API client. |
-| DEN2 — src/common/nextendo_account.cpp | Local PID/profile/session persistence in nextendo_account.txt | Keep NEX's Android Keystore-encrypted session store and NEX-only encrypted backup. |
+| DEN2 — src/common/nextendo_account.cpp | Local PID/profile/session persistence in nextendo_account.txt | Support an explicit user-selected import of the key=value file, validate its bearer token/PID with Nextendo, then re-encrypt the session in NEX Android Keystore storage. Do not copy DEN's Client ID or local signing path. |
 | DEN2 — src/core/hle/service/acc/acc.cpp | Local BAAS RS256 JWT construction, nnex claim, private-key file/environment lookup and an auto-generated RSA fallback | Do not port the local-signing fallback. Nextendo explicitly rejects client-generated BAAS keys and third-party RS256 signatures. |
 | DEN2 — src/core/hle/service/ssl and service/sockets | Nextendo-specific TLS/SNI, DNS and socket compatibility fixes | Use NEX-owned exact-host DNS and TLS code; port only protocol behavior verified against the service. |
 | Citron Nextendo — src/web_service/nextendo_api.cpp | Browser OAuth/PKCE, an application identity injected from a private build header, account/profile APIs, friend list and friend-request operations | Keep NEX's own Client ID and NEX OAuth contract; implement the supported account actions in NEX's own client. |
@@ -54,7 +54,7 @@ The Android Friends screen displays accepted friends and incoming requests, supp
 
 Missing presence stays unknown, not offline. A friend can remain visible in the Android UI without an NSA. The NEX Android bridge and native HLE cache only accept entries with an explicit non-zero NSA from the service. NEX never substitutes a friend's PID for an NSA. The signed-in player's PID is also hidden in the NEX account panel because the Citron Nextendo README warns that a PID acts as a credential.
 
-DEN2's README and release notes describe nextendo_account.txt as a session-bearing file generated through the Orange app and warn that it must not be shared. NEX does not import that file or use Orange to copy credentials across clients. The user signs in to NEX through NEX's own OAuth registration.
+NEX supports a player-selected import of DEN/Citron's nextendo_account.txt. The importer accepts the documented key=value fields (pid, username, friend_code, token, optional refresh_token and token_expiry), checks the access token against Nextendo userinfo, and requires the returned PID to match the file before saving anything. The plaintext file is not copied into NEX storage; accepted fields are re-encrypted by Android Keystore. The imported token is only an account bearer credential: all NEX API calls continue to send NEX's own X-Nextendo-Client-Id, and any game token is requested afresh through that NEX client. A refresh token from another client may be rejected by the server; in that case the player must complete NEX's own PKCE sign-in. The file is never bundled or logged.
 
 ## BAAS / ACC — explicitly blocked by the founder's answer
 
@@ -84,7 +84,7 @@ NEX's DNS routes, PRUDP-Lite tests, LoginEx codecs and NAT probe utilities are c
 
 ## What is needed from the project owner
 
-No DEN Client ID, Citron build secret, nextendo_account.txt, Orange export, token, password, private key or attestation file is needed.
+No DEN/Citron Client ID, build secret, password, private key or attestation file is imported. The player may explicitly select nextendo_account.txt; the access/refresh token inside it is handled only as a user-supplied session and is re-encrypted locally, never copied into the APK.
 
 The owner-side checks are limited to:
 
