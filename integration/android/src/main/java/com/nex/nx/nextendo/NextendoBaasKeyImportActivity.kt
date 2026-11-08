@@ -75,7 +75,6 @@ class NextendoBaasKeyImportActivity : Activity() {
             val result = runCatching {
                 NextendoBaasRuntime.installCitronSigningKey(applicationContext, pem)
             }
-            pem.fill(' ')
             mainHandler.post {
                 if (!isFinishing && !isDestroyed) {
                     result.fold(
