@@ -103,8 +103,9 @@ The BAAS builder is connected through `NextendoBaasRuntime` to Eden's ACC token 
 
 ### NAT primitives and UDP socket lifetime
 
-- A 16-byte big-endian NNCS probe codec follows the public Nextendo NNCS implementation.
-- A conservative two-vantage tracker classifies equal mappings, changed ports and ambiguous observations. It rejects duplicate/unknown vantage observations and clears its state on close.
+- A 16-byte big-endian NNCS probe codec follows the public Nextendo NNCS message layout.
+- `NextendoNatProbeClient` can run a one-shot two-vantage probe when supplied with two explicit endpoint host/port pairs. Both requests use the same ephemeral UDP socket; responses are accepted only from the configured source IPv4/port and are checked for the expected 16-byte message.
+- A conservative two-vantage tracker compares observed external mappings and rejects duplicate/unknown vantage observations. This is not a full NAT filtering diagnosis; it clears its state on close.
 - Eden's native network layer now has an NEX UDP socket keeper. While a Nextendo PID is active, a bound, unconnected UDP socket can be parked for five seconds when the guest closes it.
 - The keeper holds at most eight sockets, keys them by local port, and adopts only when the next bind uses the same local IPv4 address. It closes expired/replaced entries and clears all parked sockets on account change/logout or network-instance shutdown.
 - This implements the short close/reopen preservation used by P2P NAT-probe flows; it does not itself send NNCS probes, schedule keepalives, discover peers, signal matchmaking, or perform UDP hole-punching.
