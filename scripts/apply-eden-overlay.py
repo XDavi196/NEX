@@ -69,6 +69,8 @@ def main() -> None:
         "    external fun clearNextendoBaasIdToken()\n"
         "    external fun updateNextendoDnsRedirect(hostname: String, ipv4: String): Boolean\n"
         "    external fun clearNextendoDnsRedirects()\n"
+        "    external fun updateNextendoObservedExternalIpv4(ipv4: String): Boolean\n"
+        "    external fun clearNextendoObservedExternalIpv4()\n"
         "    external fun getNextendoPrudpDiagnostics(): Array<String>?\n"
         "    external fun clearNextendoPrudpDiagnostics()\n"
         "    external fun getAllUsers(): Array<String>?\n",
@@ -124,6 +126,15 @@ def main() -> None:
         raise RuntimeError(f"Missing NEX PRUDP observer header: {prudp_observer_source}")
     shutil.copy2(prudp_observer_source, prudp_observer_destination)
 
+    # Copy the bounded station-address rewriter, activated only after a successful
+    # two-vantage NNCS observation provides a public IPv4 address.
+    nat_rewrite_source = NEX_SOURCE / "integration/android/src/main/cpp/nextendo_nat_station_rewrite.h"
+    nat_rewrite_destination = eden / "src/core/hle/service/ssl/nextendo_nat_station_rewrite.h"
+    if not nat_rewrite_source.is_file():
+        raise RuntimeError(f"Missing NEX NAT station rewriter: {nat_rewrite_source}")
+    nat_rewrite_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(nat_rewrite_source, nat_rewrite_destination)
+
     native_cpp = app_dir / "src/main/jni/native.cpp"
     replace_once(
         native_cpp,
@@ -138,7 +149,8 @@ def main() -> None:
         '#include "core/hle/service/acc/nextendo_baas_token_cache.h"\n'
         '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n'
         '#include "core/internal_network/network.h"\n'
-        '#include "core/internal_network/nextendo_prudp_observer.h"\n',
+        '#include "core/internal_network/nextendo_prudp_observer.h"\n'
+        '#include "core/hle/service/ssl/nextendo_nat_station_rewrite.h"\n',
     )
     native_jni_anchor = """JNIEXPORT jobjectArray JNICALL Java_org_yuzu_yuzu_1emu_NativeLibrary_getAllUsers(
         JNIEnv* env,
@@ -237,6 +249,27 @@ JNIEXPORT void JNICALL
 Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoDnsRedirects(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Common::NextendoDnsRedirectCache::Clear();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoObservedExternalIpv4(
+    JNIEnv* env, [[maybe_unused]] jobject obj, jstring ipv4) {
+    if (ipv4 == nullptr) return JNI_FALSE;
+    const char* chars = env->GetStringUTFChars(ipv4, nullptr);
+    if (chars == nullptr) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return JNI_FALSE;
+    }
+    const bool accepted =
+        Common::NextendoNatStationRewrite::SetObservedExternalIPv4(chars);
+    env->ReleaseStringUTFChars(ipv4, chars);
+    return accepted ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoObservedExternalIpv4(
+    JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
+    Common::NextendoNatStationRewrite::ClearObservedExternalIPv4();
 }
 
 JNIEXPORT void JNICALL
@@ -341,6 +374,7 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoIdentity(
     if (pid > 0) {
         if (current_pid != static_cast<std::uint64_t>(pid)) {
             Network::ClearNextendoUdpSocketCache();
+            Common::NextendoNatStationRewrite::ClearObservedExternalIPv4();
         }
         Common::NextendoFriendCache::SetPlayerPid(static_cast<std::uint64_t>(pid));
     } else {
@@ -354,6 +388,7 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoIdentity(
     JNIEnv* /*env*/, [[maybe_unused]] jobject obj) {
     Network::ClearNextendoUdpSocketCache();
     Common::NextendoFriendCache::ClearPlayerPid();
+    Common::NextendoNatStationRewrite::ClearObservedExternalIPv4();
 }
 
 JNIEXPORT void JNICALL
