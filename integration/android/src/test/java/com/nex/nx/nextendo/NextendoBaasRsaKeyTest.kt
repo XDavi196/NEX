@@ -75,6 +75,41 @@ class NextendoBaasRsaKeyTest {
     }
 
     @Test
+    fun compactBaasJwtFromBuilderVerifiesAgainstExportedJwkPublicKey() {
+        val pair = keyPair()
+        val jwk = NextendoBaasJwk.from(pair.public as RSAPublicKey)
+        val signer = object : NextendoBaasSigner {
+            override val keyId: String = jwk.keyId
+            override val jwksUrl = "https://nex.example.invalid/jwks"
+            override fun signRs256(signingInput: ByteArray): ByteArray =
+                Signature.getInstance("SHA256withRSA").run {
+                    initSign(pair.private)
+                    update(signingInput)
+                    sign()
+                }
+        }
+        val claims = mapOf(
+            "iss" to kotlinx.serialization.json.JsonPrimitive("https://nex.example.invalid/issuer"),
+            "aud" to kotlinx.serialization.json.JsonPrimitive("nex-android"),
+            "sub" to kotlinx.serialization.json.JsonPrimitive("player-123"),
+            "hm" to kotlinx.serialization.json.JsonPrimitive(true),
+            "iat" to kotlinx.serialization.json.JsonPrimitive(1_800_000_000L),
+            "exp" to kotlinx.serialization.json.JsonPrimitive(1_800_003_600L)
+        )
+        val jwt = NextendoBaasIdTokenBuilder.build(
+            claims = claims,
+            gameToken = "nx2.test-server-token",
+            signer = signer
+        )
+        val parts = jwt.split('.')
+        assertEquals(3, parts.size)
+        val verifier = Signature.getInstance("SHA256withRSA")
+        verifier.initVerify(pair.public)
+        verifier.update("${parts[0]}.${parts[1]}".toByteArray(StandardCharsets.US_ASCII))
+        assertTrue(verifier.verify(Base64.getUrlDecoder().decode(parts[2])))
+    }
+
+    @Test
     fun publicJwkEncodesUnsignedRsaParametersAsBase64Url() {
         val jwk = NextendoBaasJwk.from(keyPair().public as RSAPublicKey)
         assertTrue(jwk.modulus.matches(Regex("[A-Za-z0-9_-]+")))
