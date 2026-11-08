@@ -11,6 +11,7 @@ This folder contains the NEX-owned Android integration source:
 - `NextendoPresencePublisher.kt` — online presence heartbeat every 60 seconds, offline publication on disconnect, and in-game Title ID publication from the Eden lifecycle hook.
 - `NextendoPrudpLiteAuthenticator.kt` — Nextendo published Lite CONNECT HMAC-MD5 proof, using only a runtime-provided title key.
 - `NextendoSmm2Profile.kt` — public SMM2 title profile, WSS endpoint construction and dynamic secure StationURL parsing.
+- `NextendoNatProbeClient.kt` — bounded two-vantage NNCS UDP probe using one local socket and explicit runtime endpoint configuration.
 - `NextendoBaasIdTokenBuilder.kt` — RS256 BAAS `id_token` with the provisioned JWKS `jku` header and the `nnex` game-token claim.
 - `NextendoBaasAuthenticationInfo.kt` — wraps the signed JWT in the NEX `AuthenticationInfo` DataHolder for `LoginEx.extraData`.
 - `NextendoPrudpLiteSession.kt` — tested PRUDP-Lite handshake, reliable DATA/ACK handling, duplicate suppression, fragmentation and connection state machine.
