@@ -64,4 +64,15 @@ internal object NextendoNativeBridge {
     fun clearDnsRedirects() {
         runCatching { NativeLibrary.clearNextendoDnsRedirects() }
     }
+
+    /** Reads only the bounded SYN/CONNECT metadata snapshot collected by Eden SSL. */
+    fun prudpDiagnostics(): List<String> =
+        runCatching {
+            NativeLibrary.getNextendoPrudpDiagnostics()?.toList().orEmpty()
+        }.getOrDefault(emptyList())
+
+    /** Prevents a previous linked account's network metadata from being shown. */
+    fun clearPrudpDiagnostics() {
+        runCatching { NativeLibrary.clearNextendoPrudpDiagnostics() }
+    }
 }
