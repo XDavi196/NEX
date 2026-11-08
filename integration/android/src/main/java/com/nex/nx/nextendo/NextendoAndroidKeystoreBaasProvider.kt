@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * Builds the BAAS claim set only from values supplied by the Nextendo integration
  * contract. In particular, the subject mapping is injected rather than guessed.
  */
-internal class NextendoAndroidKeystoreBaasProvider private constructor(
+internal class NextendoAndroidKeystoreBaasProvider(
     override val signer: NextendoBaasSigner,
     private val issuer: String,
     private val audience: String,
