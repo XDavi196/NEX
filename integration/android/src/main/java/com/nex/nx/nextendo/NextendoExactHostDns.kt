@@ -49,6 +49,10 @@ internal object NextendoHttpClientFactory {
         fallbackDns: Dns = Dns.SYSTEM
     ): okhttp3.OkHttpClient {
         val builder = okhttp3.OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
         if (config != null) {
             builder.dns(NextendoExactHostDns(config.serverIpv4, fallbackDns))
         } else {
