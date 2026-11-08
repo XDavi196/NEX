@@ -43,7 +43,8 @@ class NextendoPrudpLiteSessionTest {
             supportedFunctions = 0x0034,
             connectionSignature = connectionSignature
         )
-        val connectStep = session.receive(NextendoPrudpLiteCodec.encode(synAck), nowMs + 1L)
+        // Keep the synthetic handshake clock at the supplied instant so later calls using the real monotonic clock never move backwards.
+        val connectStep = session.receive(NextendoPrudpLiteCodec.encode(synAck), nowMs)
         assertEquals(1, connectStep.outboundFrames.size)
         val connectPacket = NextendoPrudpLiteCodec.decode(connectStep.outboundFrames.single())
             .packets.single()
@@ -68,7 +69,7 @@ class NextendoPrudpLiteSessionTest {
             packetId = 1,
             payload = byteArrayOf(0x10, 0x20)
         )
-        val connected = session.receive(NextendoPrudpLiteCodec.encode(connectAck), nowMs + 2L)
+        val connected = session.receive(NextendoPrudpLiteCodec.encode(connectAck), nowMs)
         assertEquals(NextendoPrudpLiteSession.State.CONNECTED, session.state())
         assertTrue(connected.events.single() is NextendoPrudpLiteSession.Event.Connected)
         assertArrayEquals(
