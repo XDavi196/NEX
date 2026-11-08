@@ -117,7 +117,7 @@ object NextendoAuthManager {
                     Result.failure(IllegalStateException("scope_missing"))
                 } else {
                     runCatching {
-                        NextendoAuthClient.fetchNexGameToken(tokens.accessToken)
+                        fetchNexGameTokenWithRecovery(context, tokens.accessToken)
                     }
                 }
                 val gameToken = gameTokenAttempt.getOrNull()
@@ -705,6 +705,32 @@ object NextendoAuthManager {
     }
 
     /**
+     * Mirrors the safe recovery behavior used by the DEN reference client:
+     * if the game-token endpoint rejects the current OAuth access token with
+     * HTTP 401, rotate the NEX refresh token once and retry with the new token.
+     * No other HTTP error is retried, and no DEN credential is involved.
+     */
+    private fun fetchNexGameTokenWithRecovery(
+        context: Context,
+        accessToken: String
+    ): NextendoAuthClient.NexGameToken {
+        return try {
+            NextendoAuthClient.fetchNexGameToken(accessToken)
+        } catch (error: NextendoAuthClient.NextendoException) {
+            if (error.httpStatus != 401) throw error
+
+            val refreshed = NextendoSessionRefresher.refreshAfterUnauthorized(
+                context = context,
+                rejectedAccessToken = accessToken
+            )
+            if (refreshed.accessToken == accessToken) {
+                throw error
+            }
+            NextendoAuthClient.fetchNexGameToken(refreshed.accessToken)
+        }
+    }
+
+    /**
      * Rehydrates process-local ACC identity before a game starts.
      *
      * Android Keystore-backed session data survives app restarts, but the native
@@ -770,7 +796,7 @@ object NextendoAuthManager {
         // that game authentication or multiplayer is ready.
         if (!hasValidGameToken(session) && "game.matchmaking" in session.grantedScopes) {
             runCatching {
-                NextendoAuthClient.fetchNexGameToken(session.accessToken)
+                fetchNexGameTokenWithRecovery(context, session.accessToken)
             }.onSuccess { gameToken ->
                 NextendoSessionStore.saveNexGameToken(context, gameToken)
                 session = NextendoSessionStore.load(context) ?: session
@@ -796,7 +822,7 @@ object NextendoAuthManager {
                     // OAuth session remains usable even if the public game-token
                     // endpoint is not provisioned for this client yet.
                     runCatching {
-                        NextendoAuthClient.fetchNexGameToken(latest.accessToken)
+                        fetchNexGameTokenWithRecovery(context, latest.accessToken)
                     }.onSuccess { token ->
                         NextendoSessionStore.saveNexGameToken(context, token)
                     }
