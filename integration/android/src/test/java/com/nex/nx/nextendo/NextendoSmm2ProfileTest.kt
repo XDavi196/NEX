@@ -11,6 +11,11 @@ class NextendoSmm2ProfileTest {
     fun exposesOnlyThePublicSmm2TitleProfile() {
         assertEquals(40000, NextendoSmm2Profile.NEX_VERSION)
         assertEquals("fdf6617f", NextendoSmm2Profile.PRUDP_ACCESS_KEY)
+        assertEquals("22306D00", NextendoSmm2Profile.GAME_SERVER_ID)
+        assertEquals(
+            "g22306D00-lp1.s.n.srv.nintendo.net",
+            NextendoSmm2Profile.AUTH_HOSTNAME
+        )
         assertEquals(443, NextendoSmm2Profile.AUTH_WSS_PORT)
         assertEquals(60007, NextendoSmm2Profile.DEFAULT_SECURE_WSS_PORT)
         assertEquals(5, NextendoSmm2Profile.AUTH_PRUDP_MINOR_VERSION)
@@ -50,6 +55,15 @@ class NextendoSmm2ProfileTest {
             supportedFunctions = 0x1234
         )
         invalid { NextendoSmm2Profile.secureSessionConfig(station, byteArrayOf()) }
+    }
+
+    @Test
+    fun buildsThePublicSmm2AuthHostnameByDefault() {
+        val endpoint = NextendoSmm2Profile.authEndpoint()
+        assertEquals("wss", endpoint.scheme)
+        assertEquals(NextendoSmm2Profile.AUTH_HOSTNAME, endpoint.host)
+        assertEquals(443, endpoint.port)
+        assertEquals("/", endpoint.path)
     }
 
     @Test
