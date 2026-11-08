@@ -50,6 +50,8 @@ NEX must continue using the public PKCE flow. Do not replace it with a private w
 
 The NEX source contains the public SMM2 profile, LoginEx/ticket codecs, PRUDP-Lite state machine and a standalone auth-to-secure session harness. The harness is not yet integrated with the guest game's native socket lifecycle. The live deployment values are not published in the public source repositories.
 
+The current public Nextendo compatibility registry lists Super Mario Maker 2 as **Experimental / In preparation**, 70% supported on game version `3.0.3`, with **matchmaking and presence untested**. This is an independent server-side blocker: even a complete NEX client transport cannot create working rooms until the deployed SMM2 service exposes and validates the required matchmaking path.
+
 Nextendo must confirm or provide through an authorized developer channel:
 
 - The production SMM2 auth hostname and IPv4 destination.
