@@ -14,7 +14,6 @@ namespace Common::NextendoFriendHle {
 
 inline constexpr std::size_t NextendoFriendRecordV2Size = 0x220;
 inline constexpr std::size_t NextendoFriendDetailedInfoV2Size = 0x800;
-inline constexpr std::size_t NextendoFriendPresenceV2Size = 0x80;
 inline constexpr std::size_t NextendoUserPresenceViewV2Size = 0xE8;
 
 #pragma pack(push, 1)

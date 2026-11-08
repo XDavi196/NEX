@@ -26,7 +26,7 @@ NEX proposes to sign its BAAS `id_token` using `SHA256withRSA`. The key is diffe
 
 1. May NEX use a separate per-installation RSA-2048 key pair generated and retained in Android Keystore, or must NEX use one application-level key through a trusted signing service?
 2. Can the Nextendo BAAS JWKS deployment register and publish independently generated public JWKs from multiple NEX installations? The public `baas-jwks` repository currently shows a server-side `BAAS_SIGNING_KEY` from which its served JWK is derived; it does not document a client registration endpoint.
-3. What exact HTTPS `jku` URL and path should NEX put in the JWS header (and payload, if required)? Who operates and updates that JWKS endpoint?
+3. What exact HTTPS `jku` URL and path should NEX put in the JWS header? The public BAAS verifier resolves `jku` from the JOSE header; NEX does not duplicate it as a payload claim unless Nextendo explicitly requires that.
 4. What exact BAAS `iss`, `aud`, `sub` mapping (PID, NSA or another identifier), `kid`, `typ`, `hm`, `iat`, `exp` and optional title/version claims must NEX use?
 5. Does the game verifier accept an Android Keystore-generated RS256 key for a third-party emulator client?
 6. Is a separate NEX app/client attestation signature required? If so, please provide the supported third-party public-client process, headers, canonical input, nonce/timestamp rules and key registration/rotation/revocation policy.

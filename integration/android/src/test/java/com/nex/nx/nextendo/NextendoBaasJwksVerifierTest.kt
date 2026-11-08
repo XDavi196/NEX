@@ -58,6 +58,20 @@ class NextendoBaasJwksVerifierTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
+    fun rejectsPrivateKeyMaterialInAnUnrelatedJwksEntry() {
+        val expected = publicJwk()
+        val unrelated = publicJwk()
+        val privateEntry = unrelated.toJson().removeSuffix("}") +
+            ""","d":"must-not-be-published"}"""
+        val document = "{\"keys\":[" + expected.toJson() + "," + privateEntry + "]}"
+        NextendoBaasJwksVerifier.verifyDocument(
+            "https://baas.example.invalid/1.0.0/certificates",
+            document,
+            expected
+        )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
     fun rejectsNonHttpsOrMutableJwksUrls() {
         val expected = publicJwk()
         NextendoBaasJwksVerifier.verifyDocument(

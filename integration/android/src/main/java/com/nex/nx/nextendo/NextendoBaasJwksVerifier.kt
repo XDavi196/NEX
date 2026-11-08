@@ -87,6 +87,13 @@ internal object NextendoBaasJwksVerifier {
         val keys = root["keys"] as? JsonArray
             ?: throw IllegalArgumentException("The BAAS JWKS response has no keys array.")
 
+        require(keys.none { element ->
+            val item = element as? JsonObject ?: return@none false
+            forbiddenPrivateMembers.any(item::containsKey)
+        }) {
+            "The BAAS JWKS response unexpectedly contains private RSA key material."
+        }
+
         val matching = keys.mapNotNull { element ->
             val item = element as? JsonObject ?: return@mapNotNull null
             if (stringValue(item["kid"]) == expected.keyId) item else null
@@ -96,9 +103,6 @@ internal object NextendoBaasJwksVerifier {
         }
 
         val key = matching.single()
-        require(forbiddenPrivateMembers.none(key::containsKey)) {
-            "The BAAS JWKS response unexpectedly contains private RSA key material."
-        }
         require(stringValue(key["kty"]) == "RSA") {
             "The registered NEX JWK has the wrong key type."
         }

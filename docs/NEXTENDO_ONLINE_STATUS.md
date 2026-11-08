@@ -45,6 +45,13 @@ A successful build or protocol unit test does not prove live login, matchmaking,
 - Presence publishing uses an unexpired OAuth access token with the \`presence\` scope and a 60-second heartbeat. It never substitutes the \`nx2.\` game token for the documented OAuth credential.
 - Game friends are fetched separately with the \`nx2.\` token. The HOME Menu publisher does not fabricate AppField data.
 
+### qLaunch friend-service IPC
+
+- The overlay is checked against the pinned Eden source commit \`8e373eb714aa01117ec885680477501cdb572112\` and the public Switch Friend-service command table.
+- NEX wires friend-list IDs \`10100\`, profile commands \`10500/10501\`, detailed friend record \`20107\`, qLaunch V2 list \`20108\` and own-presence view \`20601\` to the Nextendo cache/serializers.
+- \`20109\` (\`UpdateFriendInfoForViewerV2\`) and \`20111\` (\`LoadFriendSettingV2\`) remain explicit stubs. Provisional detail-list/presence handlers were removed because those command IDs do not have those names in the public IPC table.
+- CI checks the patched method-ID/handler map against the pinned Eden tree. Native C++ tests cover the record serializers and bounded cache; a live qLaunch screen still needs device validation.
+
 ### Runtime diagnostics
 
 The account panel shows the exact scopes returned in the OAuth token response and whether `game.matchmaking` is present. Presence publishing and `GET /api/nex-token` keep separate safe result labels: accepted 2xx, HTTP 401/403/404, other HTTP status, missing scope, network error, session unavailable or response-contract error. The last game-token result is persisted inside the encrypted Android Keystore-backed session, so it remains available after closing and reopening NEX. Tokens, authorization codes and request headers are never included.

@@ -67,11 +67,10 @@ internal object NextendoBaasIdTokenBuilder {
                 "jku" to JsonPrimitive(signer.jwksUrl)
             )
         )
-        // Keep jku in the signed payload as used by the Nextendo reference
-        // emulator, and in the JOSE header as defined by the JWS specification.
+        // The public BAAS verifier resolves jku from the JOSE header. The
+        // reference LoginEx helper places nnex in the payload, not jku.
         val payload = JsonObject(
             LinkedHashMap(claims).apply {
-                put("jku", JsonPrimitive(signer.jwksUrl))
                 put("nnex", JsonPrimitive(gameToken))
             }
         )

@@ -913,8 +913,8 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         '{20102, &IFriendService::GetFriendDetailedInfo, "GetFriendDetailedInfo"},\n'
         '            {20107, &IFriendService::GetFriendDetailedInfoV2, "GetFriendDetailedInfoV2"},\n'
         '            {20108, &IFriendService::GetFriendListForViewerV2, "GetFriendListForViewerV2"},\n'
-        '            {20109, &IFriendService::GetFriendDetailListV2, "GetFriendDetailListV2"},\n'
-        '            {20111, &IFriendService::GetFriendPresenceV2, "GetFriendPresenceV2"}',
+        '            {20109, nullptr, "UpdateFriendInfoForViewerV2"},\n'
+        '            {20111, nullptr, "LoadFriendSettingV2"}',
     )
     replace_once(
         friend_cpp,
@@ -1084,49 +1084,6 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         IPC::ResponseBuilder rb{ctx, 3};
         rb.Push(ResultSuccess);
         rb.Push<u32>(static_cast<u32>(count));
-    }
-
-    // SDK 22+: fills one 0x220-byte modern friend record for each requested PID/NSA.
-    void GetFriendDetailListV2(HLERequestContext& ctx) {
-        IPC::RequestParser rp{ctx};
-        [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
-        const auto requested = ReadNextendoPids(ctx);
-        const auto output_bytes =
-            ctx.GetWriteBufferNumElements<u64>() * sizeof(u64);
-        const auto capacity = output_bytes / NextendoFriendRecordV2Size;
-        const auto count = std::min(requested.size(), capacity);
-        const auto friends = Common::NextendoFriendCache::GetNetworkFriends();
-        std::vector<u8> output(count * NextendoFriendRecordV2Size);
-        for (std::size_t i = 0; i < count; ++i) {
-            const auto requested_id = requested[i];
-            const auto found = std::find_if(friends.begin(), friends.end(),
-                [requested_id](const auto& entry) {
-                    return entry.network_service_account_id == requested_id;
-                });
-            if (found != friends.end()) {
-                WriteNextendoFriendRecordV2(
-                    output.data() + i * NextendoFriendRecordV2Size, *found, requested_id);
-            }
-        }
-        if (!output.empty()) {
-            ctx.WriteBuffer(output);
-        }
-        LOG_INFO(Service_Friend, "[NEX Nextendo] GetFriendDetailListV2 ids={} returned={}",
-                 requested.size(), count);
-        IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(ResultSuccess);
-    }
-
-    // The official qLaunch handler returns a zeroed 0x80-byte presence detail view.
-    void GetFriendPresenceV2(HLERequestContext& ctx) {
-        IPC::RequestParser rp{ctx};
-        [[maybe_unused]] const auto user_id = rp.PopRaw<Common::UUID>();
-        const auto friend_id = rp.Pop<u64>();
-        std::array<u8, NextendoFriendPresenceV2Size> presence{};
-        ctx.WriteBuffer(presence);
-        LOG_INFO(Service_Friend, "[NEX Nextendo] GetFriendPresenceV2 id={}", friend_id);
-        IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(ResultSuccess);
     }
 
     // qLaunch SDK 19+ asks for the connected user's own 0xE8-byte presence view.

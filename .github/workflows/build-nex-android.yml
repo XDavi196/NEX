@@ -96,6 +96,10 @@ jobs:
         run: |
           python3 nex/scripts/apply-eden-overlay.py eden
 
+      - name: Verify Nextendo friend IPC dispatch
+        working-directory: nex
+        run: python3 scripts/test_nextendo_friend_ipc.py ../eden
+
       - name: Run NEX native friend-cache tests
         working-directory: nex
         shell: bash
