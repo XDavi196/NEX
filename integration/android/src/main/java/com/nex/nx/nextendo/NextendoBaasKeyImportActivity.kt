@@ -119,6 +119,6 @@ class NextendoBaasKeyImportActivity : Activity() {
                 output.write(buffer, 0, read)
             }
         }
-        return output.toByteArray().toString(StandardCharsets.UTF_8)
+        return String(output.toByteArray(), StandardCharsets.UTF_8)
     }
 }
