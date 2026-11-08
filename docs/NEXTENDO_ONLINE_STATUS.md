@@ -302,3 +302,12 @@ The source overlay now adds the native BAAS cache to Eden, exposes JNI update/cl
 The Android session manager refreshes the ACC cache through `NextendoBaasRuntime`. The runtime clears the cache when there is no valid `nx2.` game token, no installed NEX signing provider or invalid provisioned claims. It also clears the previous BAAS identity immediately after a new OAuth grant is stored, before further network calls. Since the NEX production signer/JWKS has not been provisioned, the expected diagnostic remains `signer_not_provisioned` and no JWT is currently exposed to the guest.
 
 The LoginEx and secure ticket codecs have independent unit tests. The auth/secure WSS coordinator requires the original auth hostname and PRUDP station values from a real client/server negotiation; it is not automatically invoked by SMM2's guest socket lifecycle.
+
+
+## Latest source update — 8 November 2026 (PRUDP diagnostics)
+
+The NEX-owned Eden overlay now keeps a process-local ring of at most 32 PRUDP handshake metadata records and exposes the snapshot through JNI to the account dashboard. Each entry is limited to the original TLS SNI hostname, direction, SYN/CONNECT type and flags, virtual source/destination station type and port, packet ID, PRUDP minor version, supported-function mask and payload byte count. No packet body, RMC request, AuthenticationInfo, ticket, JWT, token, signature or user data is retained or displayed. The ring is cleared when a new account session is linked or the current account is disconnected.
+
+The native PRUDP observer test now checks outbound/inbound direction and the snapshot/clear behavior. This is a diagnostic aid for observing the guest game's real SYN/CONNECT negotiation; it does not change the guest's PRUDP packets, connect to a server, negotiate matchmaking, or prove the service accepts the session. The standalone PRUDP-Lite coordinator remains a harness and has not been inserted into the guest game's native socket lifecycle.
+
+The dashboard can show the last eight observed handshake records after a game has attempted an online connection. Until a device actually performs a Nextendo SMM2 connection, an empty diagnostic list is expected. Continue to keep TLS certificate verification enabled and never copy payload bytes into diagnostics.
