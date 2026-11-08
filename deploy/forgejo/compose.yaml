@@ -26,12 +26,6 @@ services:
       - "${FORGEJO_SSH_PORT:-2222}:22"
     networks:
       - nex-git
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/api/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 45s
 
   caddy:
     image: caddy:2-alpine
@@ -39,6 +33,7 @@ services:
     restart: unless-stopped
     environment:
       FORGEJO_DOMAIN: ${FORGEJO_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
     ports:
       - "80:80"
       - "443:443"
