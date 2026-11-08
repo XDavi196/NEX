@@ -22,9 +22,10 @@ class NextendoPrudpLiteSessionTest {
 
     private fun connect(
         session: NextendoPrudpLiteSession,
-        config: NextendoPrudpLiteSession.Config
+        config: NextendoPrudpLiteSession.Config,
+        nowMs: Long = System.nanoTime() / 1_000_000L
     ) {
-        val syn = session.start().outboundFrames.single()
+        val syn = session.start(nowMs).outboundFrames.single()
         val synPacket = NextendoPrudpLiteCodec.decode(syn).packets.single()
         assertEquals(NextendoPrudpLiteCodec.TYPE_SYN, synPacket.type)
         assertEquals(NextendoPrudpLiteCodec.FLAG_NEED_ACK, synPacket.flags)
@@ -42,7 +43,7 @@ class NextendoPrudpLiteSessionTest {
             supportedFunctions = 0x0034,
             connectionSignature = connectionSignature
         )
-        val connectStep = session.receive(NextendoPrudpLiteCodec.encode(synAck))
+        val connectStep = session.receive(NextendoPrudpLiteCodec.encode(synAck), nowMs + 1L)
         assertEquals(1, connectStep.outboundFrames.size)
         val connectPacket = NextendoPrudpLiteCodec.decode(connectStep.outboundFrames.single())
             .packets.single()
@@ -67,7 +68,7 @@ class NextendoPrudpLiteSessionTest {
             packetId = 1,
             payload = byteArrayOf(0x10, 0x20)
         )
-        val connected = session.receive(NextendoPrudpLiteCodec.encode(connectAck))
+        val connected = session.receive(NextendoPrudpLiteCodec.encode(connectAck), nowMs + 2L)
         assertEquals(NextendoPrudpLiteSession.State.CONNECTED, session.state())
         assertTrue(connected.events.single() is NextendoPrudpLiteSession.Event.Connected)
         assertArrayEquals(
@@ -130,7 +131,10 @@ class NextendoPrudpLiteSessionTest {
             packetId = 1
         )
         session.receive(NextendoPrudpLiteCodec.encode(connectAck), nowMs = 6_200L)
-        assertTrue(session.tick(nowMs = 20_000L).outboundFrames.isEmpty())
+        val idle = NextendoPrudpLiteCodec.decode(
+            session.tick(nowMs = 11_200L).outboundFrames.single()
+        ).packets.single()
+        assertEquals(NextendoPrudpLiteCodec.TYPE_PING, idle.type)
         session.close()
     }
 
@@ -138,16 +142,16 @@ class NextendoPrudpLiteSessionTest {
     fun retransmitsReliableDataUntilItsAckIsReceived() {
         val config = config()
         val session = NextendoPrudpLiteSession(config)
-        connect(session, config)
+        connect(session, config, nowMs = 1_000L)
 
         val rmc = NextendoRmcCodec.encodeRequest(
             protocolId = NextendoSmm2DataStore.PROTOCOL_ID,
             methodId = NextendoSmm2DataStore.GET_USERS.toLong(),
             callId = 50L
         )
-        val first = session.sendRmc(rmc, nowMs = 10_000L).outboundFrames.single()
-        assertTrue(session.tick(nowMs = 14_999L).outboundFrames.isEmpty())
-        assertArrayEquals(first, session.tick(nowMs = 15_000L).outboundFrames.single())
+        val first = session.sendRmc(rmc, nowMs = 2_000L).outboundFrames.single()
+        assertTrue(session.tick(nowMs = 6_999L).outboundFrames.isEmpty())
+        assertArrayEquals(first, session.tick(nowMs = 7_000L).outboundFrames.single())
 
         val ack = NextendoPrudpLiteCodec.Packet(
             type = NextendoPrudpLiteCodec.TYPE_DATA,
@@ -158,8 +162,11 @@ class NextendoPrudpLiteSessionTest {
             destinationPort = config.clientSourcePort,
             packetId = 1
         )
-        session.receive(NextendoPrudpLiteCodec.encode(ack), nowMs = 15_100L)
-        assertTrue(session.tick(nowMs = 30_000L).outboundFrames.isEmpty())
+        session.receive(NextendoPrudpLiteCodec.encode(ack), nowMs = 7_100L)
+        val keepalive = NextendoPrudpLiteCodec.decode(
+            session.tick(nowMs = 12_100L).outboundFrames.single()
+        ).packets.single()
+        assertEquals(NextendoPrudpLiteCodec.TYPE_PING, keepalive.type)
         session.close()
     }
 
@@ -372,6 +379,29 @@ class NextendoPrudpLiteSessionTest {
         assertEquals("unexpected_station_address",
             (result.events.single() as NextendoPrudpLiteSession.Event.ProtocolError).reason)
         assertEquals(NextendoPrudpLiteSession.State.SYN_SENT, session.state())
+        session.close()
+    }
+
+
+    @Test
+    fun sendsPeriodicKeepalivePingsWhenTheSecureSessionIsIdle() {
+        val config = config()
+        val session = NextendoPrudpLiteSession(config)
+        connect(session, config, nowMs = 1_000L)
+
+        assertTrue(session.tick(nowMs = 6_001L).outboundFrames.isEmpty())
+        val firstPing = NextendoPrudpLiteCodec.decode(
+            session.tick(nowMs = 6_002L).outboundFrames.single()
+        ).packets.single()
+        assertEquals(NextendoPrudpLiteCodec.TYPE_PING, firstPing.type)
+        assertEquals(NextendoPrudpLiteCodec.FLAG_NEED_ACK, firstPing.flags)
+        assertEquals(0, firstPing.packetId)
+
+        val secondPing = NextendoPrudpLiteCodec.decode(
+            session.tick(nowMs = 11_002L).outboundFrames.single()
+        ).packets.single()
+        assertEquals(NextendoPrudpLiteCodec.TYPE_PING, secondPing.type)
+        assertEquals(1, secondPing.packetId)
         session.close()
     }
 
