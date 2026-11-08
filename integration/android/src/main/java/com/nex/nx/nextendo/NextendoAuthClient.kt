@@ -66,6 +66,17 @@ object NextendoAuthClient {
         return NextendoNetworkStatsParser.parse(response)
     }
 
+    /** Public per-title online counts; the endpoint does not require a player token. */
+    internal fun fetchOnlineCounts(): Map<String, Int> {
+        val response = request(
+            url = "$BASE_URL/api/online-counts",
+            method = "GET",
+            connectTimeoutMs = 4_000,
+            readTimeoutMs = 4_000
+        )
+        return NextendoOnlineCountsParser.parse(response)
+    }
+
     class NextendoException(
         val httpStatus: Int,
         message: String

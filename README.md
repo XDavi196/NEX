@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.webp" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.178">Get the latest verified experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.225">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
- > **Please read before installing:** NEX is an experimental preview. The latest published and verified APK is **alpha.178** (source commit `4f46281a`); its native and Android Nextendo tests, optimized APK build, artifact upload and prerelease publication passed. Alpha.178 includes the Eden ACC BAAS cache bridge, LoginEx/ticket codecs, secure CONNECT proof and the standalone two-vantage UDP probe client. It predates the newer multi-title DNS routing and OkHttp resolver changes currently being validated by Actions run #190. In-game multiplayer is not ready.
+> **Please read before installing:** NEX is an experimental preview. The latest published and verified APK is **v0.1.0-alpha.225** (Build 59, source commit `04cde4e8`); native and Kotlin tests, optimized APK build, artifact upload and prerelease publication passed. This preview is not multiplayer-ready. The Den2-inspired UI adaptation is being validated in the next branch build.
 
 ## What NEX is
 
@@ -25,7 +25,7 @@ The current source base is Eden `v0.2.0-rc1`, pinned to commit `8e373eb714aa0111
 - **Nextendo public Client ID:** `nxc_yAdR-14bOEq7`.
 - **Build variant:** Eden Android Optimized, customized for NEX.
 
-NEX is not based on Den2, and it does not reuse another emulator's client ID, private credentials, client secret, signing keys, or attestation material.
+NEX remains based on the pinned Eden Optimized source. Its Games header, friends entry point and per-title status badges adapt Den2's GPL-3.0 Android UI work, with attribution in the integration notes. The NEX application identity, OAuth Client ID, PKCE flow, session storage and network implementation remain NEX-owned; no Den2 client ID, token, private credential, signing key or attestation material is reused.
 
 ## Nextendo Network in NEX
 
@@ -41,15 +41,15 @@ The first in-game validation target is **Super Mario Maker 2**. Nextendo publish
 
 ### Where to find it
 
-The verified `v0.1.0-alpha.178` build includes a clearly labeled **Nextendo Network** card on the main Games screen. It opens the NEX account connection flow and, after sign-in, the account panel.
+The Games screen uses a compact friends/account icon in the top toolbar, following Den2's navigation pattern. Its menu opens the NEX Friends screen, NEX account panel or NEX network settings. The game library displays public per-title online counts when Nextendo publishes them, plus a version warning for SMM2 when the installed version differs from 3.0.3.
 
 ### Connecting your account
 
-1. Open NEX and tap **Nextendo Network** on the main Games screen.
+1. Open NEX and tap the friends/account icon on the right side of the Games header.
 2. NEX opens the Nextendo authorization page in your browser.
 3. Sign in on Nextendo and approve the permissions shown there.
 4. The browser returns to NEX through `com.nex.nx://oauth/callback`.
-5. After the connection completes, tap **Nextendo Network** again to open your account panel.
+5. After the connection completes, open the same toolbar menu and choose **Conta Nextendo** or **Amigos**.
 
 The account panel can show the username, Friend Code, and PID when those details are available. Choose **Friends** to request the friend list.
 
@@ -73,9 +73,9 @@ The current Nextendo compatibility entry lists Super Mario Maker 2 as **Experime
 
 The latest verified Android APK is the experimental prerelease:
 
-**[NEX v0.1.0-alpha.178 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.178)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.178/NEX-Android-v0.2.0-rc1-optimized.apk)
+**[NEX v0.1.0-alpha.225 — Download APK](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.225)** · [Direct APK](https://github.com/XDavi196/NEX/releases/download/v0.1.0-alpha.225/NEX-Android-v0.2.0-rc1-optimized.apk)
 
-The release includes `SHA256SUMS.txt`. Alpha.178 is built from commit `4f46281a`; it contains the ACC bridge, BAAS signing boundary, SMM2 LoginEx/ticket codecs and the standalone two-vantage UDP probe client. It does **not** contain the newer shared multi-title DNS routing/configuration changes from the current development branch, and it does not provide working in-game multiplayer. Those latest source changes are being validated by [Actions run #190](https://github.com/XDavi196/NEX/actions/runs/42437984166).
+The release includes `SHA256SUMS.txt`. Alpha.178 is built from commit `04cde4e8`; it contains the ACC bridge, BAAS signing boundary, SMM2 LoginEx/ticket codecs and the standalone two-vantage UDP probe client. It does **not** contain the newer shared multi-title DNS routing/configuration changes from the current development branch, and it does not provide working in-game multiplayer. Those latest source changes are being validated by [Actions run #190](https://github.com/XDavi196/NEX/actions/runs/42437984166).
 
 This is an experimental preview, not a stable or online-ready release.
 

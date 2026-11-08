@@ -1,8 +1,17 @@
 # NEX — Nextendo online implementation status
 
-Updated: 7 November 2026.
+Updated: 8 November 2026.
 
 A successful APK build proves that the configured Android source and native toolchain compile. It does not prove that the live account service, BAAS, SMM2 game service or multiplayer works.
+
+## Current checkpoint — 8 November 2026
+
+- Latest published and verified Android preview before the current UI adaptation: [NEX v0.1.0-alpha.225](https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.225), Build 59, source `04cde4e8889e7340a414250b096c0be884c0f3d2`. GitHub Actions run [#225](https://github.com/XDavi196/NEX/actions/runs/42488165308) passed native tests, Kotlin tests, optimized APK build, artifact upload and prerelease publication.
+- The current branch change adapts the Den2-style compact friends/account toolbar menu to the Eden Games screen and adds per-title badges through Nextendo's public `GET /api/online-counts` endpoint. The API returns counts keyed by 16-character title IDs; a title missing from the published map remains unknown, not "0 online". The public map currently does not include SMM2, so NEX must not show a fabricated SMM2 player count.
+- The official [Nextendo compatibility tracker](https://wiki.nextendo.network/games) lists **Super Mario Maker 2 as Experimental / In preparation**, with matchmaking and presence **Untested**, for game version **3.0.3**. The 70% progress score is not a multiplayer test result.
+- The official [account/Discord guide](https://wiki.nextendo.network/guide/discord-link) says online play requires a verified email, a linked Discord account that remains a member of the Nextendo Discord, and no conflicting active online session. Only one emulator/device should be online on the same account at a time; see the [account security guide](https://wiki.nextendo.network/guide/account-security) for session management.
+- **NEX BAAS is still fail-closed.** The local Android Keystore signing key and public JWK export are implemented, but the NEX public JWK has not been registered by Nextendo, and the accepted `kid`, HTTPS `jku`, `iss`, `aud`, `sub`/PID mapping and any third-party client-attestation contract have not been provisioned. Do not substitute Den2's signer, static claims or credentials.
+- Even after BAAS provisioning, the guest's real ACC/LoginEx path, server-returned secure StationURL, SMM2 title-specific matchmaking methods and SMM2 NNCS/NAT endpoints still require server confirmation and device validation. PRUDP unit tests and a successful APK build do not prove a live game session.
 
 ## Current verification — 7 November 2026
 

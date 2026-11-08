@@ -1365,137 +1365,127 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
     text = text.replace(settings_anchor, session_row, 1)
     presenter.write_text(text, encoding="utf-8")
 
-    # Add a clearly visible Nextendo shortcut to the main games header, following
-    # the placement familiar to Den2 users while keeping all authentication NEX-owned.
+    # Den2-inspired compact Nextendo entry; NEX keeps its own OAuth/session implementation.
     games_layout = app_dir / "src/main/res/layout/fragment_games.xml"
     layout_text = games_layout.read_text(encoding="utf-8")
-    title_anchor = """        <com.google.android.material.textview.MaterialTextView
-            android:id="@+id/title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/app_name"
-            style="@style/SynthwaveText.Title"
-            android:textSize="27sp"
-            />"""
-    if layout_text.count(title_anchor) != 1:
-        raise RuntimeError("Could not identify Eden's original games title")
-    # Keep Eden's original MaterialTextView title. Gradle above sets app_name to
-    # "NEX", so the header shows the wordmark instead of a large logo image.
-    header_anchor = """    </LinearLayout>
-
-    <FrameLayout
-        android:id="@+id/frame_search"
-"""
-    nextendo_entry = """    </LinearLayout>
-
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/nextendo_button"
-        style="@style/EdenCard"
-        android:layout_width="0dp"
-        android:layout_height="64dp"
-        android:layout_marginHorizontal="15dp"
-        android:layout_marginTop="12dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:contentDescription="Nextendo Network. Connect your account and view your friends."
-        app:cardCornerRadius="16dp"
-        app:cardBackgroundColor="?attr/colorSurfaceVariant"
-        app:cardElevation="0dp"
-        app:strokeColor="#E30613"
-        app:strokeWidth="1dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/header">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="16dp">
+    settings_anchor = '        <com.google.android.material.card.MaterialCardView\n            android:id="@+id/settings_button"'
+    friends_entry = """        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/friends_button"
+            style="@style/EdenCard"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Nextendo friends and account"
+            app:cardCornerRadius="21dp"
+            android:padding="8dp">
 
             <ImageView
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_marginEnd="14dp"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
                 android:src="@drawable/ic_account_circle"
-                app:tint="#E30613" />
+                app:tint="#4CAF50" />
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+        </com.google.android.material.card.MaterialCardView>
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Nextendo Network"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+        <Space
+            android:layout_width="15dp"
+            android:layout_height="wrap_content" />
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Connect your account and see your friends"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <FrameLayout
-        android:id="@+id/frame_search"
-"""
-    if layout_text.count(header_anchor) != 1:
-        raise RuntimeError("Could not identify the games header/search boundary")
-    layout_text = layout_text.replace(header_anchor, nextendo_entry, 1)
-
-    frame_start = layout_text.index('    <FrameLayout\n        android:id="@+id/frame_search"')
-    frame_end = layout_text.index("    >", frame_start) + len("    >")
-    frame_open = layout_text[frame_start:frame_end]
-    if frame_open.count('android:layout_marginTop="16dp"') != 1:
-        raise RuntimeError("Could not identify the search panel top margin")
-    if frame_open.count('app:layout_constraintTop_toBottomOf="@id/header"') != 1:
-        raise RuntimeError("Could not identify the search panel top constraint")
-    frame_open = frame_open.replace('android:layout_marginTop="16dp"', 'android:layout_marginTop="12dp"')
-    frame_open = frame_open.replace(
-        'app:layout_constraintTop_toBottomOf="@id/header"',
-        'app:layout_constraintTop_toBottomOf="@id/nextendo_button"'
-    )
-    layout_text = layout_text[:frame_start] + frame_open + layout_text[frame_end:]
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/settings_button\""""
+    if layout_text.count(settings_anchor) != 1:
+        raise RuntimeError("Could not identify Eden settings toolbar button")
+    layout_text = layout_text.replace(settings_anchor, friends_entry, 1)
     games_layout.write_text(layout_text, encoding="utf-8")
 
-    # The home-screen shortcut opens the NEX account panel: sign in when there is
-    # no session; otherwise show the profile and its Friends action.
-    games_fragment = (
-        app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/GamesFragment.kt"
-    )
+    games_fragment = app_dir / "src/main/java/org/yuzu/yuzu_emu/ui/GamesFragment.kt"
     games_text = games_fragment.read_text(encoding="utf-8")
     games_import_anchor = "import org.yuzu.yuzu_emu.model.HomeViewModel\n"
     if games_text.count(games_import_anchor) != 1:
-        raise RuntimeError("Could not identify GamesFragment import block")
-    games_text = games_text.replace(
-        games_import_anchor,
-        games_import_anchor
-        + "import com.nex.nx.nextendo.NextendoAuthManager\n",
-        1,
+        raise RuntimeError("Could not identify GamesFragment imports")
+    games_imports = (
+        "import androidx.lifecycle.Lifecycle\n"
+        "import androidx.lifecycle.lifecycleScope\n"
+        "import androidx.lifecycle.repeatOnLifecycle\n"
+        "import com.google.android.material.dialog.MaterialAlertDialogBuilder\n"
+        "import com.nex.nx.nextendo.NextendoAuthClient\n"
+        "import com.nex.nx.nextendo.NextendoAuthManager\n"
+        "import kotlinx.coroutines.Dispatchers\n"
+        "import kotlinx.coroutines.delay\n"
+        "import kotlinx.coroutines.isActive\n"
+        "import kotlinx.coroutines.launch\n"
+        "import kotlinx.coroutines.withContext\n"
     )
+    games_text = games_text.replace(games_import_anchor, games_import_anchor + games_imports, 1)
+
     view_click_anchor = "        binding.viewButton.setOnClickListener { showViewMenu(it) }\n"
     if games_text.count(view_click_anchor) != 1:
-        raise RuntimeError("Could not identify GamesFragment top toolbar setup")
+        raise RuntimeError("Could not identify GamesFragment toolbar setup")
     games_text = games_text.replace(
         view_click_anchor,
-        view_click_anchor
-        + """        binding.nextendoButton?.setOnClickListener {
-            NextendoAuthManager.openAccount(requireActivity())
-        }
-""",
-        1,
+        view_click_anchor + "        binding.friendsButton.setOnClickListener { showNextendoMenu() }\n",
+        1
     )
+
+    setup_anchor = "        setupTopView()\n\n        updateButtonsVisibility()\n"
+    if games_text.count(setup_anchor) != 1:
+        raise RuntimeError("Could not find GamesFragment setup anchor")
+    games_text = games_text.replace(
+        setup_anchor,
+        "        setupTopView()\n        startNextendoOnlineCountsPolling()\n\n        updateButtonsVisibility()\n",
+        1
+    )
+
+    navigation_anchor = "    private fun navigateToSettings() {\n"
+    if games_text.count(navigation_anchor) != 1:
+        raise RuntimeError("Could not identify GamesFragment navigation")
+    nextendo_methods = "    private fun showNextendoMenu() {\n        val host = requireActivity()\n        MaterialAlertDialogBuilder(host)\n            .setTitle(\"Nextendo Network\")\n            .setItems(arrayOf(\"Amigos\", \"Conta Nextendo\", \"Configurar rede\")) { _, which ->\n                when (which) {\n                    0 -> NextendoAuthManager.openFriends(host)\n                    1 -> NextendoAuthManager.openAccount(host)\n                    2 -> NextendoAuthManager.openNetworkSettings(host)\n                }\n            }\n            .setNegativeButton(android.R.string.cancel, null)\n            .show()\n    }\n\n    private fun startNextendoOnlineCountsPolling() {\n        viewLifecycleOwner.lifecycleScope.launch {\n            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {\n                while (isActive) {\n                    val counts = withContext(Dispatchers.IO) {\n                        runCatching { NextendoAuthClient.fetchOnlineCounts() }.getOrNull()\n                    }\n                    if (counts != null && _binding != null) {\n                        gameAdapter.setNextendoOnlineCounts(counts)\n                    }\n                    delay(30_000L)\n                }\n            }\n        }\n    }\n\n"
+    games_text = games_text.replace(navigation_anchor, nextendo_methods + navigation_anchor, 1)
     games_fragment.write_text(games_text, encoding="utf-8")
+
+    # Adapt Den2's per-title badges while retaining Eden's game-card layouts.
+    game_adapter = app_dir / "src/main/java/org/yuzu/yuzu_emu/adapters/GameAdapter.kt"
+    adapter_text = game_adapter.read_text(encoding="utf-8")
+    state_anchor = "    private var viewType = 0\n"
+    state_replacement = """    private var viewType = 0
+
+    private var nextendoOnlineCounts: Map<String, Int> = emptyMap()
+
+    fun setNextendoOnlineCounts(counts: Map<String, Int>) {
+        if (counts != nextendoOnlineCounts) {
+            nextendoOnlineCounts = counts
+            notifyDataSetChanged()
+        }
+    }
+"""
+    if adapter_text.count(state_anchor) != 1:
+        raise RuntimeError("Could not identify GameAdapter state")
+    adapter_text = adapter_text.replace(state_anchor, state_replacement, 1)
+    holder_anchor = "        private fun bindListView(model: Game) {\n"
+    if adapter_text.count(holder_anchor) != 1:
+        raise RuntimeError("Could not identify GameAdapter holder")
+    display_helper = "        private fun displayTitle(model: Game): CharSequence {\n            val base = model.title.replace(\"[\\\\t\\\\n\\\\r]+\".toRegex(), \" \")\n            val titleId = model.programId.toLongOrNull()?.toString(16)?.padStart(16, '0').orEmpty()\n            val onlineCount = nextendoOnlineCounts[titleId] ?: 0\n            val needsSmm2Version = titleId == \"01009b90006dc000\" &&\n                model.version.isNotBlank() && model.version != \"3.0.3\"\n\n            if (onlineCount <= 0 && !needsSmm2Version) return base\n\n            val result = android.text.SpannableStringBuilder(base)\n            if (needsSmm2Version) {\n                val badge = \"⚠ Requer 3.0.3\"\n                val start = result.length + 2\n                result.append(\"  \").append(badge)\n                result.setSpan(\n                    android.text.style.ForegroundColorSpan(0xFFFF9800.toInt()),\n                    start, start + badge.length,\n                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE\n                )\n            }\n            if (onlineCount > 0) {\n                val badge = \"• \" + onlineCount + \" online\"\n                val start = result.length + 2\n                result.append(\"  \").append(badge)\n                result.setSpan(\n                    android.text.style.ForegroundColorSpan(0xFF4CAF50.toInt()),\n                    start, start + badge.length,\n                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE\n                )\n            }\n            return result\n        }\n\n"
+    adapter_text = adapter_text.replace(holder_anchor, display_helper + holder_anchor, 1)
+
+    replacements = (
+        (r'listBinding.textGameTitle.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")',
+         "listBinding.textGameTitle.text = displayTitle(model)"),
+        (r'gridBinding.textGameTitle.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")',
+         "gridBinding.textGameTitle.text = displayTitle(model)"),
+        (r'gridCompactBinding.textGameTitleCompact.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")',
+         "gridCompactBinding.textGameTitleCompact.text = displayTitle(model)"),
+        (r'carouselBinding.textGameTitle.text = model.title.replace("[\\t\\n\\r]+".toRegex(), " ")',
+         "carouselBinding.textGameTitle.text = displayTitle(model)"),
+    )
+    for old_assignment, new_assignment in replacements:
+        if adapter_text.count(old_assignment) != 1:
+            raise RuntimeError("Unexpected GameAdapter title assignment")
+        adapter_text = adapter_text.replace(old_assignment, new_assignment, 1)
+    game_adapter.write_text(adapter_text, encoding="utf-8")
+
+    print("NEX Den2-inspired toolbar menu and per-game badges applied")
 
     # Publish real in-game presence from Eden's existing title-ID/playtime callback.
     emulation_activity = (

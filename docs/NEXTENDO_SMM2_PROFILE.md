@@ -77,3 +77,14 @@ The auth/secure WSS coordinator takes an explicit original auth hostname and neg
 ## AuthenticationInfo wire-format verification
 
 The DataHolder is encoded as the NEX String `AuthenticationInfo` followed by exactly one NEX Buffer. The Buffer body is a version-1 NEX Structure: one version byte, one little-endian u32 content length, then the structure fields (`Token` NEX String, `NGSVersion` u32, `TokenType` u8 and `ServerVersion` u32). This matches the public Nextendo test helper's `String("AuthenticationInfo")` + `Buffer(body)` and the public NEX `WriteStructure` implementation. The former extra outer u32 length has been removed. The LoginEx RMC request then appends this complete DataHolder as raw `extraData` immediately after the username NEX String.
+
+
+## Current online admission and service status — 8 November 2026
+
+The public Nextendo compatibility tracker currently marks SMM2 **Experimental / In preparation** and explicitly lists matchmaking and presence as **Untested**, for version **3.0.3** ([official tracker](https://wiki.nextendo.network/games)). Use 3.0.3 for controlled SMM2 client tests; a tested title version is not evidence that matchmaking is implemented or available.
+
+Before attempting game login, the account must have a verified email, a Discord account linked through the official verification flow and membership in the Nextendo Discord. The account must not already be online from another emulator/device. The official [Discord linking guide](https://wiki.nextendo.network/guide/discord-link) identifies missing Discord linkage as a common rejection reason; the [security guide](https://wiki.nextendo.network/guide/account-security) explains how to revoke stale sessions.
+
+The NEX Android Keystore key still requires server-side registration. Nextendo must publish the matching public JWK at the approved HTTPS JKU and confirm the accepted key ID, issuer, audience, subject/PID binding, token lifetime and any application-attestation requirement. Until that happens, NEX deliberately sends no BAAS token through ACC. Den2's older static BAAS claims, fallback to an OAuth session token, private signing key and application identity are not portable credentials and must not be copied into NEX.
+
+The public SMM2 service code and local PRUDP/RMC test harness do not provide a verified end-to-end matchmaking contract. Do not invent room methods, payloads, secure-server addresses or NNCS probe endpoints. The next online milestone is a service-confirmed BAAS registration plus a real guest LoginEx/secure connection; matchmaking and two-device tests remain gated by the server's published support status.
