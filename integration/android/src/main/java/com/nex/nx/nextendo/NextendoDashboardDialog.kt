@@ -30,9 +30,9 @@ internal object NextendoDashboardDialog {
         val baasDiagnostic: String,
         val routeDiagnostic: String,
         val installedRouteCount: Int,
-        val onlinePlayers: Int?,
-        val registeredAccounts: Int?,
-        val gamesOnline: Int?,
+        val onlinePlayers: Long?,
+        val registeredAccounts: Long?,
+        val gamesOnline: Long?,
         val profileRefreshFailed: Boolean
     )
 
@@ -237,7 +237,7 @@ internal object NextendoDashboardDialog {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        fun metric(label: String, value: Int?): MaterialCardView {
+        fun metric(label: String, value: Long?): MaterialCardView {
             val metricCard = MaterialCardView(activity).apply {
                 radius = dp(13).toFloat()
                 cardElevation = 0f
