@@ -3,14 +3,14 @@
 <div align="center">
   <img src="assets/nex-logo.webp" alt="NEX official logo" width="384">
   <p><strong>An independent Android Nintendo Switch emulator project built from Eden's open-source code.</strong></p>
-  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.227">Get the latest verified experimental APK</a></p>
+  <p><a href="https://github.com/XDavi196/NEX/releases/tag/v0.1.0-alpha.228">Get the latest verified experimental APK</a></p>
 </div>
 
 NEX is a community project for Android phones and tablets. It started from the Eden codebase, and the work here is about giving that foundation a separate identity, maintaining an Android-focused build, and developing a first-party NEX integration with Nextendo Network.
 
 The project is still young. Some parts are already in the app, some are being tested, and some of the online work still needs to be built. This README aims to show what is available today and what is still planned, without promising features that are not ready.
 
-> **Please read before installing:** NEX is an experimental preview. The latest published and verified APK is **v0.1.0-alpha.227** (Actions run #227, source commit `5fb063f2`); native/Kotlin tests, optimized APK build, artifact upload and prerelease publication passed. It includes the first Den2-inspired Games toolbar adaptation. It is not multiplayer-ready; the account eligibility diagnostic is in Build 228 and is not yet part of this APK.
+> **Please read before installing:** NEX is an experimental preview. The latest published and verified APK is **v0.1.0-alpha.228** (Actions run #228, source commit `1088b516`); native/Kotlin tests, optimized APK build, artifact upload and prerelease publication passed. It includes the account eligibility diagnostic. A device test has confirmed that the Nextendo account-admission check passes for the linked NEX account. This does not verify BAAS/LoginEx, secure PRUDP or SMM2 matchmaking; NEX is not multiplayer-ready.
 
 ## What NEX is
 
