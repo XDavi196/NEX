@@ -326,18 +326,19 @@ object NextendoAuthClient {
     }
 
     /**
-     * Calls an account endpoint with NEX's OAuth bearer token and NEX's own
-     * Client-ID header. Paths are restricted to the fixed Nextendo API origin.
+     * Calls a protected Nextendo account endpoint with the signed nx2. bearer
+     * credential. The server's accountFromBearer contract accepts web sessions
+     * and nx2. tokens; OAuth access tokens are accepted only by /api/oauth/*.
      */
-    internal fun requestAccountJson(
+    internal fun requestGameAccountJson(
         path: String,
-        accessToken: String,
+        gameToken: String,
         method: String = "GET",
         body: ByteArray? = null
     ): String {
-        requireAccountToken(accessToken)
+        requireGameAccountToken(gameToken)
         validateAccountApiPath(path)
-        val headers = linkedMapOf("Authorization" to "Bearer $accessToken")
+        val headers = linkedMapOf("Authorization" to "Bearer $gameToken")
         if (body != null) {
             headers["Content-Type"] = "application/json; charset=utf-8"
         }
@@ -359,29 +360,29 @@ object NextendoAuthClient {
         return requestBytes("$BASE_URL$path", accessToken = null, method = "GET", body = null)
     }
 
-    /** Binary account transfer for BCAT and cloud-save endpoints. */
-    internal fun requestAccountBytes(
+    /** Binary BCAT and cloud-save transfer authenticated with the server-issued nx2. token. */
+    internal fun requestGameAccountBytes(
         path: String,
-        accessToken: String,
+        gameToken: String,
         method: String = "GET",
         body: ByteArray? = null
     ): ByteArray {
-        requireAccountToken(accessToken)
+        requireGameAccountToken(gameToken)
         validateAccountApiPath(path)
         require(method == "GET" || method == "POST") {
             "Método inválido para transferência binária Nextendo."
         }
         return requestBytes(
             url = "$BASE_URL$path",
-            accessToken = accessToken,
+            accessToken = gameToken,
             method = method,
             body = body
         )
     }
 
-    private fun requireAccountToken(accessToken: String) {
-        require(accessToken.isNotBlank() && !accessToken.startsWith("nx2.")) {
-            "Esta operação exige a sessão OAuth da conta NEX, não o token de jogo nx2."
+    private fun requireGameAccountToken(gameToken: String) {
+        require(gameToken.startsWith("nx2.") && gameToken.length > 4) {
+            "Esta operação exige um token de jogo Nextendo nx2. válido; o OAuth access token não substitui essa credencial."
         }
     }
 
