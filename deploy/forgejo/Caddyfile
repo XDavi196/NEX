@@ -1,8 +1,0 @@
-{
-  email {$ACME_EMAIL}
-}
-
-{$FORGEJO_DOMAIN} {
-  encode zstd gzip
-  reverse_proxy forgejo:3000
-}
