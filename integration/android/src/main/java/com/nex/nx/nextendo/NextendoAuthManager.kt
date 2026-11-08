@@ -203,66 +203,42 @@ object NextendoAuthManager {
                 val username = profile?.username?.ifBlank { displaySession.username }
                     ?: displaySession.username.ifBlank { "Conta conectada" }
                 val friendCode = profile?.friendCode?.ifBlank { displaySession.friendCode }
-                    ?: displaySession.friendCode.ifBlank { "Ainda não disponível" }
+                    ?: displaySession.friendCode
                 val pid = profile?.pid?.takeIf { it > 0L } ?: displaySession.pid
-                val avatar = profile?.avatarUrl.orEmpty()
                 val gameTokenReady = hasValidGameToken(displaySession)
-                val details = buildString {
-                    append("Jogador: ")
-                    append(username)
-                    append("\nFriend Code: ")
-                    append(friendCode)
-                    append("\nPID: ")
-                    append(if (pid > 0L) pid.toString() else "Aguardando token de jogo")
-                    append("\n\nSTATUS ONLINE DO NEX")
-                    append("\nConta Nextendo: conectada")
-                    append("\nToken de jogo nx2.: ")
-                    append(if (gameTokenReady) "disponível" else "não disponível ou expirado")
-                    append("\nScopes concedidos: ")
-                    append(displaySession.grantedScopes.sorted().joinToString(", ").ifBlank { "não informados" })
-                    append("\nPermissão game.matchmaking: ")
-                    append(if ("game.matchmaking" in displaySession.grantedScopes) "concedida" else "ausente na resposta OAuth")
-                    append("\nPresença Nextendo: ")
-                    append(NextendoPresencePublisher.diagnostic())
-                    append("\nToken BAAS no ACC: ")
-                    append(NextendoBaasRuntime.diagnostic)
-                    append("\nRotas de rede Nextendo: ")
-                    append(NextendoNetworkRouting.diagnostic)
-                    if (NextendoNetworkRouting.installedRouteCount > 0) {
-                        append(" (")
-                        append(NextendoNetworkRouting.installedRouteCount)
-                        append(" hosts)")
-                    }
-                    append("\n\nESTATÍSTICAS PÚBLICAS DA REDE")
-                    if (networkStats != null) {
-                        append("\nJogadores online: ")
-                        append(networkStats.onlinePlayers)
-                        append("\nContas registradas: ")
-                        append(networkStats.totalRegistered)
-                        append("\nJogos online: ")
-                        append(networkStats.gamesOnline)
-                    } else {
-                        append("\nEstatísticas indisponíveis no momento")
-                    }
-                    append("\n\nSuper Mario Maker 2: NÃO CONECTADO")
-                    append("\nAinda falta autenticação BAAS/nnex assinada, endpoint e sessão PRUDP confirmados para o NEX.")
-                    append("\nQLaunch / nn::friends: integração parcial")
-                    append("\nA API pública não confirma NSA/UUID para todos os amigos; sem esses IDs, o QLaunch não pode montar uma lista de amigos válida.")
-                    if (avatar.isNotBlank()) {
-                        append("\n\nAvatar: ")
-                        append(avatar)
-                    }
-                    if (profile == null && pid > 0L) {
-                        append("\n\nO perfil não pôde ser atualizado agora. Os dados salvos são exibidos.")
-                    }
-                }
 
-                AlertDialog.Builder(activity)
-                    .setTitle("Perfil Nextendo")
-                    .setMessage(details)
-                    .setPositiveButton("Amigos") { _, _ -> openFriends(activity) }
-                    .setNeutralButton("Configurar rede") { _, _ -> openNetworkSettings(activity) }
-                    .setNegativeButton("Desconectar") { _, _ ->
+                NextendoDashboardDialog.show(
+                    activity = activity,
+                    snapshot = NextendoDashboardDialog.Snapshot(
+                        username = username,
+                        friendCode = friendCode,
+                        pid = pid,
+                        gameTokenReady = gameTokenReady,
+                        gameTokenDiagnostic = displaySession.gameTokenDiagnostic,
+                        presenceDiagnostic = NextendoPresencePublisher.diagnostic(),
+                        baasDiagnostic = NextendoBaasRuntime.diagnostic,
+                        routeDiagnostic = NextendoNetworkRouting.diagnostic,
+                        installedRouteCount = NextendoNetworkRouting.installedRouteCount,
+                        onlinePlayers = networkStats?.onlinePlayers,
+                        registeredAccounts = networkStats?.totalRegistered,
+                        gamesOnline = networkStats?.gamesOnline,
+                        profileRefreshFailed = profile == null && pid > 0L
+                    ),
+                    onFriends = { openFriends(activity) },
+                    onNetworkSettings = { openNetworkSettings(activity) },
+                    onCopyFriendCode = {
+                        val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE)
+                            as ClipboardManager
+                        clipboard.setPrimaryClip(
+                            ClipData.newPlainText("NEX Friend Code", friendCode)
+                        )
+                        Toast.makeText(
+                            activity,
+                            "Friend Code copiado.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    onDisconnect = {
                         NextendoPresencePublisher.stop(activity)
                         NextendoNativeBridge.clearFriendCache()
                         NextendoNativeBridge.clearIdentity()
@@ -274,7 +250,7 @@ object NextendoAuthManager {
                             Toast.LENGTH_SHORT
                         ).show()
                     }
-                    .show()
+                )
             }
         }
     }
