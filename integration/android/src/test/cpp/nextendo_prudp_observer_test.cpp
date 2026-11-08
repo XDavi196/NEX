@@ -47,6 +47,7 @@ std::vector<std::uint8_t> MakeWebSocketFrame(const std::vector<std::uint8_t>& pa
 } // namespace
 
 int main() {
+    Common::NextendoPrudpObserver::ClearRecentPackets();
     Common::NextendoPrudpObserver observer;
     observer.SetServerName("g22306d00-lp1.s.n.srv.nintendo.net");
 
@@ -70,6 +71,13 @@ int main() {
     assert(packets[0].minor_version == 5);
     assert(packets[0].supported_functions == 0x123456);
     assert(packets[0].payload_bytes == 0);
+    assert(packets[0].from_client);
+
+    auto recent = Common::NextendoPrudpObserver::GetRecentPackets();
+    assert(recent.size() == 1);
+    assert(recent[0].from_client);
+    assert(recent[0].server_name == packets[0].server_name);
+    assert(recent[0].supported_functions == 0x123456);
 
     const std::string response = "HTTP/1.1 101 Switching Protocols\r\n\r\n";
     assert(observer.ObserveInbound(
@@ -81,9 +89,20 @@ int main() {
     assert(packets[0].type == 0);
     assert(packets[0].flags == 1);
     assert(packets[0].payload_bytes == 0);
+    assert(!packets[0].from_client);
+
+    recent = Common::NextendoPrudpObserver::GetRecentPackets();
+    assert(recent.size() == 2);
+    assert(recent[1].from_client == false);
+    assert(recent[1].type == 0);
 
     observer.SetServerName("example.com");
     assert(observer.ObserveOutbound(masked.data(), masked.size()).empty());
+
+    recent = Common::NextendoPrudpObserver::GetRecentPackets();
+    assert(recent.size() == 2);
+    Common::NextendoPrudpObserver::ClearRecentPackets();
+    assert(Common::NextendoPrudpObserver::GetRecentPackets().empty());
 
     return 0;
 }
