@@ -125,3 +125,5 @@ NEX is provided as-is, without warranty. Features may be incomplete, unstable, o
 A deployment bundle for a dedicated NEX Forgejo instance is available in [deploy/forgejo](deploy/forgejo/README.md). It includes Docker Compose, Caddy HTTPS configuration, GitHub pull-mirror instructions, and a release synchronizer for release notes and APK assets.
 
 The intended URL format is `https://git.YOUR-DOMAIN/XDavi196/NEX/releases`. This is deployment configuration only: the Forgejo service is not publicly live until a server and a domain controlled by the project owner are configured.
+
+For a temporary Forgejo instance using GitHub's Linux Codespaces environment (no separate VPS), see [the Codespaces deployment guide](deploy/forgejo/CODESPACES.md). The Codespaces instance is temporary and stops automatically; it is not the permanent public Forgejo host.
