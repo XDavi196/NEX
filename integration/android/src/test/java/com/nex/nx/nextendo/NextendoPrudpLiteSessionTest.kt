@@ -390,16 +390,16 @@ class NextendoPrudpLiteSessionTest {
         val session = NextendoPrudpLiteSession(config)
         connect(session, config, nowMs = 1_000L)
 
-        assertTrue(session.tick(nowMs = 6_001L).outboundFrames.isEmpty())
+        assertTrue(session.tick(nowMs = 5_999L).outboundFrames.isEmpty())
         val firstPing = NextendoPrudpLiteCodec.decode(
-            session.tick(nowMs = 6_002L).outboundFrames.single()
+            session.tick(nowMs = 6_000L).outboundFrames.single()
         ).packets.single()
         assertEquals(NextendoPrudpLiteCodec.TYPE_PING, firstPing.type)
         assertEquals(NextendoPrudpLiteCodec.FLAG_NEED_ACK, firstPing.flags)
         assertEquals(0, firstPing.packetId)
 
         val secondPing = NextendoPrudpLiteCodec.decode(
-            session.tick(nowMs = 11_002L).outboundFrames.single()
+            session.tick(nowMs = 11_000L).outboundFrames.single()
         ).packets.single()
         assertEquals(NextendoPrudpLiteCodec.TYPE_PING, secondPing.type)
         assertEquals(1, secondPing.packetId)
