@@ -563,6 +563,67 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     void StoreOpenContext(HLERequestContext& ctx) {""",
     )
 
+    # Rewrite only recognized outbound Nextendo matchmaking station strings.
+    # The owned buffer is retained across ResultWouldBlock retries as required by OpenSSL.
+    ssl_cpp = eden / "src/core/hle/service/ssl/ssl.cpp"
+    replace_once(
+        ssl_cpp,
+        '#include "core/hle/service/ssl/ssl.h"\n',
+        '#include "core/hle/service/ssl/ssl.h"\n'
+        '#include "core/hle/service/ssl/nextendo_nat_station_rewrite.h"\n',
+    )
+    replace_once(
+        ssl_cpp,
+        "    bool did_handshake = false;\n",
+        "    bool did_handshake = false;\n"
+        "    std::vector<u8> nextendo_pending_original_write;\n"
+        "    std::vector<u8> nextendo_pending_rewritten_write;\n",
+    )
+    replace_once(
+        ssl_cpp,
+        """    Result WriteImpl(size_t* out_size, std::span<const u8> data) {
+        ASSERT_OR_EXECUTE(did_handshake, { return ResultInternalError; });
+        return backend->Write(out_size, data);
+    }""",
+        """    Result WriteImpl(size_t* out_size, std::span<const u8> data) {
+        ASSERT_OR_EXECUTE(did_handshake, { return ResultInternalError; });
+
+        if (!nextendo_pending_original_write.empty()) {
+            const bool same_pending_write =
+                data.size() == nextendo_pending_original_write.size() &&
+                std::equal(data.begin(), data.end(), nextendo_pending_original_write.begin());
+            if (!same_pending_write) {
+                LOG_WARNING(Service_SSL,
+                            "[NEX] Deferring another SSL write while a rewritten frame is pending");
+                return ResultWouldBlock;
+            }
+        } else if (!data.empty()) {
+            nextendo_pending_original_write.assign(data.begin(), data.end());
+            nextendo_pending_rewritten_write.clear();
+            std::size_t rewritten_count = 0;
+            if (Common::NextendoNatStationRewrite::TryFixupStationAddress(
+                    data, nextendo_pending_rewritten_write, &rewritten_count)) {
+                LOG_INFO(Service_SSL,
+                         "[NEX] Rewrote {} private station address(es) in matchmaking traffic",
+                         rewritten_count);
+            } else {
+                nextendo_pending_original_write.clear();
+            }
+        }
+
+        const std::span<const u8> send_data =
+            nextendo_pending_rewritten_write.empty()
+                ? data
+                : std::span<const u8>(nextendo_pending_rewritten_write);
+        const Result result = backend->Write(out_size, send_data);
+        if (result != ResultWouldBlock) {
+            nextendo_pending_original_write.clear();
+            nextendo_pending_rewritten_write.clear();
+        }
+        return result;
+    }""",
+    )
+
     # Route only explicitly provisioned Nintendo service hostnames. The original
     # hostname remains in the guest resolver result so TLS/SNI can select the correct
     # Nextendo virtual host; there is no wildcard or all-Nintendo redirect.
