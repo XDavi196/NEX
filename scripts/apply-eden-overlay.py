@@ -55,6 +55,21 @@ def main() -> None:
     for source in sorted(test_source.glob("*Test.kt")):
         shutil.copy2(source, test_destination / source.name)
 
+    # Register the private document-picker activity used to import DEN/Citron's
+    # nextendo_account.txt. The selected plaintext file is read once and is not
+    # copied into app storage.
+    manifest = app_dir / "src/main/AndroidManifest.xml"
+    manifest_text = manifest.read_text(encoding="utf-8")
+    import_activity = "com.nex.nx.nextendo.NextendoAccountImportActivity"
+    if import_activity not in manifest_text:
+        replace_once(
+            manifest,
+            "</application>",
+            '        <activity android:name="' + import_activity + '" '
+            'android:exported="false" '
+            'android:theme="@android:style/Theme.Translucent.NoTitleBar" />\\n'
+            "    </application>",
+        )
 
     # Add the NEX native friend-cache API to Eden's Kotlin/JNI boundary.
     native_library = app_dir / "src/main/java/org/yuzu/yuzu_emu/NativeLibrary.kt"
