@@ -25,7 +25,7 @@ internal class NextendoExactHostDns(
         require(NextendoNetworkAddress.isValidIpv4(serverIpv4)) {
             "Nextendo DNS server address must be a valid IPv4 address."
         }
-        val bytes = serverIpv4.split('.').map { it.toInt() }.map(Int::toByte).toByteArray()
+        val bytes = serverIpv4.split('.').map { it.toInt().toByte() }.toByteArray()
         serverAddress = InetAddress.getByAddress(bytes) as Inet4Address
         require(redirectedHosts.isNotEmpty() && redirectedHosts.all { it.isNotBlank() }) {
             "Nextendo exact-host routing list is empty or invalid."
