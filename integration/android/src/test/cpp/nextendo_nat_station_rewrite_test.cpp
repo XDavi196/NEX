@@ -174,7 +174,7 @@ bool TestNncsReplyCapture() {
     primary[14] = 9;
     primary[15] = 9;
 
-    if (ObserveNncsReply(10025, primary)) return false;
+    if (ObserveNncsReply(10025, 55000, primary)) return false;
     if (GetObservedExternalIPv4().has_value()) return false;
 
     Bytes secondary = primary;
@@ -183,23 +183,23 @@ bool TestNncsReplyCapture() {
     secondary[13] = 4;
     secondary[14] = 4;
     secondary[15] = 4;
-    if (!ObserveNncsReply(10125, secondary)) return false;
+    if (!ObserveNncsReply(10125, 55000, secondary)) return false;
 
     const auto value = GetObservedExternalIPv4();
     if (!value || *value != IPv4{8, 8, 8, 8}) return false;
 
     ClearObservedExternalIPv4();
-    if (ObserveNncsReply(9999, primary)) return false;
-    if (ObserveNncsReply(10025, Bytes{1, 2, 3})) return false;
+    if (ObserveNncsReply(9999, 55000, primary)) return false;
+    if (ObserveNncsReply(10025, 55000, Bytes{1, 2, 3})) return false;
     Bytes wrong_test = primary;
     wrong_test[3] = 100;
-    if (ObserveNncsReply(10025, wrong_test)) return false;
+    if (ObserveNncsReply(10025, 55000, wrong_test)) return false;
     Bytes private_address = primary;
     private_address[8] = 192;
     private_address[9] = 168;
     private_address[10] = 1;
     private_address[11] = 20;
-    if (ObserveNncsReply(10025, private_address)) return false;
+    if (ObserveNncsReply(10025, 55000, private_address)) return false;
 
     ClearObservedExternalIPv4();
     Bytes same_responder = primary;
@@ -207,8 +207,13 @@ bool TestNncsReplyCapture() {
     same_responder[13] = 9;
     same_responder[14] = 9;
     same_responder[15] = 9;
-    if (ObserveNncsReply(10025, primary)) return false;
-    if (ObserveNncsReply(10125, same_responder)) return false;
+    if (ObserveNncsReply(10025, 55000, primary)) return false;
+    if (ObserveNncsReply(10125, 55000, same_responder)) return false;
+
+    ClearObservedExternalIPv4();
+    Bytes local_port_mismatch = secondary;
+    if (ObserveNncsReply(10025, 55000, primary)) return false;
+    if (ObserveNncsReply(10125, 55001, local_port_mismatch)) return false;
     return !GetObservedExternalIPv4().has_value();
 }
 
