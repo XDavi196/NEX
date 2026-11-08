@@ -74,9 +74,7 @@ object NextendoFriendsDialog {
         }.getOrNull()
 
         fun friendRow(friend: NextendoSocialApi.Friend, isRequest: Boolean = false): View {
-            val name = friend.username.ifBlank {
-                if (friend.pid > 0L) "PID ${friend.pid}" else "Jogador Nextendo"
-            }
+            val name = friend.username.ifBlank { "Jogador Nextendo" }
             val statusColor = when {
                 isRequest -> COLOR_ONLINE
                 friend.presenceStatus == 2 -> COLOR_PLAYING
