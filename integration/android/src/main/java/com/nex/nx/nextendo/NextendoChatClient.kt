@@ -139,6 +139,9 @@ internal object NextendoChatClient {
         return request(context, "POST", "/v1/friends", JSONObject().put("friends", friends))
     }
 
+    fun unread(context: Context): Reply =
+        request(context, "GET", "/v1/unread")
+
     fun messages(context: Context, friendPid: Long, afterId: Long): Reply {
         require(friendPid > 0L && afterId >= 0L)
         return request(
