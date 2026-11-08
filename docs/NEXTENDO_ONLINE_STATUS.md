@@ -111,7 +111,7 @@ The BAAS builder is connected through `NextendoBaasRuntime` to Eden's ACC token 
 - The one-shot Android probe client is separate from the guest socket keeper. It can send NNCS probes to runtime-configured vantages, but it is not invoked automatically by the game and does not keep the game's socket alive.
 - The keeper implements short close/reopen preservation; neither component schedules periodic keepalives, discovers peers, signals matchmaking, or performs UDP hole-punching.
 - The public `nextendo-nncs` source documents UDP ports `10025` and `10125` for Mario Kart 8's `nncs1-lp1`/`nncs2-lp1` probes. Those are title-specific MK8 values and are deliberately not copied into the SMM2 profile.
-- No public SMM2-specific NNCS hostname/port pair, second-vantage mapping or NAT probe lifecycle has been confirmed.
+- No public SMM2-specific NNCS hostname/port pair, second-vantage mapping or probe timing has been confirmed. The one-shot probe client awaits those exact runtime values and is not wired into the guest lifecycle.
 - The native cache has deterministic tests for same-port adoption, address mismatch, expiry, replacement, capacity and cleanup. The full Android overlay still requires successful compilation and runtime validation on two devices.
 
 ## Current Nextendo public-contract audit
