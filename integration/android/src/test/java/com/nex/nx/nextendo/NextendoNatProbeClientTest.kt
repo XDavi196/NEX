@@ -164,7 +164,7 @@ class NextendoNatProbeClientTest {
         fun await() {
             worker.join(3_000)
             check(!worker.isAlive) { "Fake NNCS server did not receive a probe." }
-            failure?.let { throw AssertionError("Fake NNCS server failed.", it) }
+            failure?.let { throw IllegalStateException("Fake NNCS server failed.", it) }
         }
 
         override fun close() {
