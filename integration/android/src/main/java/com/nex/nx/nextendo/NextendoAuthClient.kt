@@ -389,7 +389,7 @@ object NextendoAuthClient {
         require(
             path.startsWith("/api/") &&
                 !path.contains("..") &&
-                path.none { it == '\\r' || it == '\\n' || it == '\\u0000' } &&
+                path.none { it.code < 0x20 } &&
                 !path.startsWith("//")
         ) {
             "O caminho da API Nextendo não é permitido."
