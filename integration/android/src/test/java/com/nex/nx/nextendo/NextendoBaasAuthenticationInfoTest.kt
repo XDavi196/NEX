@@ -77,7 +77,7 @@ class NextendoBaasAuthenticationInfoTest {
     }
 
     @Test
-    fun rejectsMalformedOrUnsignedJwt() {
+    fun rejectsMalformedOrWrongSessionJwt() {
         invalid {
             NextendoBaasAuthenticationInfo.encodeLoginExtraData(
                 "not-a-jwt",
