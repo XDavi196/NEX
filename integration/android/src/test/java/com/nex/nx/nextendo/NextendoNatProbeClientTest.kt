@@ -8,6 +8,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -73,7 +74,7 @@ class NextendoNatProbeClientTest {
             first.await()
             second.await()
             assertEquals(NextendoNatProbeTracker.NatType.SYMMETRIC, result.classification.type)
-            assertEquals(null, result.classification.externalPort)
+            assertNull(result.classification.externalPort)
         } finally {
             first.close()
             second.close()
