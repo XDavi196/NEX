@@ -407,77 +407,13 @@ object NextendoAuthManager {
             setSingleLine(true)
             setText(saved?.natIpv4.orEmpty())
         }
-        val jwksUrlInput = EditText(activity).apply {
-            hint = "HTTPS BAAS JWKS URL fornecida pela Nextendo"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_VARIATION_URI or
-                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            setSingleLine(true)
+        val exportBackup = Button(activity).apply {
+            text = "Exportar backup criptografado da conta"
+            setOnClickListener { showExportSessionBackupDialog(activity) }
         }
-        val exportPublicKey = Button(activity)
-        exportPublicKey.text = "Copiar solicitação de registro BAAS"
-        exportPublicKey.setOnClickListener {
-            runCatching { NextendoBaasRuntime.exportAndroidKeystoreRegistrationRequest() }
-                .onSuccess { registrationRequest ->
-                    val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE)
-                        as ClipboardManager
-                    clipboard.setPrimaryClip(
-                        ClipData.newPlainText(
-                            "NEX BAAS public-key registration request",
-                            registrationRequest
-                        )
-                    )
-                    Toast.makeText(
-                        activity,
-                        "Solicitação pública copiada. Envie à equipe Nextendo. Isso não registra a chave automaticamente; a chave privada não é exportada.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-                .onFailure { error ->
-                    Toast.makeText(
-                        activity,
-                        error.message ?: "Não foi possível gerar a solicitação BAAS.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-        }
-        val verifyJwksPublication = Button(activity)
-        verifyJwksPublication.text = "Verificar publicação da JWK"
-        verifyJwksPublication.setOnClickListener {
-            val jwksUrl = jwksUrlInput.text.toString().trim()
-            if (jwksUrl.isBlank()) {
-                Toast.makeText(
-                    activity,
-                    "Informe primeiro a URL HTTPS da JWKS fornecida pela Nextendo.",
-                    Toast.LENGTH_LONG
-                ).show()
-            } else {
-                verifyJwksPublication.isEnabled = false
-                executor.execute {
-                    val result = runCatching {
-                        NextendoBaasRuntime.verifyAndroidKeystoreJwksPublication(jwksUrl)
-                    }
-                    mainHandler.post {
-                        verifyJwksPublication.isEnabled = true
-                        result.fold(
-                            onSuccess = {
-                                Toast.makeText(
-                                    activity,
-                                    "A JWKS publica a chave exata deste dispositivo. Ainda falta a confirmação das claims BAAS pela Nextendo.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            },
-                            onFailure = { error ->
-                                Toast.makeText(
-                                    activity,
-                                    error.message ?: "Não foi possível confirmar a publicação da JWK.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        )
-                    }
-                }
-            }
+        val importBackup = Button(activity).apply {
+            text = "Importar backup criptografado"
+            setOnClickListener { showImportSessionBackupDialog(activity) }
         }
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -498,21 +434,14 @@ object NextendoAuthManager {
                 )
             )
             addView(
-                exportPublicKey,
+                exportBackup,
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             )
             addView(
-                jwksUrlInput,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-            addView(
-                verifyJwksPublication,
+                importBackup,
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -521,11 +450,13 @@ object NextendoAuthManager {
         }
 
         AlertDialog.Builder(activity)
-            .setTitle("Servidores e BAAS Nextendo")
+            .setTitle("Servidores e backup da conta")
             .setMessage(
-                "Informe os dois IPv4 fornecidos pela Nextendo. Eles precisam ser diferentes. " +
-                    "A verificação BAAS usa somente a URL HTTPS de JWKS confirmada pela equipe Nextendo. " +
-                    "Copiar a solicitação não registra a chave."
+                "Informe somente os IPv4 fornecidos oficialmente pela Nextendo. " +
+                    "O backup da conta é exportado criptografado com uma senha que você define. " +
+                    "Ele contém credenciais de sessão: não compartilhe o arquivo nem a senha. " +
+                    "O backup NEX não é compatível com nextendo_account.txt de outros clientes " +
+                    "e não habilita a autenticação BAAS ou o multiplayer por si só."
             )
             .setView(content)
             .setPositiveButton("Salvar e aplicar") { _, _ ->
@@ -560,6 +491,196 @@ object NextendoAuthManager {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    private fun showExportSessionBackupDialog(activity: Activity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val passwordInput = EditText(activity).apply {
+            hint = "Senha do backup (mínimo 12 caracteres)"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine(true)
+        }
+        val confirmInput = EditText(activity).apply {
+            hint = "Confirmar senha"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine(true)
+        }
+        val content = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            val inset = (20 * resources.displayMetrics.density).toInt()
+            setPadding(inset, 0, inset, 0)
+            addView(passwordInput)
+            addView(confirmInput)
+        }
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("Exportar conta NEX")
+            .setMessage(
+                "O arquivo conterá tokens de sessão criptografados. Defina uma senha forte, " +
+                    "guarde-a separadamente e nunca envie o arquivo ou a senha para outras pessoas."
+            )
+            .setView(content)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Exportar", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val password = CharArray(passwordInput.text.length()) { index ->
+                    passwordInput.text[index]
+                }
+                val confirmation = CharArray(confirmInput.text.length()) { index ->
+                    confirmInput.text[index]
+                }
+                if (password.size < NextendoSessionBackupCodec.MIN_PASSPHRASE_LENGTH) {
+                    passwordInput.error = "Use pelo menos 12 caracteres."
+                    password.fill('\u0000')
+                    confirmation.fill('\u0000')
+                    return@setOnClickListener
+                }
+                if (!password.contentEquals(confirmation)) {
+                    confirmInput.error = "As senhas não coincidem."
+                    password.fill('\u0000')
+                    confirmation.fill('\u0000')
+                    return@setOnClickListener
+                }
+                confirmation.fill('\u0000')
+                dialog.dismiss()
+                passwordInput.text.clear()
+                confirmInput.text.clear()
+                executor.execute {
+                    val result = runCatching {
+                        NextendoSessionStore.exportEncryptedBackup(activity, password)
+                    }
+                    password.fill('\u0000')
+                    mainHandler.post {
+                        if (activity.isFinishing || activity.isDestroyed) return@post
+                        result.fold(
+                            onSuccess = { encryptedBackup ->
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "NEX encrypted Nextendo session backup")
+                                    putExtra(Intent.EXTRA_TEXT, encryptedBackup)
+                                }
+                                runCatching {
+                                    activity.startActivity(
+                                        Intent.createChooser(shareIntent, "Salvar backup criptografado")
+                                    )
+                                }.onFailure {
+                                    Toast.makeText(
+                                        activity,
+                                        "Não foi possível abrir o compartilhamento do Android.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
+                            onFailure = { error ->
+                                Toast.makeText(
+                                    activity,
+                                    error.message ?: "Não foi possível exportar a conta.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showImportSessionBackupDialog(activity: Activity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val backupInput = EditText(activity).apply {
+            hint = "Cole aqui o conteúdo do backup NEX criptografado"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            minLines = 5
+            maxLines = 9
+            setHorizontallyScrolling(false)
+        }
+        val passwordInput = EditText(activity).apply {
+            hint = "Senha do backup"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine(true)
+        }
+        val content = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            val inset = (20 * resources.displayMetrics.density).toInt()
+            setPadding(inset, 0, inset, 0)
+            addView(
+                backupInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    (180 * resources.displayMetrics.density).toInt()
+                )
+            )
+            addView(passwordInput)
+        }
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("Importar conta NEX")
+            .setMessage(
+                "A restauração substituirá a sessão Nextendo atualmente salva neste NEX. " +
+                    "Só são aceitos backups criptografados exportados pelo próprio NEX; " +
+                    "o arquivo nextendo_account.txt de DEN/Citron não é compatível."
+            )
+            .setView(content)
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Importar", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val backup = backupInput.text.toString().trim()
+                val password = CharArray(passwordInput.text.length()) { index ->
+                    passwordInput.text[index]
+                }
+                if (backup.isBlank()) {
+                    backupInput.error = "Cole o conteúdo do backup."
+                    password.fill('\u0000')
+                    return@setOnClickListener
+                }
+                if (password.size < NextendoSessionBackupCodec.MIN_PASSPHRASE_LENGTH) {
+                    passwordInput.error = "A senha precisa ter pelo menos 12 caracteres."
+                    password.fill('\u0000')
+                    return@setOnClickListener
+                }
+                dialog.dismiss()
+                backupInput.text.clear()
+                passwordInput.text.clear()
+                executor.execute {
+                    val result = runCatching {
+                        NextendoSessionStore.importEncryptedBackup(activity, backup, password)
+                        NextendoBaasRuntime.clear()
+                        NextendoNativeBridge.clearFriendCache()
+                        NextendoNativeBridge.clearIdentity()
+                        NextendoNativeBridge.clearPrudpDiagnostics()
+                    }
+                    password.fill('\u0000')
+                    mainHandler.post {
+                        if (activity.isFinishing || activity.isDestroyed) return@post
+                        result.fold(
+                            onSuccess = {
+                                Toast.makeText(
+                                    activity,
+                                    "Backup restaurado. Abra a conta NEX para validar a sessão com a Nextendo.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            },
+                            onFailure = { error ->
+                                Toast.makeText(
+                                    activity,
+                                    error.message ?: "Não foi possível importar o backup.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun showSessionRecoveryDialog(activity: Activity, detail: String) {
