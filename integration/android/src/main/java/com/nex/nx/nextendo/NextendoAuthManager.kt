@@ -526,10 +526,10 @@ object NextendoAuthManager {
             .create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val password = CharArray(passwordInput.text.length()) { index ->
+                val password = CharArray(passwordInput.text.length) { index ->
                     passwordInput.text[index]
                 }
-                val confirmation = CharArray(confirmInput.text.length()) { index ->
+                val confirmation = CharArray(confirmInput.text.length) { index ->
                     confirmInput.text[index]
                 }
                 if (password.size < NextendoSessionBackupCodec.MIN_PASSPHRASE_LENGTH) {
@@ -633,7 +633,7 @@ object NextendoAuthManager {
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val backup = backupInput.text.toString().trim()
-                val password = CharArray(passwordInput.text.length()) { index ->
+                val password = CharArray(passwordInput.text.length) { index ->
                     passwordInput.text[index]
                 }
                 if (backup.isBlank()) {
