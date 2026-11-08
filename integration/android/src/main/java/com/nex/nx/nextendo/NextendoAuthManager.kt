@@ -324,6 +324,7 @@ object NextendoAuthManager {
                     onFriends = { openFriends(activity) },
                     onCommunity = { openCommunity(activity) },
                     onAccountTools = { openAccountTools(activity) },
+                    onDataManager = { openDataManager(activity) },
                     onNetworkSettings = { openNetworkSettings(activity) },
                     onCheckOnlineAccess = { checkOnlineAccess(activity) },
                     onCopyFriendCode = {
@@ -431,6 +432,15 @@ object NextendoAuthManager {
     }
 
     private class MissingOnlineGameTokenException : Exception()
+
+    /** Opens explicit cloud-save, BCAT and profile-media transfers. */
+    fun openDataManager(activity: Activity) {
+        if (NextendoSessionStore.load(activity) == null) {
+            startLogin(activity)
+            return
+        }
+        activity.startActivity(Intent(activity, NextendoDataManagerActivity::class.java))
+    }
 
     /** Opens the profile/history tools available in DEN2's Nextendo account API. */
     fun openAccountTools(activity: Activity) {
