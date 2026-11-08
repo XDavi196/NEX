@@ -42,6 +42,9 @@ internal object NextendoBaasRuntime {
         pem: String
     ): NextendoBaasProvisioningProvider {
         val signer = NextendoCitronBaasSigner.fromPem(pem)
+        require(NextendoNetworkConfigStore.load(context.applicationContext) != null) {
+            "Configure primeiro o IP principal do servidor em Nextendo Network > Configurar rede."
+        }
         val client = NextendoNetworkRouting.createHttpClient(context.applicationContext)
         val registration = NextendoBaasJwksVerifier.fetchAndVerify(
             jwksUrl = NextendoCitronBaasProfile.JWKS_URL,
