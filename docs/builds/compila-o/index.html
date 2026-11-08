@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f2329">
+  <meta name="description" content="Builds e releases do A Link to the Past Voxel Recomp, projeto privado da XDavi196.">
+  <meta property="og:title" content="Compila-o- · Releases">
+  <meta property="og:description" content="Portal de versões e compilações do A Link to the Past Voxel Recomp.">
+  <title>Compila-o- · Releases | XDavi196</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="global">
+    <a class="home" href="../" aria-label="Voltar ao XDavi196 Projects & Builds"><span class="home-mark">XD</span><span>PROJECTS <b>& BUILDS</b></span></a>
+    <div class="crumb"><a href="https://github.com/XDavi196">XDavi196</a><span>/</span><strong>Compila-o-</strong><span class="private">Privado</span></div>
+    <a class="source-link" href="https://github.com/XDavi196/Compila-o-" target="_blank" rel="noopener">Abrir repositório ↗</a>
+  </header>
+
+  <nav class="repo-nav" aria-label="Navegação do projeto">
+    <a href="https://github.com/XDavi196/Compila-o-" target="_blank" rel="noopener">◫ Visão geral</a>
+    <a href="https://github.com/XDavi196/Compila-o-/tree/main" target="_blank" rel="noopener">⌘ Código</a>
+    <a href="https://github.com/XDavi196/Compila-o-/actions" target="_blank" rel="noopener">▤ Atividade</a>
+    <a class="active" href="./" aria-current="page">⇩ Releases <span>0</span></a>
+  </nav>
+
+  <main>
+    <div class="heading">
+      <div>
+        <div class="eyebrow">REPOSITÓRIO · COMPILAÇÕES</div>
+        <h1>Compila-o- <span>/ Releases</span></h1>
+        <p>Distribuição experimental do <em>A Link to the Past — Voxel Recomp</em>.</p>
+      </div>
+      <a class="button" href="https://github.com/XDavi196/Compila-o-/releases" target="_blank" rel="noopener">Abrir Releases no GitHub ↗</a>
+    </div>
+
+    <div class="layout">
+      <section class="main-column" aria-label="Releases e builds">
+        <div class="empty-state">
+          <div class="empty-icon">⇩</div>
+          <div>
+            <h2>Nenhuma release publicada ainda</h2>
+            <p>O projeto ainda não possui uma versão pública anexada. Não há botão de download falso: o APK só aparecerá aqui depois que uma release real for criada e autorizada.</p>
+          </div>
+        </div>
+
+        <div class="section-title"><h2>Última compilação verificada</h2><span class="count">ANDROID · CI</span></div>
+        <article class="build-card">
+          <div class="build-top">
+            <span class="status"><i></i> Build concluída</span>
+            <span class="build-date">08 nov. 2026</span>
+          </div>
+          <h3>Android bootstrap <span>#57</span></h3>
+          <p>A compilação do APK e os testes instrumentados do runtime SNES passaram no emulador Android 11. Este artefato é uma base experimental de execução PPU 2D; não representa o jogo 3D voxel completo.</p>
+          <div class="build-meta">
+            <div><small>WORKFLOW</small><b>Build A Link to the Past Voxel Recomp (Android)</b></div>
+            <div><small>COMMIT</small><b><code>65dcb7901189</code></b></div>
+            <div><small>RESULTADO</small><b class="success-text">Build + testes: sucesso</b></div>
+          </div>
+          <div class="build-actions">
+            <a class="button primary" href="https://github.com/XDavi196/Compila-o-/actions/runs/42502473190" target="_blank" rel="noopener">Ver build #57 e artefato ↗</a>
+            <a class="text-link" href="https://github.com/XDavi196/Compila-o-/actions" target="_blank" rel="noopener">Histórico de compilações</a>
+          </div>
+          <div class="private-note">O artefato do Actions continua sujeito às permissões do repositório privado. Ele ainda não é um download público.</div>
+        </article>
+
+        <div class="section-title"><h2>Publicação de releases</h2><span class="count">NEX-RELEASE-BOT</span></div>
+        <article class="publish-card">
+          <div class="publish-icon">!</div>
+          <div class="publish-body">
+            <h3>Publicação aguardando credenciais do bot</h3>
+            <p>A execução de publicação #16 recebeu o APK, preparou o arquivo e o SHA-256, mas parou na validação das credenciais do <code>nex-release-bot</code>. O workflow será ajustado para usar os nomes de credenciais já adotados pelo NEX.</p>
+            <a class="text-link" href="https://github.com/XDavi196/Compila-o-/actions/runs/42502829248" target="_blank" rel="noopener">Ver execução de publicação #16 ↗</a>
+          </div>
+        </article>
+
+        <div class="section-title"><h2>Critérios antes do lançamento</h2></div>
+        <div class="checklist">
+          <div><span class="done">✓</span><span>Build Android bootstrap e testes de runtime sintético</span></div>
+          <div><span class="todo">○</span><span>Gerar o código C AOT usando a ROM USA 1.0 fornecida localmente pelo usuário</span></div>
+          <div><span class="todo">○</span><span>Validar boot, jogo, controles, áudio e saves com a ROM real</span></div>
+          <div><span class="todo">○</span><span>Implementar a extração de cena e o renderer 3D voxel</span></div>
+          <div><span class="todo">○</span><span>Publicar uma release experimental depois das verificações</span></div>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="side-card">
+          <h2>Sobre o projeto</h2>
+          <p>Recompilação nativa de <em>A Link to the Past</em> com o runtime SNESRecomp e evolução planejada para uma apresentação 3D voxel.</p>
+          <div class="side-separator"></div>
+          <dl>
+            <div><dt>Visibilidade</dt><dd><span class="private">Privado</span></dd></div>
+            <div><dt>Plataforma atual</dt><dd>Android</dd></div>
+            <div><dt>Application ID</dt><dd><code>com.xdavi196.alttpvoxel</code></dd></div>
+            <div><dt>Versão base</dt><dd>0.1.0-bootstrap</dd></div>
+            <div><dt>Releases públicas</dt><dd>0</dd></div>
+          </dl>
+        </section>
+        <section class="side-card links-card">
+          <h2>Acesso rápido</h2>
+          <a href="https://github.com/XDavi196/Compila-o-" target="_blank" rel="noopener">Código-fonte (requer acesso) ↗</a>
+          <a href="https://github.com/XDavi196/Compila-o-/actions" target="_blank" rel="noopener">Builds e testes ↗</a>
+          <a href="https://github.com/XDavi196/Compila-o-/releases" target="_blank" rel="noopener">Releases do GitHub ↗</a>
+          <a href="https://forgejo.org/releases/" target="_blank" rel="noopener">Downloads oficiais do Forgejo ↗</a>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <span>XDavi196 · Compila-o-</span>
+    <span>Portal de releases inspirado na organização do Forgejo. Hospedado como site estático no GitHub Pages; não é uma instância Forgejo.</span>
+    <a href="../">Voltar ao portal de projetos ↑</a>
+  </footer>
+</body>
+</html>
