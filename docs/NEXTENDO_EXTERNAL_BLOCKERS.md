@@ -12,29 +12,21 @@ This document separates NEX-owned implementation work from values and service be
 
 Do not add a client secret, another emulator's credential, or any service-side secret to the APK.
 
-## 1. BAAS id_token and JWK publication
+## 1. BAAS game authentication — explicitly blocked by Nextendo policy
 
-NEX contains the RS256 compact-JWT builder, the `nnex` game-token claim, the `AuthenticationInfo` DataHolder encoder and the Eden ACC cache bridge. It creates a per-installation RSA-2048 key in Android Keystore; the private key is non-exportable. The `kid` is the RFC 7638 thumbprint of the public RSA JWK. The settings screen now copies a support-ready registration JSON with NEX's public application identity and public JWK, not private signing material.
+NEX contains an RS256 JWT builder, an AuthenticationInfo DataHolder encoder and an Eden ACC cache bridge as protocol/test scaffolding. These components are not a production authentication path. The earlier per-installation Android Keystore/JWK proposal is superseded and must not be used to try to register client-generated keys.
 
-NEX also has `NextendoBaasJwksVerifier`: after Nextendo supplies the correct HTTPS `jku` URL and registers/publishes the key, NEX fetches the JWKS with platform TLS validation and verifies exact `kid`, `n` and `e` equality. The provider cannot be installed from a merely local JWK export. Even a successful JWKS match does not establish service acceptance of the `iss`, `aud`, `sub` or other claims; Nextendo must confirm those separately.
+The Nextendo founder explicitly told the NEX project:
 
-**Official-source constraint:** the public [NextendoNetwork/baas-jwks README](https://github.com/NextendoNetwork/baas-jwks) says the service publishes the public JWK derived from the same RSA private key used by the client to sign the BAAS token. Its [main.go](https://github.com/NextendoNetwork/baas-jwks/blob/main/main.go) loads one signing key from the server-side `BAAS_SIGNING_KEY` path/environment variable and publishes that public key under configured key IDs. The public code does not expose a client-facing API for registering arbitrary per-installation keys. NEX therefore cannot claim a per-device JWK is registered until Nextendo confirms the supported registration mechanism or provisions an approved NEX-specific signing arrangement.
+- Client-generated public keys will not be registered in the Nextendo JWKS.
+- Third-party RS256 BAAS tokens signed by client applications will not be accepted.
+- The JWKS is not open to per-installation registrations.
+- Game tokens are issued by Nextendo's own servers after the player signs in with a Nextendo account.
+- There is currently no third-party client certification process and no third-party BAAS token contract, including a jku/claims specification, to implement.
 
-Before enabling the runtime provider, confirm:
+This is a service-side trust restriction, not a missing Client ID or a missing Android Keystore setting. Do not generate a new client-held BAAS signing key, do not publish a locally generated JWK, do not send the retired per-installation registration request as a proposed solution, and do not copy DEN/Citron's local RSA fallback or any other emulator's signing material. NEX's ACC runtime must remain fail-closed and must not provide a client-generated BAAS JWT to the emulated game.
 
-1. Whether Nextendo accepts a distinct RSA key pair and `kid` per NEX installation, or requires a single NEX application key held by an approved signing service.
-2. The exact HTTPS `jku` hostname/path and the supported way to register or publish NEX's public JWK there.
-3. Whether the existing `baas-jwks` deployment can serve multiple independently generated public keys, or whether Nextendo must provide a separate NEX JWKS deployment/registration API.
-4. The exact JWT header and claims: `alg`, `kid`, `typ`, `jku`, `iss`, `aud`, `sub`/PID mapping, `hm`, `iat`, `exp`, and any title/version claims such as `tv`.
-5. Whether an Android Keystore RSA-2048 non-exportable key is accepted for NEX game authentication and whether the guest's BAAS verifier can reach the registered public JWK route with the expected TLS/SNI behavior.
-6. The rotation/revocation procedure and whether device-specific registration is permitted.
-
-The private RSA key must not be committed to Git, printed to logs, embedded in CI output, or copied from another emulator. A local key is not production-ready unless its matching public JWK is hosted at the confirmed `jku` and accepted by the title/service. NEX now exports a support-ready request and can verify the exact public key returned by a configured HTTPS JWKS endpoint. This check proves key publication only; it does not prove acceptance of the remaining JWT claims. The provider must not be installed until Nextendo confirms the claims contract and the exact key is published.
-
-Public references:
-- https://github.com/NextendoNetwork/Ryujinx-Nextendo
-- https://github.com/NextendoNetwork/baas-jwks
-- https://wiki.nextendo.network/developers
+The prerequisite for future work is a new, official Nextendo server-side mechanism that issues or authorizes a game-ready credential for NEX. If the policy changes, Nextendo must provide the supported flow, how the server binds the credential to the NEX application/account/game token, the permitted claims, expiry/refresh contract, and the LoginEx/ACC integration requirements. Until then, BAAS/LoginEx game authentication cannot be completed by NEX.
 
 ## 2. Client attestation and OAuth/API contract
 
@@ -113,20 +105,6 @@ For service-side support, send only a token-free diagnostic: exact UTC timestamp
 
 NEX now has an Android Keystore-backed network configuration screen and an exact-host multi-title auth/DAUTH DNS installer. This closes the client-side plumbing for main-server hostname routing, but it does not supply production addresses or complete the title login path.
 
-NEX can implement and test its Android Keystore signer, JWT/DataHolder serialization, ACC delivery, DNS route installation, guest socket integration and NAT client logic. NEX cannot truthfully fill production IPs, certificate deployment data, live `jku` registration, third-party attestation requirements or missing server-side SMM2 matchmaking behavior without confirmation from Nextendo or a verified live handshake.
+NEX can continue implementing and testing the already-owned DataHolder serialization, ACC cache delivery boundary, exact-host DNS routing, TLS/SNI handling, guest socket integration and NAT client logic. NEX cannot invent BAAS trust, a third-party attestation credential, production IPs, certificate deployment data or missing server-side SMM2 matchmaking behavior. The client-side BAAS cache remains empty until Nextendo provides an approved server-issued game-authentication mechanism.
 
-
-## 6. BAAS registration request prepared in NEX
-
-The NEX **Configurar rede** screen now has **Copiar solicitação de registro BAAS**. It generates the per-installation key in Android Keystore if needed and copies a JSON request containing:
-
-- NEX Android package ID and public OAuth Client ID;
-- algorithm RS256 and RSA-2048 key type/size;
-- the RFC 7638 `kid` / thumbprint;
-- the public-only JWK Set (`kty`, `use`, `alg`, `kid`, `n`, `e`);
-- an explicit statement that no private key is included;
-- the server-side questions listed above.
-
-This is a registration request, not an automatic registration API call or approval receipt. Submit it only through a verified Nextendo developer/support channel. Do not send a private key, OAuth token, `nx2.` token or BAAS JWT.
-
-After Nextendo publishes the exact public JWK, the NEX verifier can test the HTTPS `jku` response. It refuses a different key under the same `kid`, missing keys, HTTP/non-HTTPS endpoints, redirects and JWKS documents that include private RSA members. Runtime activation still requires the externally confirmed issuer/audience/subject contract.
+The previous per-installation JWK registration proposal is retired following the founder's explicit response. The file docs/NEXTENDO_BAAS_REGISTRATION_REQUEST.md is retained only as a historical record and must not be sent as a current request.
