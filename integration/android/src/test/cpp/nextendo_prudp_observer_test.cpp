@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "core/internal_network/nextendo_prudp_observer.h"
+#include "../../main/cpp/nextendo_prudp_observer.h"
 
 namespace {
 
