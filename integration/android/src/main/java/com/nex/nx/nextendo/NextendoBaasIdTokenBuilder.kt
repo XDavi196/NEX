@@ -77,6 +77,7 @@ internal object NextendoBaasIdTokenBuilder {
         // reference LoginEx helper places nnex in the payload, not jku.
         val payload = JsonObject(
             LinkedHashMap(claims).apply {
+                put("jku", JsonPrimitive(signer.jwksUrl))
                 put("nnex", JsonPrimitive(gameToken))
             }
         )
