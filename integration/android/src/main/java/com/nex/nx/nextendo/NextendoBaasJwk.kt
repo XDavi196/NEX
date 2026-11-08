@@ -24,14 +24,15 @@ internal object NextendoBaasJwk {
         fun toJwksJson(): String = """{"keys":[${toJson()}]}"""
     }
 
-    fun from(publicKey: RSAPublicKey): PublicRsaJwk {
+    fun from(publicKey: RSAPublicKey, registeredKeyId: String? = null): PublicRsaJwk {
         val modulus = base64Url(unsignedBytes(publicKey.modulus))
         val exponent = base64Url(unsignedBytes(publicKey.publicExponent))
         val canonical = """{"e":"$exponent","kty":"RSA","n":"$modulus"}"""
             .toByteArray(StandardCharsets.UTF_8)
         val thumbprint = MessageDigest.getInstance("SHA-256").digest(canonical)
         return PublicRsaJwk(
-            keyId = base64Url(thumbprint),
+            keyId = registeredKeyId?.also { require(it.isNotBlank()) }
+                ?: base64Url(thumbprint),
             modulus = modulus,
             exponent = exponent
         )
