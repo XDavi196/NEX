@@ -33,7 +33,7 @@ The current NEX client uses these routes:
 | Remove friend | POST /api/friends/remove | nx2 game token + target pid |
 | App/game presence | \`POST /api/presence\` | OAuth access token with \`presence\` |
 
-Every REST request made by `NextendoAuthClient` carries the configured NEX Client ID header. The current code does not yet add the cryptographic client-attestation signature described by the official Ryujinx-Nextendo v1.8.7 security update; this requires a NEX-issued credential and a documented signing contract.
+Every REST request made by `NextendoAuthClient` carries the configured NEX Client ID header. Presence publishing uses the OAuth access token with the `presence` scope as described by the Developer Documentation; the `nx2.` game token is not sent to `/api/presence`. The current code does not yet add the cryptographic client-attestation signature described by the official Ryujinx-Nextendo v1.8.7 security update; this requires a NEX-issued credential and a documented signing contract.
 
 The sign-in coordinator generates a new PKCE verifier, S256 challenge and state for each authorization. It saves the pending transaction using the Android Keystore-backed session store before opening the browser. The callback validates the NEX scheme, host and path, then exchanges the one-time code. OAuth access tokens and the separate game token are stored as different credential types.
 
