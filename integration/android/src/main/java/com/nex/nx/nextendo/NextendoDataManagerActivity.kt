@@ -16,7 +16,7 @@ import android.widget.Toast
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 
-/** User-driven cloud-save, BCAT and profile-media transfers; never silently overwrites game data. */
+/** User-driven BCAT export and profile-media transfers. */
 internal class NextendoDataManagerActivity : Activity() {
     private enum class PendingImport { NONE, PROFILE_JPEG, MII }
     private enum class PendingExport { NONE, BCAT }
@@ -24,7 +24,6 @@ internal class NextendoDataManagerActivity : Activity() {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var titleIdInput: EditText
     private var pendingImport = PendingImport.NONE
-    private var pendingExport = PendingExport.NONE
     private var pendingBytes: ByteArray? = null
     private var pendingFileName = "NEX-export.bin"
 
@@ -155,7 +154,6 @@ internal class NextendoDataManagerActivity : Activity() {
         pendingBytes?.fill(0)
         pendingBytes = bytes
         pendingFileName = name
-        pendingExport = kind
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = if (name.endsWith(".zip")) "application/zip" else "application/octet-stream"
@@ -277,7 +275,6 @@ internal class NextendoDataManagerActivity : Activity() {
         pendingBytes?.fill(0)
         pendingBytes = null
         pendingImport = PendingImport.NONE
-        pendingExport = PendingExport.NONE
     }
 
     override fun onDestroy() {
