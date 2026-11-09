@@ -57,8 +57,16 @@ int main() {
     assert(!SetNncsRedirectIps("203.0.113.11", "203.0.113.11"));
     assert(!SetNncsRedirectIps("0.0.0.0", "198.51.100.21"));
 
+    RecordResolved("nncs1.p01.lp1.n.n.srv.nintendo.net", "203.0.113.11", 0);
+    RecordResolved("nncs2.p01.lp1.n.n.srv.nintendo.net", "198.51.100.21", 0);
     RecordResolved("nncs2.p01.lp1.n.n.srv.nintendo.net", "198.51.100.21", 10025);
     assert(HostnameForPeer("198.51.100.21", 10025) == "nncs2.p01.lp1.n.n.srv.nintendo.net");
+    using Common::NextendoDnsRedirectCache::NncsVantageForPeer;
+    assert(NncsVantageForPeer("203.0.113.11", 10025) == 0U);
+    assert(NncsVantageForPeer("203.0.113.11", 10125) == 0U);
+    assert(NncsVantageForPeer("198.51.100.21", 10025) == 1U);
+    assert(NncsVantageForPeer("198.51.100.21", 10125) == 1U);
+    assert(!NncsVantageForPeer("192.0.2.33", 10025).has_value());
     const std::array<std::uint8_t, 4> expected_nat_ip{198, 51, 100, 21};
     assert(ResolveIpv4ForPort(10025) == expected_nat_ip);
 

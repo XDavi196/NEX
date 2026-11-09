@@ -296,6 +296,35 @@ inline std::optional<std::array<std::uint8_t, 4>> ResolveIpv4ForPort(std::uint16
     return std::nullopt;
 }
 
+inline std::optional<std::uint8_t> NncsVantageForPeer(
+    const std::string& ipv4, std::uint16_t port) {
+    if (!IsValidIpv4(ipv4)) {
+        return std::nullopt;
+    }
+    std::lock_guard lock{cache_mutex};
+    const auto find_vantage = [&](bool exact_port) -> std::optional<std::uint8_t> {
+        for (auto it = resolved_routes.rbegin(); it != resolved_routes.rend(); ++it) {
+            if (it->ipv4 != ipv4 || (exact_port && it->port != port)) {
+                continue;
+            }
+            if (IsNncsHostname(it->hostname, "nncs1")) {
+                return 0U;
+            }
+            if (IsNncsHostname(it->hostname, "nncs2")) {
+                return 1U;
+            }
+        }
+        return std::nullopt;
+    };
+
+    if (port != 0) {
+        if (const auto exact = find_vantage(true)) {
+            return exact;
+        }
+    }
+    return find_vantage(false);
+}
+
 inline void Clear() {
     std::lock_guard lock{cache_mutex};
     cache_entries.clear();

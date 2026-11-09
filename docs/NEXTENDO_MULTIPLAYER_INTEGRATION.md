@@ -93,3 +93,8 @@ Do not describe NEX as multiplayer-ready until all of the following have been te
 4. Both guests receive consistent NNCS observations for their own game UDP sockets.
 5. Peer signaling and UDP hole punching complete, gameplay packets flow in both directions, and disconnect/cleanup works.
 
+
+
+### NNCS vantage validation
+
+Two NNCS replies must report the same public IPv4 and distinct responder IPv4 values; the response source port is restricted to 10025/10125 but is not used to distinguish the two vantages. The vantages are classified by the actual source IP against the exact DNS resolution records for the nncs1 and nncs2 hostname families.

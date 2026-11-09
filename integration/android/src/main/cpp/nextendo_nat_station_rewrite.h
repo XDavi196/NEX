@@ -78,17 +78,22 @@ inline void ResetObservedNncsStateLocked() {
 }
 
 /**
- * Captures a reply from one of the two NNCS vantage ports using the guest game's
- * actual BSD UDP socket. The two replies must report the same public IPv4 and
- * come from distinct responder addresses before Station URL rewriting is enabled.
+ * Captures a reply from one of the two NNCS hostname families using the guest
+ * game's actual BSD UDP socket. The family is resolved from the source IP against
+ * the exact DNS routes installed for nncs1 and nncs2. Each family may reply on
+ * either UDP service port (10025 or 10125); ports do not identify the vantages.
+ *
+ * Before Station URL rewriting is enabled, both distinct families must report
+ * the same public IPv4 and distinct responder addresses.
  *
  * NNCS response layout (four big-endian u32 values):
  *   test id (101), external mapped port, external IPv4, responder IPv4.
  */
-inline bool ObserveNncsReply(std::uint16_t source_port, std::uint16_t local_port,
+inline bool ObserveNncsReply(std::uint8_t vantage, std::uint16_t source_port,
+                             std::uint16_t local_port,
                              std::span<const std::uint8_t> response) {
-    if ((source_port != 10025 && source_port != 10125) || local_port == 0 ||
-        response.size() != 16) {
+    if (vantage > 1 || (source_port != 10025 && source_port != 10125) ||
+        local_port == 0 || response.size() != 16) {
         return false;
     }
     const auto read_be32 = [&response](std::size_t offset) -> std::uint32_t {
@@ -108,8 +113,8 @@ inline bool ObserveNncsReply(std::uint16_t source_port, std::uint16_t local_port
         return false;
     }
 
-    const std::size_t vantage = source_port == 10025 ? 0U : 1U;
-    const std::uint8_t bit = static_cast<std::uint8_t>(1U << vantage);
+    const std::size_t vantage_index = static_cast<std::size_t>(vantage);
+    const std::uint8_t bit = static_cast<std::uint8_t>(1U << vantage_index);
     std::lock_guard lock{observed_ip_mutex};
 
     if (pending_nncs_local_port != 0 && pending_nncs_local_port != local_port) {
@@ -118,14 +123,14 @@ inline bool ObserveNncsReply(std::uint16_t source_port, std::uint16_t local_port
     if (pending_external_ip.has_value() && *pending_external_ip != address) {
         ResetObservedNncsStateLocked();
     }
-    if (observed_nncs_responders[vantage].has_value() &&
-        *observed_nncs_responders[vantage] != responder) {
+    if (observed_nncs_responders[vantage_index].has_value() &&
+        *observed_nncs_responders[vantage_index] != responder) {
         ResetObservedNncsStateLocked();
     }
 
     pending_external_ip = address;
     pending_nncs_local_port = local_port;
-    observed_nncs_responders[vantage] = responder;
+    observed_nncs_responders[vantage_index] = responder;
     observed_nncs_vantage_mask = static_cast<std::uint8_t>(observed_nncs_vantage_mask | bit);
 
     if (observed_nncs_vantage_mask != 0x03U) {

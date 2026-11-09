@@ -796,9 +796,13 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
 
     if (ret == 16 && bsd_errno == Errno::SUCCESS && p_addr_in != nullptr) {
         const auto [local_address, local_errno] = descriptor.socket->GetSockName();
-        if (local_errno == Network::Errno::SUCCESS && local_address.portno != 0 &&
+        const auto peer_ipv4 = Network::IPv4AddressToString(addr_in.ip);
+        const auto nncs_vantage =
+            Common::NextendoDnsRedirectCache::NncsVantageForPeer(peer_ipv4, addr_in.portno);
+        if (nncs_vantage.has_value() && local_errno == Network::Errno::SUCCESS &&
+            local_address.portno != 0 &&
             Common::NextendoNatStationRewrite::ObserveNncsReply(
-                addr_in.portno, local_address.portno,
+                *nncs_vantage, addr_in.portno, local_address.portno,
                 std::span<const u8>(message.data(), static_cast<std::size_t>(ret)))) {
             LOG_INFO(Service,
                      "[NEX] Captured the public NAT mapping from both NNCS vantages "
