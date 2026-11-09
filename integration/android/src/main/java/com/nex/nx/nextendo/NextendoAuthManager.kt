@@ -488,7 +488,74 @@ object NextendoAuthManager {
                             profileResult.getOrNull()?.consoleNickname.orEmpty()
                         )
                     }
+                    ,
+                    onChooseGalleryAvatar = { showGalleryAvatarPicker(activity) }
                 )
+            }
+        }
+    }
+
+    private fun showGalleryAvatarPicker(activity: Activity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        executor.execute {
+            val result = runCatching { NextendoAccountExtrasApi.fetchGalleryAvatarIds() }
+            mainHandler.post {
+                if (activity.isFinishing || activity.isDestroyed) return@post
+                val ids = result.getOrNull().orEmpty()
+                if (result.isFailure || ids.isEmpty()) {
+                    AlertDialog.Builder(activity)
+                        .setTitle("Galeria Nextendo indisponível")
+                        .setMessage(
+                            result.exceptionOrNull()?.message
+                                ?: "O servidor não retornou avatares públicos."
+                        )
+                        .setPositiveButton("OK", null)
+                        .show()
+                    return@post
+                }
+                val labels = ids.map { "Avatar $it" }.toTypedArray()
+                AlertDialog.Builder(activity)
+                    .setTitle("Escolher avatar da galeria")
+                    .setItems(labels) { _, which ->
+                        val selectedId = ids[which]
+                        executor.execute {
+                            val update = runCatching {
+                                val session = refreshSessionIfNeeded(activity)
+                                NextendoAccountExtrasApi.updateProfile(
+                                    gameToken = requireValidGameToken(session),
+                                    // The public server resolves uploaded image before gallery ID.
+                                    // Clear image to make the selected gallery avatar visible.
+                                    imageBase64 = "",
+                                    avatarId = selectedId
+                                )
+                            }
+                            mainHandler.post {
+                                if (activity.isFinishing || activity.isDestroyed) return@post
+                                update.fold(
+                                    onSuccess = {
+                                        Toast.makeText(
+                                            activity,
+                                            "Avatar da galeria atualizado.",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        openAccountTools(activity)
+                                    },
+                                    onFailure = { error ->
+                                        AlertDialog.Builder(activity)
+                                            .setTitle("Não foi possível atualizar o avatar")
+                                            .setMessage(
+                                                error.message
+                                                    ?: NextendoRequestDiagnostic.fromFailure(error)
+                                            )
+                                            .setPositiveButton("OK", null)
+                                            .show()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
             }
         }
     }
