@@ -724,6 +724,8 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     if (redirected.has_value() && result.has_value()) {
         for (auto& entry : result.value()) {
             entry.canon_name = host;
+            Common::NextendoDnsRedirectCache::RecordResolved(
+                host, Network::IPv4AddressToString(entry.addr.ip), entry.addr.portno);
         }
         LOG_INFO(Network, "[NEX] Redirected exact host '{}' to {} (original hostname retained)",
                  host, *redirected);
@@ -757,8 +759,10 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     replace_once(
         bsd_cpp,
         '#include "core/hle/service/sockets/bsd.h"\n',
+        '#include <array>\n'
         '#include "core/hle/service/sockets/bsd.h"\n'
-        '#include "core/hle/service/ssl/nextendo_nat_station_rewrite.h"\n',
+        '#include "core/hle/service/ssl/nextendo_nat_station_rewrite.h"\n'
+        '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n',
     )
     replace_once(
         bsd_cpp,
@@ -781,6 +785,30 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     }
 
     // Restore original state""",
+    )
+
+    # Games which lose the GetAddrInfo IP but retain the service port can
+    # recover only an endpoint previously produced by NEX's exact DNS redirect.
+    replace_once(
+        bsd_cpp,
+        """    auto addr_in = GetValue<SockAddrIn>(addr);
+
+    const Errno result = Translate(file_descriptors[fd]->socket->Connect(Translate(addr_in)));""",
+        """    auto addr_in = GetValue<SockAddrIn>(addr);
+    auto translated_addr = Translate(addr_in);
+    static constexpr std::array<u8, 4> zero_address{0, 0, 0, 0};
+    if (addr_in.ip == zero_address && translated_addr.portno != 0) {
+        if (const auto recovered =
+                Common::NextendoDnsRedirectCache::ResolveIpv4ForPort(translated_addr.portno)) {
+            translated_addr.ip = *recovered;
+            LOG_INFO(Service,
+                     "[NEX] Connect fd={} recovered redirected IPv4 {} for service port {}",
+                     fd, Network::IPv4AddressToString(translated_addr.ip),
+                     translated_addr.portno);
+        }
+    }
+
+    const Errno result = Translate(file_descriptors[fd]->socket->Connect(translated_addr));""",
     )
 
     network_header = eden / "src/core/internal_network/network.h"
@@ -960,14 +988,62 @@ void ClearParkedNextendoUdpSockets() {
     )
 
 
+    # Forward the title's ALPN preference into the TLS backend. Nextendo service
+    # hosts use HTTP/1.1; NPLN/gRPC hosts may negotiate h2 when requested by the game.
+    ssl_backend_header = eden / "src/core/hle/service/ssl/ssl_backend.h"
+    replace_once(
+        ssl_backend_header,
+        "    virtual Result DoHandshake() = 0;\\n",
+        "    virtual Result DoHandshake(std::span<const std::string> requested_alpn_protos) = 0;\\n",
+    )
+
+    ssl_cpp = eden / "src/core/hle/service/ssl/ssl.cpp"
+    replace_once(
+        ssl_cpp,
+        """    Result DoHandshakeImpl() {
+        ASSERT_OR_EXECUTE(!did_handshake && socket, { return ResultNoSocket; });
+        Result res = backend->DoHandshake();
+        did_handshake = res.IsSuccess();
+        return res;
+    }""",
+        """    Result DoHandshakeImpl() {
+        ASSERT_OR_EXECUTE(!did_handshake && socket, { return ResultNoSocket; });
+        std::vector<std::string> requested_alpn_protos;
+        for (std::size_t offset = 0; offset < next_alpn_proto.size();) {
+            const std::size_t length = next_alpn_proto[offset++];
+            if (length == 0 || offset + length > next_alpn_proto.size()) {
+                break;
+            }
+            requested_alpn_protos.emplace_back(
+                reinterpret_cast<const char*>(next_alpn_proto.data() + offset), length);
+            offset += length;
+        }
+        Result res = backend->DoHandshake(requested_alpn_protos);
+        did_handshake = res.IsSuccess();
+        return res;
+    }""",
+    )
+
     # Observe only SMM2/Nextendo WSS handshakes after TLS decryption. The observer
     # emits virtual station metadata for SYN/CONNECT only; it never logs DATA/RMC
     # payloads, tickets, signatures, or BAAS tokens.
     ssl_backend = eden / "src/core/hle/service/ssl/ssl_backend_openssl.cpp"
     replace_once(
         ssl_backend,
+        "#include <mutex>\\n",
+        "#include <algorithm>\\n"
+        "#include <cctype>\\n"
+        "#include <mutex>\\n"
+        "#include <span>\\n"
+        "#include <string>\\n"
+        "#include <string_view>\\n"
+        "#include <vector>\\n",
+    )
+    replace_once(
+        ssl_backend,
         '#include "core/internal_network/network.h"\n',
         '#include "core/internal_network/network.h"\n'
+        '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n'
         '#include "core/internal_network/nextendo_prudp_observer.h"\n',
     )
     replace_once(
@@ -1012,12 +1088,95 @@ void ClearParkedNextendoUdpSockets() {
         return HandleReturn("SSL_do_handshake", 0, ret);
     }
 """,
-        """    Result DoHandshake() override {
+        """    Result DoHandshake(std::span<const std::string> requested_alpn_protos) override {
         const auto record_handshake = [this](Result result) {
             nextendo_prudp_observer.RecordTlsHandshake(
                 result == ResultSuccess, result == ResultWouldBlock, skip_cert_verification);
             return result;
         };
+
+        // Recognize a redirected endpoint only when its peer IP matches an
+        // exact hostname/IP pair configured by NEX.
+        std::string redirected_host;
+        if (socket) {
+            const auto [peer_addr, peer_error] = socket->GetPeerName();
+            if (peer_error == Network::Errno::SUCCESS) {
+                const std::string peer_ip = Network::IPv4AddressToString(peer_addr.ip);
+                if (const char* server_name =
+                        SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)) {
+                    const auto configured =
+                        Common::NextendoDnsRedirectCache::Resolve(server_name);
+                    if (configured.has_value() && *configured == peer_ip) {
+                        redirected_host = server_name;
+                    }
+                }
+                if (redirected_host.empty()) {
+                    const auto recovered = Common::NextendoDnsRedirectCache::HostnameForPeer(
+                        peer_ip, peer_addr.portno);
+                    if (recovered.has_value()) {
+                        const auto configured =
+                            Common::NextendoDnsRedirectCache::Resolve(*recovered);
+                        if (configured.has_value() && *configured == peer_ip) {
+                            redirected_host = *recovered;
+                        }
+                    }
+                }
+            }
+        }
+
+        const bool redirected = !redirected_host.empty();
+        if (redirected) {
+            if (!SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)) {
+                if (!SSL_set_tlsext_host_name(ssl, redirected_host.c_str())) {
+                    LOG_ERROR(Service_SSL,
+                              "[NEX] Could not restore SNI for redirected host '{}'",
+                              redirected_host);
+                    return record_handshake(CheckOpenSSLErrors());
+                }
+            }
+
+            std::string server_name = redirected_host;
+            if (const char* current = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)) {
+                server_name = current;
+            }
+            std::transform(server_name.begin(), server_name.end(), server_name.begin(),
+                           [](unsigned char value) {
+                               return static_cast<char>(std::tolower(value));
+                           });
+            const bool is_npln =
+                server_name.find("npln") != std::string::npos ||
+                server_name.find("gs.nintendo.net") != std::string::npos;
+
+            std::vector<unsigned char> alpn_wire;
+            if (is_npln) {
+                for (const auto& protocol : requested_alpn_protos) {
+                    if (protocol != "h2" && protocol != "http/1.1") {
+                        continue;
+                    }
+                    alpn_wire.push_back(static_cast<unsigned char>(protocol.size()));
+                    alpn_wire.insert(alpn_wire.end(), protocol.begin(), protocol.end());
+                }
+            }
+            if (alpn_wire.empty()) {
+                static constexpr unsigned char http11_only[] = {8, 'h', 't', 't', 'p', '/', '1', '.', '1'};
+                alpn_wire.assign(http11_only, http11_only + sizeof(http11_only));
+            }
+            if (SSL_set_alpn_protos(ssl, alpn_wire.data(),
+                                    static_cast<unsigned int>(alpn_wire.size())) != 0) {
+                LOG_ERROR(Service_SSL, "[NEX] Failed to set ALPN for redirected host '{}'",
+                          redirected_host);
+                return record_handshake(CheckOpenSSLErrors());
+            }
+
+            // This certificate exception is limited to endpoints in the NEX redirect cache.
+            skip_cert_verification = true;
+            SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
+            SSL_set1_host(ssl, nullptr);
+            SSL_set_hostflags(ssl, 0);
+            LOG_INFO(Service_SSL,
+                     "[NEX] Redirected TLS host '{}' uses SNI and ALPN '{}'",
+                     redirected_host, is_npln ? "game-requested" : "http/1.1");
+        }
 
         SSL_set_verify_result(ssl, X509_V_OK);
         const int ret = SSL_do_handshake(ssl);
