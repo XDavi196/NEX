@@ -125,6 +125,10 @@ jobs:
             integration/android/src/test/cpp/nextendo_nat_station_rewrite_test.cpp \
             -o "$RUNNER_TEMP/nextendo_nat_station_rewrite_test"
           "$RUNNER_TEMP/nextendo_nat_station_rewrite_test"
+          g++ -std=c++20 -Wall -Wextra -Werror -pthread -I . \
+            integration/android/src/test/cpp/nextendo_presence_hle_test.cpp \
+            -o "$RUNNER_TEMP/nextendo_presence_hle_test"
+          "$RUNNER_TEMP/nextendo_presence_hle_test"
 
       - name: Run NEX Nextendo unit tests
         working-directory: eden/src/android
