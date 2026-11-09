@@ -68,6 +68,20 @@ internal object NextendoAccountExtrasApi {
     /** Reads the account's current lobby. This reports server state; it does not create a room. */
     /** Lists recent encounters. No player IP address is requested or stored. */
     /** Public avatar lookup by numeric PID only; server-provided avatar URLs are never followed. */
+    /** Lists the public gallery IDs from the official Nextendo server. */
+    fun fetchGalleryAvatarIds(): List<String> {
+        val response = NextendoAuthClient.requestPublicJson("/api/avatars")
+        val root = parseObject(response, "gallery avatars")
+        val ids = (root["avatars"] as? JsonArray).orEmpty().mapNotNull { element ->
+            val value = (element as? JsonPrimitive)
+                ?.takeIf { it.isString }
+                ?.contentOrNull
+                ?: return@mapNotNull null
+            value.takeIf { Regex("^[A-Za-z0-9_-]{1,80}$").matches(it) }
+        }
+        return ids.distinct().take(500)
+    }
+
     /** Public gallery avatar lookup with a path-safe server avatar identifier. */
     fun fetchGalleryAvatar(avatarId: String): ByteArray {
         require(Regex("^[A-Za-z0-9_-]{1,80}$").matches(avatarId)) {
