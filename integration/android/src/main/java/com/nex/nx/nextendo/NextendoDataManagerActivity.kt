@@ -125,10 +125,30 @@ internal class NextendoDataManagerActivity : Activity() {
 
     private fun exportBcat() {
         val id = currentTitleId() ?: return
-        withSession { session ->
-            val bytes = NextendoAccountExtrasApi.downloadBcatSeed(session.nexGameToken, id)
-            if (bytes.isEmpty()) throw IllegalStateException("A Nextendo não retornou um BCAT para esse Title ID.")
-            runOnUiThread { prepareExport(bytes, "$id-bcat.zip", PendingExport.BCAT) }
+        executor.execute {
+            val result = runCatching { NextendoAccountExtrasApi.downloadBcatSeed(id) }
+            runOnUiThread {
+                result.fold(
+                    onSuccess = { bytes ->
+                        if (bytes.isEmpty()) {
+                            Toast.makeText(
+                                this,
+                                "A Nextendo não publicou um BCAT para esse Title ID.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            prepareExport(bytes, "$id-bcat.zip", PendingExport.BCAT)
+                        }
+                    },
+                    onFailure = { error ->
+                        Toast.makeText(
+                            this,
+                            error.message ?: "Não foi possível exportar o BCAT.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                )
+            }
         }
     }
 
