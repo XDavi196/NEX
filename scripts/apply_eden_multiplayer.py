@@ -60,7 +60,7 @@ def apply(eden: Path) -> None:
         "std::pair<s32, Errno> BSD::SocketImpl(Domain domain, Type type, Protocol protocol) {\n"
         "    // Eden's backend is IPv4-only; fail cleanly so NPLN can retry IPv4 after IPv6.\n"
         "    if (domain != Domain::INET && domain != Domain::Unspecified) {\n"
-        "        LOG_WARNING(Service, \\"[NEX] Unsupported socket domain={}, returning EAFNOSUPPORT\\", static_cast<u32>(domain));\n"
+        "        LOG_WARNING(Service, \"[NEX] Unsupported socket domain={}, returning EAFNOSUPPORT\", static_cast<u32>(domain));\n"
         "        return {-1, Errno::AFNOSUPPORT};\n"
         "    }\n\n",
         "IPv6 fallback for sockets",
