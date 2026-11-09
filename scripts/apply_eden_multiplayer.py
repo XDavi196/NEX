@@ -13,8 +13,8 @@ def apply(eden: Path) -> None:
     bsd_header = eden / "src/core/hle/service/sockets/bsd.h"
 
     replace_once(
-        bsd_cpp, '#include <array>\n',
-        '#include <algorithm>\n#include <array>\n#include <cstddef>\n#include <cstring>\n',
+        bsd_cpp, '#include <memory>\n',
+        '#include <algorithm>\n#include <cstddef>\n#include <cstring>\n#include <memory>\n',
         "BSD standard includes",
     )
     replace_once(
