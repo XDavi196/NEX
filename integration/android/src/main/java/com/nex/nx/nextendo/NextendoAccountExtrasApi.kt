@@ -69,8 +69,10 @@ internal object NextendoAccountExtrasApi {
     /** Lists recent encounters. No player IP address is requested or stored. */
     /** Public avatar lookup by numeric PID only; server-provided avatar URLs are never followed. */
     /** Lists the public gallery IDs from the official Nextendo server. */
-    fun fetchGalleryAvatarIds(): List<String> {
-        val response = NextendoAuthClient.requestPublicJson("/api/avatars")
+    fun fetchGalleryAvatarIds(): List<String> =
+        parseGalleryAvatarIds(NextendoAuthClient.requestPublicJson("/api/avatars"))
+
+    internal fun parseGalleryAvatarIds(response: String): List<String> {
         val root = parseObject(response, "gallery avatars")
         val ids = (root["avatars"] as? JsonArray).orEmpty().mapNotNull { element ->
             val value = (element as? JsonPrimitive)
