@@ -33,6 +33,7 @@ def apply(eden: Path) -> None:
         bsd_header,
         "        bool is_connection_based = false;\n    };",
         "        bool is_connection_based = false;\n"
+        "        bool is_eventfd = false;\n"
         "        std::map<std::pair<u32, u32>, std::vector<u8>> feigned_opts;\n"
         "    };",
         "saved socket options field",
@@ -651,6 +652,87 @@ void BSD::RecvMMsg(HLERequestContext& ctx) {
 """
     replace_once(bsd_cpp, methods_anchor, methods + methods_anchor, "MMsg handlers")
 
+    old_read = """void BSD::Read(HLERequestContext& ctx) {
+    IPC::RequestParser rp{ctx};
+    const s32 fd = rp.Pop<s32>();
+
+    LOG_WARNING(Service, "(STUBBED) called. fd={} len={}", fd, ctx.GetWriteBufferSize());
+
+    IPC::ResponseBuilder rb{ctx, 4};
+    rb.Push(ResultSuccess);
+    rb.Push<u32>(0); // ret
+    rb.Push<u32>(0); // bsd errno
+}"""
+    new_read = """void BSD::Read(HLERequestContext& ctx) {
+    IPC::RequestParser rp{ctx};
+    const s32 fd = rp.Pop<s32>();
+
+    LOG_DEBUG(Service, "called. fd={} len={}", fd, ctx.GetWriteBufferSize());
+    if (!IsFileDescriptorValid(fd)) {
+        IPC::ResponseBuilder rb{ctx, 4};
+        rb.Push(ResultSuccess);
+        rb.Push<s32>(-1);
+        rb.PushEnum(Errno::BADF);
+        return;
+    }
+
+    if (file_descriptors[fd]->is_eventfd) {
+        u64 total = 0;
+        s32 drained = 0;
+        Errno last_errno = Errno::SUCCESS;
+        for (int i = 0; i < 1024; ++i) {
+            if (i > 0) {
+                std::vector<Network::PollFD> poll_fds{
+                    Network::PollFD{
+                        .socket = file_descriptors[fd]->socket.get(),
+                        .events = Network::PollEvents::In,
+                        .revents = Network::PollEvents{},
+                    }};
+                const auto [poll_result, poll_errno] = Network::Poll(poll_fds, 0);
+                if (poll_result <= 0 || poll_errno != Network::Errno::SUCCESS ||
+                    static_cast<u16>(poll_fds[0].revents & Network::PollEvents::In) == 0) {
+                    break;
+                }
+            }
+
+            std::vector<u8> chunk(sizeof(u64));
+            const auto [chunk_result, chunk_errno] = RecvImpl(fd, 0, chunk);
+            if (chunk_result != static_cast<s32>(sizeof(u64))) {
+                last_errno = chunk_errno;
+                break;
+            }
+            u64 value{};
+            std::memcpy(&value, chunk.data(), sizeof(value));
+            total += value;
+            ++drained;
+        }
+
+        IPC::ResponseBuilder rb{ctx, 4};
+        if (drained > 0) {
+            std::vector<u8> message(sizeof(u64));
+            std::memcpy(message.data(), &total, sizeof(total));
+            ctx.WriteBuffer(message);
+            rb.Push(ResultSuccess);
+            rb.Push<s32>(static_cast<s32>(sizeof(u64)));
+            rb.PushEnum(Errno::SUCCESS);
+        } else {
+            rb.Push(ResultSuccess);
+            rb.Push<s32>(-1);
+            rb.PushEnum(last_errno);
+        }
+        return;
+    }
+
+    std::vector<u8> message(ctx.GetWriteBufferSize());
+    const auto [result, bsd_errno] = RecvImpl(fd, 0, message);
+    ctx.WriteBuffer(message);
+    IPC::ResponseBuilder rb{ctx, 4};
+    rb.Push(ResultSuccess);
+    rb.Push<s32>(result);
+    rb.PushEnum(bsd_errno);
+}"""
+    replace_once(bsd_cpp, old_read, new_read, "BSD Read stub")
+
     old_eventfd = """void BSD::EventFd(HLERequestContext& ctx) {
     IPC::RequestParser rp{ctx};
     const u64 initval = rp.Pop<u64>();
@@ -705,6 +787,7 @@ void BSD::RecvMMsg(HLERequestContext& ctx) {
     FileDescriptor& descriptor = *file_descriptors[fd];
     descriptor.socket = std::move(socket);
     descriptor.is_connection_based = true;
+    descriptor.is_eventfd = true;
     if (initval > 0) {
         const auto seed = std::span<const u8>{
             reinterpret_cast<const u8*>(&initval), sizeof(initval)};
