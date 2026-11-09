@@ -348,6 +348,14 @@ object NextendoAuthClient {
         )
     }
 
+    /** Public Nextendo JSON endpoint, restricted to its known gallery list path. */
+    internal fun requestPublicJson(path: String): String {
+        require(path == "/api/avatars") {
+            "Este caminho não pertence à lista pública permitida da Nextendo."
+        }
+        return request("$BASE_URL$path", method = "GET")
+    }
+
     /** Public image paths only; never follows a server-supplied avatar URL. */
     internal fun requestPublicBytes(path: String): ByteArray {
         val validAvatarPath = Regex("^/api/avatar\\?pid=[1-9][0-9]{0,18}$").matches(path)
