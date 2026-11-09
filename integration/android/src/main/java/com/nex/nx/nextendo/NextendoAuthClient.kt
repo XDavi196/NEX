@@ -360,32 +360,12 @@ object NextendoAuthClient {
 
     /** Public image paths only; never follows a server-supplied avatar URL. */
     internal fun requestPublicBytes(path: String): ByteArray {
-        val validAvatarPath = Regex("^/api/avatar\\?pid=[1-9][0-9]{0,18}$").matches(path)
         val validGalleryPath = Regex("^/avatars/[A-Za-z0-9_-]{1,80}\\.jpg$").matches(path)
-        require(validAvatarPath || validGalleryPath) {
-            "Apenas caminhos públicos de avatar Nextendo são permitidos."
+        val validBcatPath = Regex("^/api/bcat/[0-9A-Fa-f]{16}$").matches(path)
+        require(validGalleryPath || validBcatPath) {
+            "Apenas caminhos públicos de avatar ou BCAT da Nextendo são permitidos."
         }
-        return requestBytes("$BASE_URL$path", accessToken = null, method = "GET", body = null)
-    }
-
-    /** Binary BCAT and cloud-save transfer authenticated with the server-issued nx2. token. */
-    internal fun requestGameAccountBytes(
-        path: String,
-        gameToken: String,
-        method: String = "GET",
-        body: ByteArray? = null
-    ): ByteArray {
-        requireGameAccountToken(gameToken)
-        validateAccountApiPath(path)
-        require(method == "GET" || method == "POST") {
-            "Método inválido para transferência binária Nextendo."
-        }
-        return requestBytes(
-            url = "$BASE_URL$path",
-            accessToken = gameToken,
-            method = method,
-            body = body
-        )
+        return requestBytes("$BASE_URL$path")
     }
 
     private fun requireGameAccountToken(gameToken: String) {
@@ -405,31 +385,16 @@ object NextendoAuthClient {
         }
     }
 
-    private fun requestBytes(
-        url: String,
-        accessToken: String?,
-        method: String,
-        body: ByteArray?
-    ): ByteArray {
+    private fun requestBytes(url: String): ByteArray {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
-            connection.requestMethod = method
+            connection.requestMethod = "GET"
             connection.connectTimeout = 15_000
             connection.readTimeout = 30_000
             connection.useCaches = false
             connection.instanceFollowRedirects = false
             connection.setRequestProperty("Accept", "application/octet-stream, image/jpeg, application/zip")
             connection.setRequestProperty(CLIENT_ID_HEADER, CLIENT_ID)
-            if (!accessToken.isNullOrBlank()) {
-                connection.setRequestProperty("Authorization", "Bearer $accessToken")
-            }
-            if (body != null) {
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/octet-stream")
-                connection.setFixedLengthStreamingMode(body.size)
-                connection.outputStream.use { it.write(body) }
-            }
-
             val status = connection.responseCode
             if (status == HttpURLConnection.HTTP_NO_CONTENT) return byteArrayOf()
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
