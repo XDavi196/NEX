@@ -113,8 +113,8 @@ bool MMsgReadBytes(std::span<const u8>& data, std::size_t count, std::vector<u8>
 }
 
 bool MMsgDeserialize(std::span<const u8> data, s32 vlen, std::vector<MMsgEntry>& out) {
-    if (data.empty() || data.front() != 0x8 || vlen < 0 ||
-        static_cast<std::size_t>(vlen) > MaxMMsgCount) return false;
+    // The first byte is reserved; the reference BSD implementation ignores it.
+    if (data.empty() || vlen < 0 || static_cast<std::size_t>(vlen) > MaxMMsgCount) return false;
     data = data.subspan(1);
     out.clear();
     out.resize(static_cast<std::size_t>(vlen));
