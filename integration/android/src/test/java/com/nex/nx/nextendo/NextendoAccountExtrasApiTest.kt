@@ -100,7 +100,7 @@ class NextendoAccountExtrasApiTest {
     @Test
     fun parsesPublicGalleryIdsAndRejectsUnsafeOrDuplicateEntries() {
         val ids = NextendoAccountExtrasApi.parseGalleryAvatarIds(
-            """{"avatars":["avatar_01","switch-02","../secrets","with space","avatar_01","123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890","not-a-number"]}"""
+            """{"avatars":["avatar_01","switch-02","../secrets","with space","avatar_01","123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890",9]}"""
         )
         assertEquals(listOf("avatar_01", "switch-02"), ids)
     }
