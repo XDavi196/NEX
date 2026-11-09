@@ -55,6 +55,37 @@ def apply(eden: Path) -> None:
     )
 
     replace_once(
+        bsd_header,
+        "    struct AcceptWork {\n",
+        "    struct SelectWork {\n"
+        "        void Execute(BSD* bsd);\n"
+        "        void Response(HLERequestContext& ctx);\n\n"
+        "        s32 nfds;\n"
+        "        s32 timeout;\n"
+        "        std::span<const u8> read_in;\n"
+        "        std::span<const u8> write_in;\n"
+        "        std::span<const u8> error_in;\n"
+        "        std::vector<u8> read_out;\n"
+        "        std::vector<u8> write_out;\n"
+        "        std::vector<u8> error_out;\n"
+        "        s32 ret{};\n"
+        "        Errno bsd_errno{};\n"
+        "    };\n\n"
+        "    struct AcceptWork {\n",
+        "BSD SelectWork declaration",
+    )
+    replace_once(
+        bsd_header,
+        "    std::pair<s32, Errno> PollImpl(",
+        "    std::pair<s32, Errno> SelectImpl(s32 nfds, s32 timeout, std::span<const u8> read_in,\n"
+        "                                      std::span<const u8> write_in, std::span<const u8> error_in,\n"
+        "                                      std::vector<u8>& read_out, std::vector<u8>& write_out,\n"
+        "                                      std::vector<u8>& error_out);\n"
+        "    std::pair<s32, Errno> PollImpl(",
+        "BSD SelectImpl declaration",
+    )
+
+    replace_once(
         bsd_cpp,
         "std::pair<s32, Errno> BSD::SocketImpl(Domain domain, Type type, Protocol protocol) {\n\n",
         "std::pair<s32, Errno> BSD::SocketImpl(Domain domain, Type type, Protocol protocol) {\n"
@@ -193,6 +224,30 @@ std::vector<u8> ReadMMsgBuffer(HLERequestContext& ctx) {
 
 } // Anonymous namespace"""
     replace_once(bsd_cpp, helper_anchor, helper, "MMsg parser/serializer")
+
+    select_work_cpp = """void BSD::SelectWork::Execute(BSD* bsd) {
+    std::tie(ret, bsd_errno) =
+        bsd->SelectImpl(nfds, timeout, read_in, write_in, error_in, read_out, write_out, error_out);
+}
+
+void BSD::SelectWork::Response(HLERequestContext& ctx) {
+    if (!read_out.empty()) ctx.WriteBuffer(read_out, 0);
+    if (!write_out.empty()) ctx.WriteBuffer(write_out, 1);
+    if (!error_out.empty()) ctx.WriteBuffer(error_out, 2);
+
+    IPC::ResponseBuilder rb{ctx, 4};
+    rb.Push(ResultSuccess);
+    rb.Push<s32>(ret);
+    rb.PushEnum(bsd_errno);
+}
+
+"""
+    replace_once(
+        bsd_cpp,
+        "void BSD::AcceptWork::Execute(BSD* bsd) {",
+        select_work_cpp + "void BSD::AcceptWork::Execute(BSD* bsd) {",
+        "BSD SelectWork definitions",
+    )
 
     def replace_function(path: Path, signature: str, next_signature: str, body: str, label: str) -> None:
         source = path.read_text(encoding="utf-8")
