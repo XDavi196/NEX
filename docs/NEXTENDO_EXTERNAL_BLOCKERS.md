@@ -43,10 +43,10 @@ NEX must continue using the public PKCE flow. Do not replace it with a private w
 
 ## 2.1. Nextendo account features ported from DEN2
 
-The NEX Android client separates its OAuth access token from the server-issued `nx2.` game token. The live Developer Documentation is the intended public-client contract; the public account source has several older endpoint/token discrepancies documented in `NEXTENDO_ANDROID.md`. OAuth access tokens remain confined to the OAuth/userinfo and `/api/nex-token` exchange. Implemented client features include:
+The NEX Android client separates its OAuth access token from the server-issued `nx2.` game token. Per the live Developer Documentation, `POST /api/presence` uses the OAuth access token plus the `presence` scope; `nx2.` is reserved for game authentication and the BAAS `nnex` claim. The public account source has older endpoint/token discrepancies documented in `NEXTENDO_ANDROID.md`. Implemented client features include:
 
 - Friends: list/refresh, add by Friend Code, accept/decline requests and remove; game-facing friend cache/IPC and real guest `UpdateUserPresence` capture.
-- Presence: online/playing/offline heartbeat; actual 0xC0 title AppKeyValueStorage forwarded as Base64; DEN2's SMM2/Splatoon private-battle `InGame` fix is gated by confirmed two-vantage NAT; ARMS `JoinMode` 1–4 maps to joinable presence.
+- Presence: online/playing/offline heartbeat using OAuth `presence` scope; actual 0xC0 title AppKeyValueStorage forwarded as Base64; DEN2's SMM2/Splatoon private-battle `InGame` fix is gated by confirmed two-vantage NAT; ARMS `JoinMode` 1–4 maps to joinable presence.
 - Account/profile: profile read, username and console nickname updates, JPEG/Mii import, public gallery avatar listing/selection, and avatar/profile field preservation.
 - History and transfer: real Eden playtime sync, history read, BCAT seed download/export and SHA-256. Cloud-save upload/download is not offered: Nextendo removed the cloud-save service in September 2026.
 - Diagnostics: backend health ping, online eligibility check, public online-counts feed, exact-host DNS/TLS routing and payload-blind PRUDP/NAT diagnostics.
