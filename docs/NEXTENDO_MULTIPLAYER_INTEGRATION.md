@@ -36,6 +36,10 @@ The receive hook checks a 16-byte NNCS reply from the guest's UDP socket:
 
 Only after both vantage replies satisfy those checks does the native NAT state expose the observed external IPv4 to the Station URL rewriter. Any mismatch resets the pending observation. The two source ports and message layout follow the DEN2 client implementation; live SMM2 deployment compatibility still needs confirmation.
 
+### DNS routing for the two NNCS NAT-check vantages
+
+The native DNS cache now keeps the configured main server IPv4 and the distinct NAT-vantage IPv4 as separate routes. It maps only hostnames matching `nncs1-<label>.n.n.srv.nintendo.net` to the main server and `nncs2-<label>.n.n.srv.nintendo.net` to the NAT-vantage address. These constrained routes follow the DEN2/Nextendo resolver behavior without enabling a wildcard redirect for unrelated Nintendo domains. The resolved hostnames are retained for diagnostics and port-based endpoint recovery.
+
 ### UDP socket lifetime and Station URL correction
 
 The existing native UDP port keeper parks an eligible unconnected UDP socket briefly when the guest closes it and re-adopts it when the game binds the same local port/address again. This preserves the host-side socket and its external NAT mapping across the short probe close/reopen sequence.

@@ -43,11 +43,13 @@ internal object NextendoNetworkRouting {
         NextendoNativeBridge.clearDnsRedirects()
         installedRouteCount = 0
         try {
+            NextendoNativeBridge.updateNncsRedirects(config.serverIpv4, config.natIpv4)
+            installedRouteCount += 2
             NextendoGameNetworkProfiles.allExactAuthHosts.forEach { hostname ->
                 NextendoNativeBridge.updateDnsRedirect(hostname, config.serverIpv4)
                 installedRouteCount += 1
             }
-            diagnostic = "exact_routes_installed"
+            diagnostic = "exact_and_nncs_routes_installed"
         } catch (error: Throwable) {
             NextendoNativeBridge.clearDnsRedirects()
             installedRouteCount = 0

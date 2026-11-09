@@ -80,6 +80,13 @@ internal object NextendoNativeBridge {
         }
     }
 
+    /** Routes only the two recognized NNCS hostname families to their separate vantage IPs. */
+    fun updateNncsRedirects(serverIpv4: String, natIpv4: String) {
+        require(NativeLibrary.updateNextendoNncsRedirects(serverIpv4, natIpv4)) {
+            "As rotas DNS dos dois pontos NNCS foram rejeitadas. Verifique os IPv4 configurados."
+        }
+    }
+
     fun clearDnsRedirects() {
         runCatching { NativeLibrary.clearNextendoDnsRedirects() }
     }

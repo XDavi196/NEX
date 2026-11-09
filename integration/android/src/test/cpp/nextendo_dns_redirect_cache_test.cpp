@@ -42,8 +42,25 @@ int main() {
     assert(!Set("good.example", "0.0.0.0"));
     assert(!Resolve("unknown.example").has_value());
 
+    using Common::NextendoDnsRedirectCache::SetNncsRedirectIps;
+    assert(SetNncsRedirectIps("203.0.113.11", "198.51.100.21"));
+    assert(Resolve("nncs1-smm2.n.n.srv.nintendo.net") == "203.0.113.11");
+    assert(Resolve("NNCS2-SMM2.N.N.SRV.NINTENDO.NET.") == "198.51.100.21");
+    assert(!Resolve("xnncs2-smm2.n.n.srv.nintendo.net").has_value());
+    assert(!Resolve("nncs2-smm2.example.net").has_value());
+    assert(!Resolve("nncs2-a.b.n.n.srv.nintendo.net").has_value());
+    assert(!SetNncsRedirectIps("203.0.113.11", "203.0.113.11"));
+    assert(!SetNncsRedirectIps("0.0.0.0", "198.51.100.21"));
+
+    RecordResolved("nncs2-smm2.n.n.srv.nintendo.net", "198.51.100.21", 10025);
+    assert(HostnameForPeer("198.51.100.21", 10025) == "nncs2-smm2.n.n.srv.nintendo.net");
+    const std::array<std::uint8_t, 4> expected_nat_ip{198, 51, 100, 21};
+    assert(ResolveIpv4ForPort(10025) == expected_nat_ip);
+
     Clear();
     assert(Size() == 0);
     assert(!Resolve("smm2-auth.nintendo.net").has_value());
+    assert(!Resolve("nncs1-smm2.n.n.srv.nintendo.net").has_value());
+    assert(!Resolve("nncs2-smm2.n.n.srv.nintendo.net").has_value());
     return 0;
 }

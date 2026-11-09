@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -107,6 +108,60 @@ inline bool IsValidIpv4(const std::string& value) {
     return parts == 4;
 }
 
+inline bool IsNncsHostname(const std::string& hostname, std::string_view prefix) {
+    constexpr std::string_view suffix = ".n.n.srv.nintendo.net";
+    if (!hostname.starts_with(prefix) || !hostname.ends_with(suffix) ||
+        hostname.size() <= prefix.size() + suffix.size()) {
+        return false;
+    }
+    const auto identifier = std::string_view{hostname}.substr(
+        prefix.size(), hostname.size() - prefix.size() - suffix.size());
+    return !identifier.empty() && identifier.find('.') == std::string_view::npos;
+}
+
+inline std::string nncs1_redirect_ipv4;
+inline std::string nncs2_redirect_ipv4;
+
+inline std::optional<std::string> ResolveNncsLocked(const std::string& hostname) {
+    if (IsNncsHostname(hostname, "nncs1-") && !nncs1_redirect_ipv4.empty()) {
+        return nncs1_redirect_ipv4;
+    }
+    if (IsNncsHostname(hostname, "nncs2-") && !nncs2_redirect_ipv4.empty()) {
+        return nncs2_redirect_ipv4;
+    }
+    return std::nullopt;
+}
+
+/**
+ * Installs the two logically distinct NNCS NAT-check vantage routes.
+ * Only the nncs1 and nncs2 hostname families below n.n.srv.nintendo.net are
+ * matched; this is deliberately narrower than redirecting all Nintendo hosts.
+ */
+inline bool SetNncsRedirectIps(const std::string& server_ipv4, const std::string& nat_ipv4) {
+    if (!IsValidIpv4(server_ipv4) || !IsValidIpv4(nat_ipv4) ||
+        server_ipv4 == nat_ipv4 || server_ipv4 == "0.0.0.0" ||
+        server_ipv4 == "255.255.255.255" || nat_ipv4 == "0.0.0.0" ||
+        nat_ipv4 == "255.255.255.255") {
+        return false;
+    }
+
+    std::lock_guard lock{cache_mutex};
+    const bool changed = nncs1_redirect_ipv4 != server_ipv4 ||
+                         nncs2_redirect_ipv4 != nat_ipv4;
+    nncs1_redirect_ipv4 = server_ipv4;
+    nncs2_redirect_ipv4 = nat_ipv4;
+    if (changed) {
+        resolved_routes.erase(
+            std::remove_if(resolved_routes.begin(), resolved_routes.end(),
+                [](const ResolvedRoute& entry) {
+                    return IsNncsHostname(entry.hostname, "nncs1-") ||
+                           IsNncsHostname(entry.hostname, "nncs2-");
+                }),
+            resolved_routes.end());
+    }
+    return true;
+}
+
 inline std::optional<std::array<std::uint8_t, 4>> ParseIpv4Address(const std::string& value) {
     if (!IsValidIpv4(value)) {
         return std::nullopt;
@@ -163,7 +218,10 @@ inline std::optional<std::string> Resolve(const std::string& supplied_hostname) 
     std::lock_guard lock{cache_mutex};
     const auto found = std::find_if(cache_entries.begin(), cache_entries.end(),
         [&hostname](const Entry& entry) { return entry.hostname == *hostname; });
-    return found == cache_entries.end() ? std::nullopt : std::optional<std::string>{found->ipv4};
+    if (found != cache_entries.end()) {
+        return found->ipv4;
+    }
+    return ResolveNncsLocked(*hostname);
 }
 /**
  * Record the address/port returned for an exact configured redirect. This
@@ -178,7 +236,10 @@ inline void RecordResolved(const std::string& supplied_hostname, const std::stri
     std::lock_guard lock{cache_mutex};
     const auto configured = std::find_if(cache_entries.begin(), cache_entries.end(),
         [&hostname](const Entry& entry) { return entry.hostname == *hostname; });
-    if (configured == cache_entries.end() || configured->ipv4 != ipv4) {
+    const auto configured_ipv4 = configured != cache_entries.end()
+        ? std::optional<std::string>{configured->ipv4}
+        : ResolveNncsLocked(*hostname);
+    if (!configured_ipv4.has_value() || *configured_ipv4 != ipv4) {
         return;
     }
     resolved_routes.erase(
@@ -233,6 +294,8 @@ inline void Clear() {
     std::lock_guard lock{cache_mutex};
     cache_entries.clear();
     resolved_routes.clear();
+    nncs1_redirect_ipv4.clear();
+    nncs2_redirect_ipv4.clear();
 }
 
 inline std::size_t Size() {

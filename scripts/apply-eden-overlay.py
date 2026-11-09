@@ -110,6 +110,7 @@ def main() -> None:
         "    external fun updateNextendoBaasIdToken(idToken: ByteArray)\n"
         "    external fun clearNextendoBaasIdToken()\n"
         "    external fun updateNextendoDnsRedirect(hostname: String, ipv4: String): Boolean\n"
+        "    external fun updateNextendoNncsRedirects(serverIpv4: String, natIpv4: String): Boolean\n"
         "    external fun clearNextendoDnsRedirects()\n"
         "    external fun clearNextendoObservedExternalIpv4()\n"
         "    external fun getNextendoPrudpDiagnostics(): Array<String>?\n"
@@ -291,6 +292,28 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoDnsRedirect(
     const bool accepted = Common::NextendoDnsRedirectCache::Set(hostname_chars, ipv4_chars);
     env->ReleaseStringUTFChars(hostname, hostname_chars);
     env->ReleaseStringUTFChars(ipv4, ipv4_chars);
+    return accepted ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_yuzu_yuzu_1emu_NativeLibrary_updateNextendoNncsRedirects(
+    JNIEnv* env, [[maybe_unused]] jobject obj, jstring server_ipv4, jstring nat_ipv4) {
+    if (server_ipv4 == nullptr || nat_ipv4 == nullptr) {
+        return JNI_FALSE;
+    }
+    const char* server_chars = env->GetStringUTFChars(server_ipv4, nullptr);
+    const char* nat_chars = env->GetStringUTFChars(nat_ipv4, nullptr);
+    if (server_chars == nullptr || nat_chars == nullptr) {
+        if (server_chars != nullptr) env->ReleaseStringUTFChars(server_ipv4, server_chars);
+        if (nat_chars != nullptr) env->ReleaseStringUTFChars(nat_ipv4, nat_chars);
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        return JNI_FALSE;
+    }
+
+    const bool accepted =
+        Common::NextendoDnsRedirectCache::SetNncsRedirectIps(server_chars, nat_chars);
+    env->ReleaseStringUTFChars(server_ipv4, server_chars);
+    env->ReleaseStringUTFChars(nat_ipv4, nat_chars);
     return accepted ? JNI_TRUE : JNI_FALSE;
 }
 
