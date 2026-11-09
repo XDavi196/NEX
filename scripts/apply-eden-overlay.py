@@ -1109,7 +1109,8 @@ void ClearParkedNextendoUdpSockets() {
         "#include <queue>\n"
         "#include <vector>\n"
         '#include "core/hle/service/friend/nextendo_friend_cache.h"\n'
-        '#include "core/hle/service/friend/nextendo_friend_hle.h"\n',
+        '#include "core/hle/service/friend/nextendo_friend_hle.h"\n'
+        '#include "core/hle/service/ssl/nextendo_nat_station_rewrite.h"\n',
     )
     friend_support = r'''// NEX-owned friend record serializers. Unknown identity fields remain zero.
 namespace {
@@ -1126,6 +1127,63 @@ struct NextendoGuestPresenceImpl {
 };
 static_assert(sizeof(NextendoGuestPresenceImpl) == 0xE0);
 #pragma pack(pop)
+
+// Keep the exact title-provided AppKeyValueStorage bytes, but apply DEN2's
+// narrowly-scoped joinability fixes only after the guest socket has a confirmed
+// public NAT mapping. No game-specific data is fabricated.
+bool FixupNextendoInGameFlag(std::string& app_field) {
+    if (!Common::NextendoNatStationRewrite::GetObservedExternalIPv4().has_value()) {
+        return false;
+    }
+
+    bool private_mode = false;
+    std::size_t in_game_value_offset = std::string::npos;
+    bool in_game_is_zero = false;
+    std::size_t pos = 0;
+    while (pos < app_field.size()) {
+        const auto key_end = app_field.find('\\0', pos);
+        const auto key_limit = key_end == std::string::npos ? app_field.size() : key_end;
+        if (key_limit == pos) break;
+        const std::string key = app_field.substr(pos, key_limit - pos);
+        pos = key_limit + 1;
+        if (pos >= app_field.size()) break;
+        const auto value_end = app_field.find('\\0', pos);
+        const auto value_limit = value_end == std::string::npos ? app_field.size() : value_end;
+        const std::string value = app_field.substr(pos, value_limit - pos);
+        if (key == "Mode") private_mode = value == "cPrivate";
+        if (key == "InGame") {
+            in_game_value_offset = pos;
+            in_game_is_zero = value == "0";
+        }
+        pos = value_limit + 1;
+    }
+
+    if (!private_mode || in_game_value_offset == std::string::npos || !in_game_is_zero) {
+        return false;
+    }
+    app_field[in_game_value_offset] = '1';
+    return true;
+}
+
+bool IsNextendoArmsSessionActive(const std::string& app_field) {
+    std::size_t pos = 0;
+    while (pos < app_field.size()) {
+        const auto key_end = app_field.find('\\0', pos);
+        const auto key_limit = key_end == std::string::npos ? app_field.size() : key_end;
+        if (key_limit == pos) break;
+        const std::string key = app_field.substr(pos, key_limit - pos);
+        pos = key_limit + 1;
+        if (pos >= app_field.size()) break;
+        const auto value_end = app_field.find('\\0', pos);
+        const auto value_limit = value_end == std::string::npos ? app_field.size() : value_end;
+        const std::string value = app_field.substr(pos, value_limit - pos);
+        pos = value_limit + 1;
+        if (key == "JoinMode") {
+            return value == "1" || value == "2" || value == "3" || value == "4";
+        }
+    }
+    return false;
+}
 
 std::vector<u64> ReadNextendoPids(HLERequestContext& ctx) {
     constexpr std::size_t MaxRequestedIds = Common::NextendoFriendCache::MaxFriends;
@@ -1347,17 +1405,34 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         rb.Push<u32>(static_cast<u32>(pids.size()));
     }
 
-    // Mirrors DEN2: cache the real 0xC0 game AppKeyValueStorage bytes from nn::friends.
+    // Mirrors DEN2: cache the game's exact AppKeyValueStorage, fixing join flags only
+    // when the guest's real NAT mapping has been confirmed by both NNCS vantage points.
     void UpdateUserPresence(HLERequestContext& ctx) {
         if (ctx.CanReadBuffer() &&
             ctx.GetReadBufferSize() >= sizeof(NextendoGuestPresenceImpl)) {
             NextendoGuestPresenceImpl presence{};
             std::memcpy(&presence, ctx.ReadBuffer().data(), sizeof(presence));
-            const auto status = std::clamp<std::uint32_t>(presence.status, 1U, 2U);
-            Common::NextendoFriendCache::SetLocalPresence(status, presence.app_key_value);
+
+            std::uint32_t status = std::clamp<std::uint32_t>(presence.status, 1U, 2U);
+            std::string app_field(
+                reinterpret_cast<const char*>(presence.app_key_value.data()),
+                presence.app_key_value.size());
+            if (FixupNextendoInGameFlag(app_field)) {
+                status = 2U;
+                LOG_INFO(Service_Friend,
+                         "[NEX Nextendo] Private battle InGame flag enabled after NAT confirmation");
+            } else if (IsNextendoArmsSessionActive(app_field)) {
+                status = 2U;
+                LOG_INFO(Service_Friend,
+                         "[NEX Nextendo] ARMS JoinMode indicates an active session");
+            }
+
+            std::array<u8, 0xC0> forwarded_app_field{};
+            std::memcpy(forwarded_app_field.data(), app_field.data(), forwarded_app_field.size());
+            Common::NextendoFriendCache::SetLocalPresence(status, forwarded_app_field);
             LOG_INFO(Service_Friend,
                      "[NEX Nextendo] Captured guest presence status={} appFieldBytes={}",
-                     status, presence.app_key_value.size());
+                     status, forwarded_app_field.size());
         } else {
             LOG_WARNING(Service_Friend,
                         "[NEX Nextendo] UpdateUserPresence received no valid 0xE0 presence buffer");
