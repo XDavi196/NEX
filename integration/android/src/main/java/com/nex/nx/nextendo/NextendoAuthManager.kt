@@ -221,20 +221,6 @@ object NextendoAuthManager {
                 val savedSession = NextendoSessionStore.load(appContext)
                     ?: throw IllegalStateException("A sessão importada não foi persistida.")
 
-                // The deployed account API validates presence through accountFromBearer,
-                // which accepts the same issued nx2. credential used for game friends.
-                // Never mark an OAuth scope as verified from this separate game-token call.
-                if (hasValidGameToken(savedSession)) {
-                    runCatching {
-                        NextendoAuthClient.postPresence(
-                            gameToken = savedSession.nexGameToken,
-                            status = 1,
-                            appField = "",
-                            appId = "",
-                            appDetail = ""
-                        )
-                    }
-                }
                 NextendoPresencePublisher.start(appContext)
                 syncNativeIdentity(savedSession)
                 NextendoBaasRuntime.refresh(context, savedSession)
