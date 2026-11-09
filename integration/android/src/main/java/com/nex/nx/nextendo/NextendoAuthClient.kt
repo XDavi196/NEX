@@ -304,7 +304,7 @@ object NextendoAuthClient {
             url = "$BASE_URL/api/presence",
             method = "POST",
             headers = mapOf(
-                "Authorization" to "Bearer $gameToken",
+                "Authorization" to "Bearer $accessToken",
                 "Content-Type" to "application/json; charset=utf-8"
             ),
             body = body
