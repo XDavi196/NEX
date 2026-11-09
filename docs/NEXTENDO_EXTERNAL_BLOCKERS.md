@@ -24,7 +24,7 @@ This format compatibility does **not** by itself authorize the NEX application t
 
 DEN is not a different trust mechanism: its public ACC implementation also uses RS256, the same fixed BAAS values and an externally supplied PEM with a local auto-generated fallback. Falling back to DEN would not resolve a missing or mismatched signing key. Its OAuth-token fallback for nnex is deliberately not ported.
 
-**Validation status:** implementation and local signature/JWKS matching tests are being added. Live BAAS acceptance, ACC/AuthenticationInfo, LoginEx, secure-session and in-game multiplayer still require tests against the Nextendo deployment with the authorized key and two accounts.
+**Validation status:** the signer, encrypted PEM import path and live-JWKS key-match gate are implemented; automated signature/profile/JWKS tests run in CI. Live BAAS acceptance, ACC/AuthenticationInfo, LoginEx and secure-session are still unverified because the required Nextendo authorization/key is not available to this client. The NEX code never silently generates a substitute signer.
 
 ## 2. Client attestation and OAuth/API contract
 
@@ -39,6 +39,18 @@ Nextendo must confirm:
 - Whether friend data exposes the stable player-to-`NetworkServiceAccountId` mapping expected by qLaunch, or explicitly confirms the PID-to-NSA mapping used by the reference emulator.
 
 NEX must continue using the public PKCE flow. Do not replace it with a private web-session login or reuse official emulator attestation material.
+
+## 2.1. Nextendo account features ported from DEN2
+
+The NEX Android client now uses its own public Client ID and the server-issued `nx2.` credential for protected account-service calls. OAuth access tokens remain confined to the OAuth/userinfo and `/api/nex-token` exchange. Implemented client features include:
+
+- Friends: list/refresh, add by Friend Code, accept/decline requests and remove; game-facing friend cache/IPC and real guest `UpdateUserPresence` capture.
+- Presence: online/playing/offline heartbeat; actual 0xC0 title AppKeyValueStorage forwarded as Base64; DEN2's SMM2/Splatoon private-battle `InGame` fix is gated by confirmed two-vantage NAT; ARMS `JoinMode` 1–4 maps to joinable presence.
+- Account/profile: profile read, username and console nickname updates, JPEG/Mii import, public gallery avatar listing/selection, and avatar/profile field preservation.
+- History and transfer: real Eden playtime sync, history read, manual cloud-save download/upload, BCAT seed download/export and SHA-256.
+- Diagnostics: backend health ping, online eligibility check, public online-counts feed, exact-host DNS/TLS routing and payload-blind PRUDP/NAT diagnostics.
+
+The public server source currently exposes the supported account/profile/history/BCAT/save/health/gallery endpoints listed above. DEN2 also contains calls for `/api/my-lobby`, `/api/recent-players`, `/api/report-player` and `/api/avatar?pid=...`, but these handlers are not registered in the public `nextendo-account` server route table checked for this integration. NEX therefore displays the lobby/recent-player functions as unavailable rather than sending speculative requests. Player reporting and PID avatar download remain blocked until Nextendo publishes/authorizes those routes. The NZP player-count call belongs to the separate NZP game service, not Nextendo, and is not represented as a Nextendo feature.
 
 ## 3. SMM2 production routing and matchmaking
 
@@ -101,7 +113,7 @@ For service-side support, send only a token-free diagnostic: exact UTC timestamp
 
 ## Current engineering boundary
 
-NEX now has an Android Keystore-backed network configuration screen and an exact-host multi-title auth/DAUTH DNS installer. This closes the client-side plumbing for main-server hostname routing, but it does not supply production addresses or complete the title login path.
+NEX now has an Android Keystore-backed network configuration screen and an exact-host multi-title auth/DAUTH DNS installer. Supported DEN2 account features are now ported to the NEX public Client ID, with profile gallery selection and actual game presence capture. The public-server route gaps are called out in §2.1 rather than presented as implemented. This closes client-side account features and hostname plumbing, but it does not supply production addresses or complete the title login path.
 
 NEX now builds the Citron-compatible BAAS id_token only after an operator-authorized PEM is imported and its public key matches the live Nextendo JWKS. The game-visible cache remains empty until a valid unexpired nx2. token and a verified Citron signer are both available. The local JWKS match is not server-side acceptance approval. NEX still cannot invent third-party API attestation, production IPs, certificate deployment data or missing server-side SMM2 matchmaking behavior.
 
