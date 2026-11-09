@@ -12,9 +12,9 @@ This document separates NEX-owned implementation work from values and service be
 
 Do not add a client secret, another emulator's credential, or any service-side secret to the APK.
 
-## 1. Citron-compatible BAAS game authentication — signer key required
+## 1. BAAS implementation decision: Citron format, authorized signer still required
 
-NEX now implements the public BAAS id_token format used by Nextendo's Citron client. The profile uses the Citron values iss=https://e0d67c509fb203858ebcb2fe3f88c2aa.baas.nintendo.com, aud=ed9e2f05d286f7b8, jku=https://e0d67c509fb203858ebcb2fe3f88c2aa.baas.nintendo.com/1.0.0/certificates and kid=nextendo-baas-key-1. The payload includes the Citron Nintendo-device metadata and binds the exact Nextendo-issued nx2. game token in nnex. It never places the OAuth access token in nnex.
+**Decision: use the Citron BAAS format in NEX.** The current code already implements `NextendoCitronBaasSigner`, `NextendoCitronBaasProfile` and the Citron claim provider. DEN is retained only as a protocol reference; its ACC implementation uses the same fixed RS256/JWKS identity but can fall back to placing an OAuth session token in `nnex` when `/api/nex-token` fails. NEX deliberately rejects that fallback because Nextendo requires a real `nx2.` game token. The profile uses the Citron values iss=https://e0d67c509fb203858ebcb2fe3f88c2aa.baas.nintendo.com, aud=ed9e2f05d286f7b8, jku=https://e0d67c509fb203858ebcb2fe3f88c2aa.baas.nintendo.com/1.0.0/certificates and kid=nextendo-baas-key-1. The payload includes the Citron Nintendo-device metadata and binds the exact Nextendo-issued nx2. game token in nnex. It never places the OAuth access token in nnex.
 
 **The private signing key is not in the public Citron source.** Citron loads it from the operator-provided NEXTENDO_BAAS_SIGNING_KEY environment variable or nextendo_baas.pem; its locally auto-generated fallback only creates a different RSA identity and must not be assumed to match the live JWKS. The Nextendo baas-jwks service publishes the public JWK corresponding to the same private key used by the signer. A valid signature therefore requires the matching private key and the matching kid/public JWK pair.
 
@@ -22,41 +22,46 @@ NEX adds **Importar chave BAAS** to the Nextendo menu. The user must select a PE
 
 This format compatibility does **not** by itself authorize the NEX application to use Citron's BAAS identity. The Nextendo founder previously stated that third-party client-generated BAAS tokens are not accepted and that per-installation JWK registration is unavailable. The Citron integration therefore uses only the fixed Nextendo JWKS identity; the operator must still confirm that this signer may be used by NEX's public Client ID nxc_yAdR-14bOEq7 and that the NEX API credential/attestation contract permits it. A successful local JWKS match proves only that the correct public key is published; it does not prove that a game accepts the resulting id_token or completes LoginEx.
 
-DEN is not a different trust mechanism: its public ACC implementation also uses RS256, the same fixed BAAS values and an externally supplied PEM with a local auto-generated fallback. Falling back to DEN would not resolve a missing or mismatched signing key. Its OAuth-token fallback for nnex is deliberately not ported.
+DEN is not an alternative trust mechanism: it uses RS256, the same fixed issuer/audience/JWKS URL/kid and an externally supplied PEM. Its persisted auto-generated fallback creates a different key that will not match the published JWKS. Copying the DEN signer would therefore not remove the key requirement; copying its OAuth-token fallback would make the `nnex` claim invalid.
 
 **Validation status:** the signer, encrypted PEM import path and live-JWKS key-match gate are implemented; automated signature/profile/JWKS tests run in CI. Live BAAS acceptance, ACC/AuthenticationInfo, LoginEx and secure-session are still unverified because the required Nextendo authorization/key is not available to this client. The NEX code never silently generates a substitute signer.
 
 ## 2. Client attestation and OAuth/API contract
 
-The public developer documentation says distributed Android apps are public OAuth clients and must use PKCE without a client secret. The official Ryujinx-Nextendo README separately says official builds sign API requests with an application private key. The public documentation does not fully specify whether that cryptographic attestation gate applies to third-party public OAuth clients such as NEX.
+The public developer documentation requires public Android applications to use PKCE and says unregistered clones are refused. The official Ryujinx-Nextendo README and its v1.8.7 changelog state that the official emulator signs API requests with an application-specific private key and that client attestation became mandatory. **The current NEX code sends `X-Nextendo-Client-Id` but does not implement a cryptographic client-attestation signature.** This is an unresolved server authorization blocker, not a missing JWT claim.
 
 Nextendo must confirm:
 
 - Whether the NEX public Client ID is allowed to call `/api/nex-token`, friends, profile and presence endpoints without the official emulator's attestation signature.
-- If attestation is required, the supported third-party signing format, headers, canonical request bytes, timestamp/nonce rules, key registration process and rotation/revocation procedure.
+- Whether NEX's configured Client ID is registered and explicitly allowed to receive the `game.matchmaking` permission and online access.
+- A NEX-specific client-attestation credential and the exact signing contract: algorithm, headers, canonical request bytes, timestamp/nonce rules, key registration, rotation and revocation.
 - Whether the production API currently accepts the portal scopes `presence`, `profil`, `game.matchmaking` and `emulator.status`, and the exact response contract for each endpoint.
 - Whether `GET /api/nex-token` accepts the documented OAuth bearer token and returns `nex_token`, `pid`, `username`, `friend_code` and `expires_in`.
 - Whether friend data exposes the stable player-to-`NetworkServiceAccountId` mapping expected by qLaunch, or explicitly confirms the PID-to-NSA mapping used by the reference emulator.
 
-NEX must continue using the public PKCE flow. Do not replace it with a private web-session login or reuse official emulator attestation material.
+NEX must continue using the public PKCE flow. Do not replace it with a private web-session login, reuse official Ryujinx/Citron private keys, or fabricate attestation headers. Without a credential issued for NEX, the client cannot satisfy an attestation gate.
 
 ## 2.1. Nextendo account features ported from DEN2
 
-The NEX Android client now uses its own public Client ID and the server-issued `nx2.` credential for protected account-service calls. OAuth access tokens remain confined to the OAuth/userinfo and `/api/nex-token` exchange. Implemented client features include:
+The NEX Android client separates its OAuth access token from the server-issued `nx2.` game token. The live Developer Documentation is the intended public-client contract; the public account source has several older endpoint/token discrepancies documented in `NEXTENDO_ANDROID.md`. OAuth access tokens remain confined to the OAuth/userinfo and `/api/nex-token` exchange. Implemented client features include:
 
 - Friends: list/refresh, add by Friend Code, accept/decline requests and remove; game-facing friend cache/IPC and real guest `UpdateUserPresence` capture.
 - Presence: online/playing/offline heartbeat; actual 0xC0 title AppKeyValueStorage forwarded as Base64; DEN2's SMM2/Splatoon private-battle `InGame` fix is gated by confirmed two-vantage NAT; ARMS `JoinMode` 1–4 maps to joinable presence.
 - Account/profile: profile read, username and console nickname updates, JPEG/Mii import, public gallery avatar listing/selection, and avatar/profile field preservation.
-- History and transfer: real Eden playtime sync, history read, manual cloud-save download/upload, BCAT seed download/export and SHA-256.
+- History and transfer: real Eden playtime sync, history read, BCAT seed download/export and SHA-256. Cloud-save upload/download is not offered: Nextendo removed the cloud-save service in September 2026.
 - Diagnostics: backend health ping, online eligibility check, public online-counts feed, exact-host DNS/TLS routing and payload-blind PRUDP/NAT diagnostics.
 
-The public server source currently exposes the supported account/profile/history/BCAT/save/health/gallery endpoints listed above. DEN2 also contains calls for `/api/my-lobby`, `/api/recent-players`, `/api/report-player` and `/api/avatar?pid=...`, but these handlers are not registered in the public `nextendo-account` server route table checked for this integration. NEX therefore displays the lobby/recent-player functions as unavailable rather than sending speculative requests. Player reporting and PID avatar download remain blocked until Nextendo publishes/authorizes those routes. The NZP player-count call belongs to the separate NZP game service, not Nextendo, and is not represented as a Nextendo feature.
+The public server source contains account/profile/history/BCAT/save/health/gallery handlers, but the current Nextendo documentation marks cloud saves as removed and reserves account management to official applications. A route remaining in source is not proof that the live deployment accepts a third-party client. DEN2 also contains calls for `/api/my-lobby`, `/api/recent-players`, `/api/report-player` and `/api/avatar?pid=...`, but these handlers are not registered in the public `nextendo-account` server route table checked for this integration. NEX therefore displays the lobby/recent-player functions as unavailable rather than sending speculative requests. Player reporting and PID avatar download remain blocked until Nextendo publishes/authorizes those routes. The NZP player-count call belongs to the separate NZP game service, not Nextendo, and is not represented as a Nextendo feature.
+
+## 2.2. Cloud-save service status
+
+The current Nextendo cloud-save guide says the service was **removed in September 2026**. NEX therefore no longer exposes cloud-save upload/download actions. BCAT schedule bundles are a separate service and remain available as public title data where the server has published a bundle. No cloud-save feature should be advertised as active until Nextendo announces a replacement.
 
 ## 3. SMM2 production routing and matchmaking
 
 The NEX source contains the public SMM2 profile, LoginEx/ticket codecs, PRUDP-Lite state machine and a standalone auth-to-secure session harness. The harness is not yet integrated with the guest game's native socket lifecycle. The live deployment values are not published in the public source repositories.
 
-The current public Nextendo compatibility registry lists Super Mario Maker 2 as **Experimental / In preparation**, 70% supported on game version `3.0.3`, with **matchmaking and presence untested**. This is an independent server-side blocker: even a complete NEX client transport cannot create working rooms until the deployed SMM2 service exposes and validates the required matchmaking path.
+The current Nextendo game-compatibility page lists Super Mario Maker 2 as **Experimental / In preparation**, 70% supported on version `3.0.3`, with **matchmaking and presence untested**. Its published progress is for Course World features; it is not a promise that versus rooms or peer sessions work. This is an independent server-side blocker: a perfect NEX client cannot create working SMM2 rooms until Nextendo enables and validates matchmaking.
 
 Nextendo must confirm or provide through an authorized developer channel:
 
@@ -115,6 +120,6 @@ For service-side support, send only a token-free diagnostic: exact UTC timestamp
 
 NEX now has an Android Keystore-backed network configuration screen and an exact-host multi-title auth/DAUTH DNS installer. Supported DEN2 account features are now ported to the NEX public Client ID, with profile gallery selection and actual game presence capture. The public-server route gaps are called out in §2.1 rather than presented as implemented. This closes client-side account features and hostname plumbing, but it does not supply production addresses or complete the title login path.
 
-NEX now builds the Citron-compatible BAAS id_token only after an operator-authorized PEM is imported and its public key matches the live Nextendo JWKS. The game-visible cache remains empty until a valid unexpired nx2. token and a verified Citron signer are both available. The local JWKS match is not server-side acceptance approval. NEX still cannot invent third-party API attestation, production IPs, certificate deployment data or missing server-side SMM2 matchmaking behavior.
+NEX selects Citron BAAS and requires an operator-authorized PEM whose public key matches the live Nextendo JWKS; no local/random fallback is permitted. The game-visible cache remains empty until a valid unexpired `nx2.` token and the authorized signer are available. Even then, a JWKS match does not solve client attestation or prove live LoginEx acceptance. NEX cannot invent official client credentials, production IPs, certificate deployment data or missing SMM2 server matchmaking.
 
 The previous per-installation JWK registration proposal is retired following the founder's explicit response. The file docs/NEXTENDO_BAAS_REGISTRATION_REQUEST.md is retained only as a historical record and must not be sent as a current request.
