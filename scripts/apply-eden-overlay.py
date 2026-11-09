@@ -1033,7 +1033,7 @@ void ClearParkedNextendoUdpSockets() {
         "#include <mutex>\n",
         "#include <algorithm>\n"
         "#include <cctype>\n"
-        "#include <mutex>\\n"
+        "#include <mutex>\n"
         "#include <span>\n"
         "#include <string>\n"
         "#include <string_view>\n"
