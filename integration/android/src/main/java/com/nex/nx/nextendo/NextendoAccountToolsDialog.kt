@@ -19,7 +19,8 @@ internal object NextendoAccountToolsDialog {
         historyError: String?,
         onRefresh: () -> Unit,
         onChangeUsername: () -> Unit,
-        onChangeConsoleNickname: () -> Unit
+        onChangeConsoleNickname: () -> Unit,
+        onChooseGalleryAvatar: () -> Unit
     ) {
         if (activity.isFinishing || activity.isDestroyed) return
         val density = activity.resources.displayMetrics.density
@@ -64,6 +65,13 @@ internal object NextendoAccountToolsDialog {
             ViewGroup.LayoutParams.MATCH_PARENT, dp(46)
         ).apply { topMargin = dp(8) })
         root.addView(editNickname, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(46)
+        ))
+        root.addView(MaterialButton(activity).apply {
+            text = "Escolher avatar da galeria"
+            isAllCaps = false
+            setOnClickListener { onChooseGalleryAvatar() }
+        }, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(46)
         ))
 
