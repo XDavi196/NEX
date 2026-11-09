@@ -149,7 +149,7 @@ object NextendoPresencePublisher {
         val sessionResult = runCatching {
             NextendoSessionRefresher.getValidSession(context, TOKEN_REFRESH_MARGIN_SECONDS)
         }
-        var session = sessionResult.getOrElse { error ->
+        val session = sessionResult.getOrElse { error ->
             lastPresenceDiagnostic = describeFailure(error)
             return
         }
