@@ -54,6 +54,14 @@ Only a private station `address=` with non-zero `natf` is replaced; the station 
 
 This does not rewrite inbound peer Station URLs. Replacing a remote peer address with the local player's external IP would be wrong; peer station handling needs an authoritative per-peer address supplied or discovered through the supported service protocol.
 
+### BSD compatibility for NPLN/gRPC
+
+The NEX overlay now registers Eden BSD command IDs 29/30 as `RecvMMsg`/`SendMMsg`, using the same in/out buffer layout as DEN2. Messages are dispatched through the normal socket send/receive functions; a receive with a source-address buffer uses `RecvFromImpl`, so the guest-socket NNCS observer remains on the same path. The parser bounds the batch to 64 messages, 16 I/O vectors per message and 8 MiB of payload to reject malformed guest buffers safely.
+
+The previously stubbed `EventFd` command now creates a loopback UDP self-pipe, allowing pollable event notifications used by gRPC/NPLN runtimes. IPv6 socket creation returns `EAFNOSUPPORT` cleanly instead of constructing an invalid socket, so an IPv4 fallback can proceed. Socket options unsupported by Eden are recorded per descriptor and echoed by `getsockopt`; real supported `SOL_SOCKET` options still reach the host socket.
+
+These are emulator-side compatibility primitives, not proof of a working title session. Compilation and live NPLN validation are still required.
+ 
 ### Friends and presence
 
 The account-facing friends and presence features remain separate from gameplay transport. Friends operations use the server-issued `nx2.` game token, while presence publishing uses an OAuth access token with the granted presence scope. The NEX Client ID is unchanged.
