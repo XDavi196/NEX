@@ -195,33 +195,24 @@ inline void RecordResolved(const std::string& supplied_hostname, const std::stri
     resolved_routes.push_back(ResolvedRoute{*hostname, ipv4, port});
 }
 
-/** Return a hostname only when the peer endpoint maps unambiguously to one redirect. */
+/** Prefer the exact peer IP/port; fall back to DEN/Citron's last-resolved host for that IP. */
 inline std::optional<std::string> HostnameForPeer(const std::string& ipv4, std::uint16_t port) {
     std::lock_guard lock{cache_mutex};
-    std::optional<std::string> match;
+    if (port != 0) {
+        for (auto it = resolved_routes.rbegin(); it != resolved_routes.rend(); ++it) {
+            if (it->ipv4 == ipv4 && it->port == port) {
+                return it->hostname;
+            }
+        }
+    }
+    // GetHostByName and some SSL clients do not retain a service port. Preserve
+    // the same last-resolved-host fallback used by the Nextendo reference clients.
     for (auto it = resolved_routes.rbegin(); it != resolved_routes.rend(); ++it) {
-        if (it->ipv4 != ipv4 || it->port != port || port == 0) {
-            continue;
+        if (it->ipv4 == ipv4) {
+            return it->hostname;
         }
-        if (match && *match != it->hostname) {
-            return std::nullopt;
-        }
-        match = it->hostname;
     }
-    if (match) {
-        return match;
-    }
-    // GetHostByName provides no service port; fall back only for an unambiguous IP.
-    for (const auto& entry : resolved_routes) {
-        if (entry.ipv4 != ipv4) {
-            continue;
-        }
-        if (match && *match != entry.hostname) {
-            return std::nullopt;
-        }
-        match = entry.hostname;
-    }
-    return match;
+    return std::nullopt;
 }
 
 /** Recover a DNS-redirected IPv4 when the guest keeps only the service port. */
