@@ -1141,13 +1141,13 @@ bool FixupNextendoInGameFlag(std::string& app_field) {
     bool in_game_is_zero = false;
     std::size_t pos = 0;
     while (pos < app_field.size()) {
-        const auto key_end = app_field.find('\\0', pos);
+        const auto key_end = app_field.find('\0', pos);
         const auto key_limit = key_end == std::string::npos ? app_field.size() : key_end;
         if (key_limit == pos) break;
         const std::string key = app_field.substr(pos, key_limit - pos);
         pos = key_limit + 1;
         if (pos >= app_field.size()) break;
-        const auto value_end = app_field.find('\\0', pos);
+        const auto value_end = app_field.find('\0', pos);
         const auto value_limit = value_end == std::string::npos ? app_field.size() : value_end;
         const std::string value = app_field.substr(pos, value_limit - pos);
         if (key == "Mode") private_mode = value == "cPrivate";
@@ -1168,13 +1168,13 @@ bool FixupNextendoInGameFlag(std::string& app_field) {
 bool IsNextendoArmsSessionActive(const std::string& app_field) {
     std::size_t pos = 0;
     while (pos < app_field.size()) {
-        const auto key_end = app_field.find('\\0', pos);
+        const auto key_end = app_field.find('\0', pos);
         const auto key_limit = key_end == std::string::npos ? app_field.size() : key_end;
         if (key_limit == pos) break;
         const std::string key = app_field.substr(pos, key_limit - pos);
         pos = key_limit + 1;
         if (pos >= app_field.size()) break;
-        const auto value_end = app_field.find('\\0', pos);
+        const auto value_end = app_field.find('\0', pos);
         const auto value_limit = value_end == std::string::npos ? app_field.size() : value_end;
         const std::string value = app_field.substr(pos, value_limit - pos);
         pos = value_limit + 1;
