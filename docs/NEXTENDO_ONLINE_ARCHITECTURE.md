@@ -96,11 +96,19 @@ O overlay também liga um cache limitado de sockets UDP à camada de rede nativa
 
 Além da sonda Kotlin diagnóstica, o overlay nativo agora observa respostas NNCS diretamente em `BSD::RecvFromImpl`, usando o socket UDP real do jogo. O estado de NAT só é aceito após as duas vantage replies concordarem no IP externo e na porta UDP local, com endereços de resposta distintos. A sonda Kotlin continua diagnóstica e não fornece o endereço público anunciado pelo jogo. Ainda faltam keepalive periódico, descoberta de peers, sinalização de matchmaking, hole-punching UDP e teardown coordenado da sessão. O código público do `nextendo-nncs` documenta `10025` e `10125` para o fluxo de Mario Kart 8 (`nncs1-lp1`/`nncs2-lp1`); esses valores não são transferidos ao SMM2. O hostname, as duas portas e o contrato de sondagem NNCS do SMM2 continuam sem confirmação oficial. O fluxo precisa ser validado em dois dispositivos reais.
 
+## 7.1. Compatibilidade BSD para NPLN/gRPC
+
+O overlay do NEX liga os comandos BSD 29/30 a `SendMMsg` e `RecvMMsg`, com a estrutura in/out usada pelo DEN2. O envio e a recepção usam os mesmos métodos de socket do jogo; quando há buffer de endereço de origem, a recepção passa por `RecvFromImpl` e preserva a observação NNCS no socket UDP real. O parser limita 64 mensagens, 16 iovecs por mensagem e 8 MiB de dados por lote.
+
+O comando `EventFd`, que era um stub, agora cria um self-pipe UDP em loopback para fornecer um descritor observável por `poll`, necessário a runtimes gRPC/NPLN. Tentativas de socket IPv6 recebem `EAFNOSUPPORT` de forma limpa para permitir fallback IPv4; isso não adiciona suporte IPv6 ao backend. Opções de socket que Eden não implementa são guardadas por descritor e devolvidas por `getsockopt`, enquanto opções `SOL_SOCKET` suportadas continuam aplicadas ao socket real.
+
+Esses ajustes corrigem primitivas do emulador, mas não substituem o handshake de jogo, matchmaking, sinalização ou P2P. O build que contém essas alterações ainda precisa passar e o caminho NPLN precisa ser validado em jogo.
+ 
 ## 8. Segurança e bloqueios
 
 - Não copiar Client IDs, tokens, sessões, chaves privadas ou attestations do Den2 ou de qualquer outro emulador.
 - Não inventar hostnames, endereços IP, access keys, claims, formatos de pacote ou regras de aceitação.
-- Não desativar verificação de certificado TLS.
+- A exceção de certificado é permitida apenas para um par hostname/IP de redirecionamento DNS exato configurado no NEX; todas as outras conexões mantêm a verificação TLS normal.
 - Não publicar AppField fictício.
 - Usar o PID persistente como NetworkServiceAccountId apenas no mapeamento definido pelo serviço Nextendo; nunca derivar UUID de Switch a partir do PID.
 - Não declarar multiplayer funcional sem teste com duas contas NEX, dois dispositivos e um jogo Nextendo suportado.
