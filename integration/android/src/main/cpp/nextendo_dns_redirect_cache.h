@@ -108,25 +108,31 @@ inline bool IsValidIpv4(const std::string& value) {
     return parts == 4;
 }
 
-inline bool IsNncsHostname(const std::string& hostname, std::string_view prefix) {
+inline bool IsNncsHostname(const std::string& hostname, std::string_view family) {
     constexpr std::string_view suffix = ".n.n.srv.nintendo.net";
-    if (!hostname.starts_with(prefix) || !hostname.ends_with(suffix) ||
-        hostname.size() <= prefix.size() + suffix.size()) {
+    if (!hostname.starts_with(family) || !hostname.ends_with(suffix) ||
+        hostname.size() <= family.size() + suffix.size()) {
+        return false;
+    }
+
+    // Nintendo exposes both nncs1-lp1... and nncs1.p01.lp1... forms.
+    const char separator = hostname[family.size()];
+    if (separator != '-' && separator != '.') {
         return false;
     }
     const auto identifier = std::string_view{hostname}.substr(
-        prefix.size(), hostname.size() - prefix.size() - suffix.size());
-    return !identifier.empty() && identifier.find('.') == std::string_view::npos;
+        family.size() + 1, hostname.size() - family.size() - 1 - suffix.size());
+    return !identifier.empty();
 }
 
 inline std::string nncs1_redirect_ipv4;
 inline std::string nncs2_redirect_ipv4;
 
 inline std::optional<std::string> ResolveNncsLocked(const std::string& hostname) {
-    if (IsNncsHostname(hostname, "nncs1-") && !nncs1_redirect_ipv4.empty()) {
+    if (IsNncsHostname(hostname, "nncs1") && !nncs1_redirect_ipv4.empty()) {
         return nncs1_redirect_ipv4;
     }
-    if (IsNncsHostname(hostname, "nncs2-") && !nncs2_redirect_ipv4.empty()) {
+    if (IsNncsHostname(hostname, "nncs2") && !nncs2_redirect_ipv4.empty()) {
         return nncs2_redirect_ipv4;
     }
     return std::nullopt;
@@ -154,8 +160,8 @@ inline bool SetNncsRedirectIps(const std::string& server_ipv4, const std::string
         resolved_routes.erase(
             std::remove_if(resolved_routes.begin(), resolved_routes.end(),
                 [](const ResolvedRoute& entry) {
-                    return IsNncsHostname(entry.hostname, "nncs1-") ||
-                           IsNncsHostname(entry.hostname, "nncs2-");
+                    return IsNncsHostname(entry.hostname, "nncs1") ||
+                           IsNncsHostname(entry.hostname, "nncs2");
                 }),
             resolved_routes.end());
     }

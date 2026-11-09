@@ -38,7 +38,7 @@ Only after both vantage replies satisfy those checks does the native NAT state e
 
 ### DNS routing for the two NNCS NAT-check vantages
 
-The native DNS cache now keeps the configured main server IPv4 and the distinct NAT-vantage IPv4 as separate routes. It maps only hostnames matching `nncs1-<label>.n.n.srv.nintendo.net` to the main server and `nncs2-<label>.n.n.srv.nintendo.net` to the NAT-vantage address. These constrained routes follow the DEN2/Nextendo resolver behavior without enabling a wildcard redirect for unrelated Nintendo domains. The resolved hostnames are retained for diagnostics and port-based endpoint recovery.
+The native DNS cache now keeps the configured main server IPv4 and the distinct NAT-vantage IPv4 as separate routes. It maps only `nncs1-` / `nncs1.` hostnames under `.n.n.srv.nintendo.net` to the main server, and the corresponding `nncs2-` / `nncs2.` families to the NAT-vantage address. Both documented hostname styles (for example, `nncs2-lp1` and `nncs2.p01.lp1`) are recognized. These constrained routes follow the DEN2/Nextendo resolver behavior without enabling a wildcard redirect for unrelated Nintendo domains. The resolved hostnames are retained for diagnostics and port-based endpoint recovery.
 
 ### UDP socket lifetime and Station URL correction
 
