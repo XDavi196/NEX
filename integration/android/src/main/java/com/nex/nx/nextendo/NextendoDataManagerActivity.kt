@@ -18,8 +18,8 @@ import java.util.concurrent.Executors
 
 /** User-driven cloud-save, BCAT and profile-media transfers; never silently overwrites game data. */
 internal class NextendoDataManagerActivity : Activity() {
-    private enum class PendingImport { NONE, SAVE, PROFILE_JPEG, MII }
-    private enum class PendingExport { NONE, SAVE, BCAT }
+    private enum class PendingImport { NONE, PROFILE_JPEG, MII }
+    private enum class PendingExport { NONE, BCAT }
 
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var titleIdInput: EditText
@@ -42,7 +42,7 @@ internal class NextendoDataManagerActivity : Activity() {
             setPadding(dp(20), dp(12), dp(20), dp(12))
         }
         content.addView(TextView(this).apply {
-            text = "Transferências manuais da sua conta Nextendo. O NEX não substitui saves locais automaticamente."
+            text = "Exportação manual de BCAT e importação de mídia de perfil. O serviço Nextendo de cloud saves foi removido em setembro de 2026; os saves locais do jogo não são afetados."
             textSize = 13f
             setPadding(0, 0, 0, dp(12))
         })
@@ -51,8 +51,6 @@ internal class NextendoDataManagerActivity : Activity() {
             setSingleLine(true)
         }
         content.addView(titleIdInput)
-        addAction(content, "Baixar save da nuvem") { downloadSave() }
-        addAction(content, "Enviar save para a nuvem") { chooseSaveToUpload() }
         addAction(content, "Exportar BCAT (ZIP)") { exportBcat() }
         addAction(content, "Atualizar foto do perfil (JPEG)") { chooseProfileJpeg() }
         addAction(content, "Atualizar Mii (arquivo binário)") { chooseMii() }
@@ -124,21 +122,6 @@ internal class NextendoDataManagerActivity : Activity() {
                 }
             }
         }
-    }
-
-    private fun downloadSave() {
-        val id = currentTitleId() ?: return
-        withSession { session ->
-            val bytes = NextendoAccountExtrasApi.pullSave(session.nexGameToken, id)
-                ?: throw IllegalStateException("Não existe save na nuvem ou a Nextendo não retornou dados.")
-            runOnUiThread { prepareExport(bytes, "$id-cloud-save.bin", PendingExport.SAVE) }
-        }
-    }
-
-    private fun chooseSaveToUpload() {
-        if (currentTitleId() == null) return
-        pendingImport = PendingImport.SAVE
-        openDocument("*/*")
     }
 
     private fun exportBcat() {
@@ -225,8 +208,7 @@ internal class NextendoDataManagerActivity : Activity() {
 
     private fun readImport(uri: Uri) {
         val kind = pendingImport
-        val titleId = if (kind == PendingImport.SAVE) currentTitleId() else null
-        if (kind == PendingImport.NONE || (kind == PendingImport.SAVE && titleId == null)) {
+        if (kind == PendingImport.NONE) {
             clearPending()
             return
         }
@@ -252,21 +234,6 @@ internal class NextendoDataManagerActivity : Activity() {
                     val result = runCatching {
                         val session = sessionForGameApi()
                         when (kind) {
-                            PendingImport.SAVE -> {
-                                val outcome = NextendoAccountExtrasApi.pushSave(
-                                    session.nexGameToken, titleId!!, payload
-                                )
-                                if (!outcome.ok) {
-                                    throw IllegalStateException(
-                                        outcome.error.ifBlank {
-                                            if (outcome.tooLarge) "O save excede o limite da nuvem."
-                                            else "A Nextendo recusou o upload do save."
-                                        }
-                                    )
-                                }
-                                if (outcome.kept) "A Nextendo manteve o save maior já armazenado."
-                                else "Save enviado para a nuvem."
-                            }
                             PendingImport.PROFILE_JPEG -> {
                                 require(payload.size >= 3 &&
                                     payload[0] == 0xFF.toByte() &&
