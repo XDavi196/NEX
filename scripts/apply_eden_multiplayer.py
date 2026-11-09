@@ -361,6 +361,162 @@ void BSD::SelectWork::Response(HLERequestContext& ctx) {
         "DEN2-compatible SetSockOpt",
     )
 
+    select_impl_cpp = """std::pair<s32, Errno> BSD::SelectImpl(
+    s32 nfds, s32 timeout, std::span<const u8> read_in, std::span<const u8> write_in,
+    std::span<const u8> error_in, std::vector<u8>& read_out, std::vector<u8>& write_out,
+    std::vector<u8>& error_out) {
+    std::fill(read_out.begin(), read_out.end(), 0);
+    std::fill(write_out.begin(), write_out.end(), 0);
+    std::fill(error_out.begin(), error_out.end(), 0);
+
+    if (nfds < 0 || timeout < -1) return {-1, Errno::INVAL};
+
+    constexpr s32 MaxSelectFds = 128;
+    std::vector<s32> read_fds;
+    std::vector<s32> write_fds;
+    std::vector<s32> error_fds;
+    const auto extract = [nfds](std::span<const u8> mask, std::vector<s32>& output) {
+        if (nfds <= 0) return;
+        for (std::size_t byte_index = 0; byte_index < mask.size(); ++byte_index) {
+            const u8 value = mask[byte_index];
+            for (unsigned int bit = 0; bit < 8; ++bit) {
+                if ((value & static_cast<u8>(1U << bit)) == 0) continue;
+                const std::size_t fd = byte_index * 8 + bit;
+                if (fd < static_cast<std::size_t>(nfds) && fd < MaxSelectFds) {
+                    output.push_back(static_cast<s32>(fd));
+                }
+            }
+        }
+    };
+    extract(read_in, read_fds);
+    extract(write_in, write_fds);
+    extract(error_in, error_fds);
+
+    if (read_fds.empty() && write_fds.empty() && error_fds.empty()) {
+        return {0, Errno::SUCCESS};
+    }
+
+    struct RequestedFd {
+        s32 fd;
+        Network::PollEvents events;
+    };
+    std::vector<RequestedFd> requested;
+    const auto add = [&requested](const std::vector<s32>& fds, Network::PollEvents event) {
+        for (const s32 fd : fds) {
+            const auto found = std::find_if(requested.begin(), requested.end(),
+                [fd](const RequestedFd& entry) { return entry.fd == fd; });
+            if (found == requested.end()) {
+                requested.push_back({fd, event});
+            } else {
+                found->events = found->events | event;
+            }
+        }
+    };
+    add(read_fds, Network::PollEvents::In);
+    add(write_fds, Network::PollEvents::Out);
+    add(error_fds, Network::PollEvents::Pri);
+
+    std::vector<s32> polled_fds;
+    std::vector<Network::PollFD> host_pollfds;
+    polled_fds.reserve(requested.size());
+    host_pollfds.reserve(requested.size());
+    for (const auto& entry : requested) {
+        if (entry.fd < 0 || entry.fd >= MaxSelectFds ||
+            !file_descriptors[entry.fd] || !file_descriptors[entry.fd]->socket) {
+            continue;
+        }
+        polled_fds.push_back(entry.fd);
+        host_pollfds.push_back(Network::PollFD{
+            .socket = file_descriptors[entry.fd]->socket.get(),
+            .events = entry.events,
+            .revents = Network::PollEvents{},
+        });
+    }
+    if (host_pollfds.empty()) return {0, Errno::SUCCESS};
+
+    const auto [poll_ret, poll_errno] = Translate(Network::Poll(host_pollfds, timeout));
+    if (poll_errno != Errno::SUCCESS) return {poll_ret, poll_errno};
+
+    constexpr Network::PollEvents error_like =
+        Network::PollEvents::Err | Network::PollEvents::Hup | Network::PollEvents::Nval;
+    constexpr Network::PollEvents except_like =
+        Network::PollEvents::Pri | Network::PollEvents::Err |
+        Network::PollEvents::Hup | Network::PollEvents::Nval;
+    const auto has_event = [](Network::PollEvents value, Network::PollEvents mask) {
+        return static_cast<u16>(value & mask) != 0;
+    };
+    const auto set_fd = [](std::vector<u8>& mask, s32 fd) {
+        if (fd < 0) return;
+        const auto byte_index = static_cast<std::size_t>(fd) / 8;
+        if (byte_index < mask.size()) {
+            mask[byte_index] |= static_cast<u8>(1U << (static_cast<unsigned int>(fd) % 8));
+        }
+    };
+
+    s32 ready = 0;
+    for (std::size_t index = 0; index < host_pollfds.size(); ++index) {
+        const s32 fd = polled_fds[index];
+        const auto events = host_pollfds[index].events;
+        const auto revents = host_pollfds[index].revents;
+        bool counted = false;
+
+        if (has_event(events, Network::PollEvents::In) &&
+            has_event(revents, Network::PollEvents::In | error_like)) {
+            set_fd(read_out, fd);
+            counted = true;
+        }
+        if (has_event(events, Network::PollEvents::Out) &&
+            has_event(revents, Network::PollEvents::Out | error_like)) {
+            set_fd(write_out, fd);
+            counted = true;
+        }
+        if (has_event(events, Network::PollEvents::Pri) &&
+            has_event(revents, except_like)) {
+            set_fd(error_out, fd);
+            counted = true;
+        }
+        if (counted) ++ready;
+    }
+    return {ready, Errno::SUCCESS};
+}
+
+"""
+    replace_once(
+        bsd_cpp,
+        "std::pair<s32, Errno> BSD::PollImpl(",
+        select_impl_cpp + "std::pair<s32, Errno> BSD::PollImpl(",
+        "BSD SelectImpl implementation",
+    )
+
+    old_select = """void BSD::Select(HLERequestContext& ctx) {
+    LOG_DEBUG(Service, "(STUBBED) called");
+
+    IPC::ResponseBuilder rb{ctx, 4};
+
+    rb.Push(ResultSuccess);
+    rb.Push<u32>(0); // ret
+    rb.Push<u32>(0); // bsd errno
+}"""
+    new_select = """void BSD::Select(HLERequestContext& ctx) {
+    IPC::RequestParser rp{ctx};
+    const s32 nfds = rp.Pop<s32>();
+    const s32 timeout = rp.Pop<s32>();
+
+    LOG_DEBUG(Service, "called. nfds={} timeout={}", nfds, timeout);
+
+    ExecuteWork(ctx, SelectWork{
+                         .nfds = nfds,
+                         .timeout = timeout,
+                         .read_in = ctx.CanReadBuffer(0) ? ctx.ReadBuffer(0) : std::span<const u8>{},
+                         .write_in = ctx.CanReadBuffer(1) ? ctx.ReadBuffer(1) : std::span<const u8>{},
+                         .error_in = ctx.CanReadBuffer(2) ? ctx.ReadBuffer(2) : std::span<const u8>{},
+                         .read_out = std::vector<u8>(ctx.GetWriteBufferSize(0)),
+                         .write_out = std::vector<u8>(ctx.GetWriteBufferSize(1)),
+                         .error_out = std::vector<u8>(ctx.GetWriteBufferSize(2)),
+                     });
+}"""
+    replace_once(bsd_cpp, old_select, new_select, "BSD Select stub")
+
     methods_anchor = "void BSD::DuplicateSocket(HLERequestContext& ctx) {"
     methods = """void BSD::SendMMsg(HLERequestContext& ctx) {
     IPC::RequestParser rp{ctx};
