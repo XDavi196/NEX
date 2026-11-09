@@ -1,7 +1,6 @@
 package com.nex.nx.nextendo
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -19,7 +18,6 @@ import java.util.concurrent.Executors
 /** User-driven BCAT export and profile-media transfers. */
 internal class NextendoDataManagerActivity : Activity() {
     private enum class PendingImport { NONE, PROFILE_JPEG, MII }
-    private enum class PendingExport { NONE, BCAT }
 
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var titleIdInput: EditText
@@ -137,7 +135,7 @@ internal class NextendoDataManagerActivity : Activity() {
                                 Toast.LENGTH_LONG
                             ).show()
                         } else {
-                            prepareExport(bytes, "$id-bcat.zip", PendingExport.BCAT)
+                            prepareExport(bytes, "$id-bcat.zip")
                         }
                     },
                     onFailure = { error ->
@@ -170,7 +168,7 @@ internal class NextendoDataManagerActivity : Activity() {
         startActivityForResult(intent, REQUEST_IMPORT)
     }
 
-    private fun prepareExport(bytes: ByteArray, name: String, kind: PendingExport) {
+    private fun prepareExport(bytes: ByteArray, name: String) {
         pendingBytes?.fill(0)
         pendingBytes = bytes
         pendingFileName = name
