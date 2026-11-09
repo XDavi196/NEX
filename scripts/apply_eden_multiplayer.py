@@ -258,7 +258,7 @@ void BSD::RecvMMsg(HLERequestContext& ctx) {
         for (const auto& segment : msg.iov) capacity += segment.size();
         std::vector<u8> received(capacity);
         s32 received_bytes = -1;
-        std::vector<u8> remote_address;
+        std::vector<u8> remote_address(sizeof(SockAddrIn));
         Errno recv_errno = Errno::SUCCESS;
         if (!msg.name.empty() && !file_descriptors[fd]->is_connection_based) {
             std::tie(received_bytes, recv_errno) =
