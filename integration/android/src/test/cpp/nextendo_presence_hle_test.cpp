@@ -42,7 +42,7 @@ int main() {
     assert(joined.private_battle_in_game_fixed);
     const std::string_view joined_view(
         reinterpret_cast<const char*>(private_battle.data()), private_battle.size());
-    assert(joined_view.find("InGame\0" "1\0") != std::string_view::npos);
+    assert(joined_view.find(std::string_view("InGame\0" "1\0", 9)) != std::string_view::npos);
 
     // Public rooms are never modified by the private-battle workaround.
     AppField public_room{};
