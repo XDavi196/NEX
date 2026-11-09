@@ -98,11 +98,15 @@ Além da sonda Kotlin diagnóstica, o overlay nativo agora observa respostas NNC
 
 ## 7.1. Compatibilidade BSD para NPLN/gRPC
 
-O overlay do NEX liga os comandos BSD 29/30 a `SendMMsg` e `RecvMMsg`, com a estrutura in/out usada pelo DEN2. O envio e a recepção usam os mesmos métodos de socket do jogo; quando há buffer de endereço de origem, a recepção passa por `RecvFromImpl` e preserva a observação NNCS no socket UDP real. O parser limita 64 mensagens, 16 iovecs por mensagem e 8 MiB de dados por lote.
+O overlay do NEX liga os comandos BSD 29/30 a `SendMMsg` e `RecvMMsg`, com a estrutura in/out usada pelo DEN2. O envio e a recepção usam os métodos normais de socket do jogo; quando há buffer de endereço de origem, a recepção passa por `RecvFromImpl` e preserva a observação NNCS no socket UDP real. O parser limita 64 mensagens, 16 iovecs por mensagem e 8 MiB de dados por lote.
 
-O comando `EventFd`, que era um stub, agora cria um self-pipe UDP em loopback para fornecer um descritor observável por `poll`, necessário a runtimes gRPC/NPLN. Tentativas de socket IPv6 recebem `EAFNOSUPPORT` de forma limpa para permitir fallback IPv4; isso não adiciona suporte IPv6 ao backend. Opções de socket que Eden não implementa são guardadas por descritor e devolvidas por `getsockopt`, enquanto opções `SOL_SOCKET` suportadas continuam aplicadas ao socket real.
+O comando `EventFd` cria um self-pipe UDP em loopback: `Write` enfileira valores de 64 bits, `Read` drena e soma os valores pendentes, e somente a primeira leitura pode bloquear. Isso fornece um descritor de wake-up observável por `poll`, necessário a runtimes gRPC/NPLN. O `BSD::Select`, que antes sempre retornava zero, agora converte os três conjuntos de descritores (leitura, escrita e exceção) em eventos do poller nativo e devolve os conjuntos prontos ao jogo.
 
-Esses ajustes corrigem primitivas do emulador, mas não substituem o handshake de jogo, matchmaking, sinalização ou P2P. O build que contém essas alterações ainda precisa passar e o caminho NPLN precisa ser validado em jogo.
+Tentativas de socket IPv6 recebem `EAFNOSUPPORT` de forma limpa para permitir fallback IPv4; isso não adiciona suporte IPv6 ao backend. Opções de socket que Eden não implementa são guardadas por descritor e devolvidas por `getsockopt`, enquanto opções `SOL_SOCKET` suportadas continuam aplicadas ao socket real.
+
+O reescritor de Station URL reconhece `SecureConnection.Register` (`0x0B/0x01`), `RegisterEx` (`0x0B/0x04`), `ReplaceURL` (`0x0B/0x07`) e os métodos Create/Join/AutoMatchmake de MatchmakeExtension. Só altera uma estação privada com `natf` não zero depois de confirmar a mesma IPv4 pública por duas respostas NNCS independentes.
+
+Esses ajustes corrigem primitivas do emulador, mas não substituem BAAS/LoginEx autorizado, o handshake seguro do jogo, o matchmaking por título, a sinalização ou P2P. O build #407 passou pelo overlay e testes nativos/unitários, mas ainda está em compilação do APK; o source revision mais novo está enfileirado para build próprio. Não há teste de sala em dois dispositivos ainda.
  
 ## 8. Segurança e bloqueios
 
