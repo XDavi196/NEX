@@ -54,13 +54,6 @@ internal object NextendoAccountExtrasApi {
         val lastPlayed: String
     )
 
-    data class SaveUploadResult(
-        val ok: Boolean,
-        val kept: Boolean = false,
-        val tooLarge: Boolean = false,
-        val error: String = ""
-    )
-
     private const val MAX_PROFILE_IMAGE_BASE64 = 1_500_000
     private const val MAX_MII_BASE64 = 128_000
     private val titleIdPattern = Regex("^[0-9A-Fa-f]{16}$")
@@ -194,9 +187,10 @@ internal object NextendoAccountExtrasApi {
         )
     }
 
-    fun downloadBcatSeed(gameToken: String, titleId: String): ByteArray {
+    /** BCAT schedule bundles are public title data, not account cloud saves. */
+    fun downloadBcatSeed(titleId: String): ByteArray {
         val id = normalizedTitleId(titleId)
-        return NextendoAuthClient.requestGameAccountBytes("/api/bcat/$id", gameToken)
+        return NextendoAuthClient.requestPublicBytes("/api/bcat/$id")
     }
 
     fun hashBcatSeedHex(data: ByteArray): String {
@@ -208,36 +202,6 @@ internal object NextendoAccountExtrasApi {
                 append(alphabet[unsigned ushr 4])
                 append(alphabet[unsigned and 0x0F])
             }
-        }
-    }
-
-    /** Returns null when the server reports that no cloud save exists yet. */
-    fun pullSave(gameToken: String, titleId: String): ByteArray? {
-        val id = normalizedTitleId(titleId)
-        val bytes = NextendoAuthClient.requestGameAccountBytes("/api/save/$id", gameToken)
-        return bytes.takeIf { it.isNotEmpty() }
-    }
-
-    fun pushSave(gameToken: String, titleId: String, data: ByteArray): SaveUploadResult {
-        val id = normalizedTitleId(titleId)
-        require(data.isNotEmpty()) { "O save está vazio; o upload foi cancelado." }
-        return try {
-            val response = NextendoAuthClient.requestGameAccountBytes(
-                path = "/api/save/$id",
-                gameToken = gameToken,
-                method = "POST",
-                body = data
-            )
-            val json = runCatching {
-                Json.parseToJsonElement(String(response, Charsets.UTF_8)) as? JsonObject
-            }.getOrNull()
-            SaveUploadResult(ok = true, kept = json?.boolean("kept") ?: false)
-        } catch (error: NextendoAuthClient.NextendoException) {
-            SaveUploadResult(
-                ok = false,
-                tooLarge = error.httpStatus == 413,
-                error = error.message.orEmpty()
-            )
         }
     }
 
