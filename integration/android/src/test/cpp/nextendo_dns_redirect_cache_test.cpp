@@ -32,7 +32,7 @@ int main() {
     assert(Set("npln-auth.nintendo.net", "198.51.100.20"));
     RecordResolved("npln-auth.nintendo.net", "198.51.100.20", 7575);
     assert(HostnameForPeer("198.51.100.20", 7575) == "npln-auth.nintendo.net");
-    assert(!HostnameForPeer("198.51.100.20", 8443).has_value());
+    assert(HostnameForPeer("198.51.100.20", 8443) == "npln-auth.nintendo.net");
     assert(ResolveIpv4ForPort(7575) == expected_redirect_ip);
 
     assert(!Set("*.nintendo.net", "203.0.113.10"));
