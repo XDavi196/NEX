@@ -993,8 +993,8 @@ void ClearParkedNextendoUdpSockets() {
     ssl_backend_header = eden / "src/core/hle/service/ssl/ssl_backend.h"
     replace_once(
         ssl_backend_header,
-        "    virtual Result DoHandshake() = 0;\\n",
-        "    virtual Result DoHandshake(std::span<const std::string> requested_alpn_protos) = 0;\\n",
+        "    virtual Result DoHandshake() = 0;\n",
+        "    virtual Result DoHandshake(std::span<const std::string> requested_alpn_protos) = 0;\n",
     )
 
     ssl_cpp = eden / "src/core/hle/service/ssl/ssl.cpp"
@@ -1030,14 +1030,14 @@ void ClearParkedNextendoUdpSockets() {
     ssl_backend = eden / "src/core/hle/service/ssl/ssl_backend_openssl.cpp"
     replace_once(
         ssl_backend,
-        "#include <mutex>\\n",
-        "#include <algorithm>\\n"
-        "#include <cctype>\\n"
+        "#include <mutex>\n",
+        "#include <algorithm>\n"
+        "#include <cctype>\n"
         "#include <mutex>\\n"
-        "#include <span>\\n"
-        "#include <string>\\n"
-        "#include <string_view>\\n"
-        "#include <vector>\\n",
+        "#include <span>\n"
+        "#include <string>\n"
+        "#include <string_view>\n"
+        "#include <vector>\n",
     )
     replace_once(
         ssl_backend,
