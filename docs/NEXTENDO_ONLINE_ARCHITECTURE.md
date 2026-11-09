@@ -67,13 +67,13 @@ O código do servidor Nextendo foi consultado como referência pública, não in
 
 ## 6. DNS, TLS e SNI por título
 
-O overlay agora liga um cache de rotas DNS exatas ao serviço `sfdnsres` do Eden. O Android/JNI pode instalar até 32 mapeamentos explícitos hostname → IPv4. Curingas não são aceitos; uma rota só se aplica quando o hostname consultado coincide exatamente. O hostname original permanece no resultado de resolução para que o jogo mantenha o nome correto ao abrir TLS e enviar SNI.
+O overlay liga um cache de rotas DNS exatas ao serviço `sfdnsres` do Eden. O Android/JNI pode instalar até 32 mapeamentos explícitos hostname → IPv4. Curingas não são aceitos; uma rota só se aplica quando o hostname consultado coincide exatamente. O hostname original permanece no resultado de resolução. Para cada resposta redirecionada, o NEX registra host, IPv4 e porta de serviço num cache limitado; isso permite recuperar o SNI quando o título não o envia e recuperar o IPv4 quando um jogo perde o endereço e mantém apenas a porta no BSD `connect()`.
 
 A proteção de DNS do Eden continua bloqueando domínios Nintendo sem rota. Um domínio bloqueado só passa pelo resolvedor quando o NEX instalou uma rota exata para ele. Não há redirecionamento geral de `*.nintendo.net`.
 
-O NEX ainda não tem os hostnames e IPs de produção do SMM2, nem a confirmação de cobertura dos certificados e do SNI para esses endereços. Os valores locais de exemplo do servidor público não são usados como endpoints de produção. Portanto, o cache permanece vazio até receber o mapa oficial de produção. O endereço/porta do servidor seguro anunciado no LoginEx continua sendo a fonte autoritativa para a segunda conexão.
+No handshake TLS, o NEX só reconhece o redirecionamento quando o IP do peer coincide com o IPv4 configurado para o hostname exato. O SNI fornecido pelo jogo é preservado; se estiver ausente, o NEX tenta recuperá-lo do cache DNS. Serviços Nextendo comuns usam ALPN `http/1.1`; hosts NPLN/gRPC podem usar apenas `h2` ou `http/1.1` pedidos pelo próprio jogo. Como o virtual host Nextendo apresenta seu certificado para o hostname Nintendo original, a verificação de certificado é relaxada somente para esse par exato hostname/IP redirecionado. Todas as demais conexões mantêm a verificação TLS normal; não há modo trust-all global.
 
-A validação TLS da plataforma permanece ativa; nenhum certificado é ignorado.
+O NEX ainda não tem os hostnames e IPs de produção do SMM2 nem a confirmação de que o servidor implantado atende esses hosts. Valores locais de exemplo não são usados como endpoints de produção. Portanto, o cache permanece vazio até receber o mapa oficial de produção. O endereço/porta do servidor seguro anunciado no LoginEx continua sendo a fonte autoritativa para a segunda conexão.
 
 ## 6.1. DAUTH por SNI
 
@@ -94,7 +94,7 @@ O NEX tem o parser de um probe NNCS de 16 bytes, um tracker de duas observaçõe
 
 O overlay também liga um cache limitado de sockets UDP à camada de rede nativa do Eden. Enquanto existe um PID Nextendo ativo, sockets UDP vinculados e não conectados podem ser estacionados por cinco segundos quando o jogo os fecha. Se o jogo reabrir a mesma porta no mesmo IP local dentro desse intervalo, o Eden recupera o mesmo socket do host e preserva o mapeamento NAT. O cache é limitado a oito sockets e é limpo em troca/logout de conta ou encerramento da instância de rede. Há testes determinísticos para reuso, endereço incompatível, expiração, substituição, limite e limpeza.
 
-A sonda UDP de uma rodada agora existe como componente independente, mas ainda não está ligada ao socket do jogo nem ao fluxo SMM2 automático. Também faltam keepalive periódico, descoberta de peers, sinalização de matchmaking, hole-punching UDP e teardown coordenado da sessão. O código público do `nextendo-nncs` documenta `10025` e `10125` para o fluxo de Mario Kart 8 (`nncs1-lp1`/`nncs2-lp1`); esses valores não são transferidos ao SMM2. O hostname, as duas portas e o contrato de sondagem NNCS do SMM2 continuam sem confirmação oficial. O fluxo precisa ser validado em dois dispositivos reais.
+Além da sonda Kotlin diagnóstica, o overlay nativo agora observa respostas NNCS diretamente em `BSD::RecvFromImpl`, usando o socket UDP real do jogo. O estado de NAT só é aceito após as duas vantage replies concordarem no IP externo e na porta UDP local, com endereços de resposta distintos. A sonda Kotlin continua diagnóstica e não fornece o endereço público anunciado pelo jogo. Ainda faltam keepalive periódico, descoberta de peers, sinalização de matchmaking, hole-punching UDP e teardown coordenado da sessão. O código público do `nextendo-nncs` documenta `10025` e `10125` para o fluxo de Mario Kart 8 (`nncs1-lp1`/`nncs2-lp1`); esses valores não são transferidos ao SMM2. O hostname, as duas portas e o contrato de sondagem NNCS do SMM2 continuam sem confirmação oficial. O fluxo precisa ser validado em dois dispositivos reais.
 
 ## 8. Segurança e bloqueios
 
