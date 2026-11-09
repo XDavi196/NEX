@@ -7,6 +7,7 @@ import argparse
 import shutil
 import subprocess
 from pathlib import Path
+from apply_eden_multiplayer import apply as apply_eden_multiplayer
 
 EXPECTED_EDEN_COMMIT = "8e373eb714aa01117ec885680477501cdb572112"
 NEX_SOURCE = Path(__file__).resolve().parents[1]
@@ -2089,6 +2090,8 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         raise RuntimeError("Could not identify EmulationActivity lifecycle callbacks")
     activity_text = activity_text.replace(lifecycle_anchor, lifecycle_replacement, 1)
     emulation_activity.write_text(activity_text, encoding="utf-8")
+
+    apply_eden_multiplayer(eden)
 
     print(f"NEX overlay applied successfully to Eden {commit}")
     print(f"Android applicationId: com.nex.nx")
