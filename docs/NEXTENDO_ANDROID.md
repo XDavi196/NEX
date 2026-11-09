@@ -108,7 +108,11 @@ The BAAS side now has a JWT builder and an \`AuthenticationInfo\` DataHolder enc
 
 See [the detailed SMM2 BAAS and PRUDP profile](NEXTENDO_SMM2_PROFILE.md).
 
-## Cloud-save status
+## Account-management scope and cloud-save status
+
+The Developer Documentation describes a `profil` scope for profile data but also states that account management and console linking are reserved to official Nextendo applications. NEX's profile edit/import actions therefore remain gated by live authorization; the existence of a public route in the repository is not proof that the third-party Client ID can use it.
+
+Cloud-save status
 
 Nextendo's current Cloud Saves guide says the service was removed in September 2026. The NEX transfer screen no longer offers cloud-save upload or download. The BCAT seed endpoint is separate; it remains a schedule-data download, not a cloud-save backup.
 
