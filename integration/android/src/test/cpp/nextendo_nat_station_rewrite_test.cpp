@@ -108,8 +108,9 @@ bool TestSupportedMethods() {
     constexpr std::string_view station =
         "prudp:/address=192.168.1.20;port=1234;natf=1;natm=1";
     constexpr IPv4 public_ip{8, 8, 8, 8};
-    constexpr std::array<std::pair<std::uint8_t, std::uint32_t>, 5> methods{{
-        {0x0B, 0x01}, {0x0B, 0x07}, {0x6D, 0x26}, {0x6D, 0x27}, {0x6D, 0x28}
+    constexpr std::array<std::pair<std::uint8_t, std::uint32_t>, 6> methods{{
+        {0x0B, 0x01}, {0x0B, 0x04}, {0x0B, 0x07},
+        {0x6D, 0x26}, {0x6D, 0x27}, {0x6D, 0x28}
     }};
     for (const auto& [protocol, method] : methods) {
         const auto input = BuildFrame(protocol, method, station);
