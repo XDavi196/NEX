@@ -25,6 +25,20 @@ def apply(eden: Path) -> None:
     )
     replace_once(
         bsd_header,
+        "#include <memory>\n",
+        "#include <map>\n#include <memory>\n",
+        "socket option map include",
+    )
+    replace_once(
+        bsd_header,
+        "        bool is_connection_based = false;\n    };",
+        "        bool is_connection_based = false;\n"
+        "        std::map<std::pair<u32, u32>, std::vector<u8>> feigned_opts;\n"
+        "    };",
+        "saved socket options field",
+    )
+    replace_once(
+        bsd_header,
         "    void SendTo(HLERequestContext& ctx);\n",
         "    void SendTo(HLERequestContext& ctx);\n"
         "    void RecvMMsg(HLERequestContext& ctx);\n"
@@ -38,6 +52,18 @@ def apply(eden: Path) -> None:
         '        {29, &BSD::RecvMMsg, "RecvMMsg"}, //3.0.0+\n'
         '        {30, &BSD::SendMMsg, "SendMMsg"}, //3.0.0+',
         "MMsg command registration",
+    )
+
+    replace_once(
+        bsd_cpp,
+        "std::pair<s32, Errno> BSD::SocketImpl(Domain domain, Type type, Protocol protocol) {\n\n",
+        "std::pair<s32, Errno> BSD::SocketImpl(Domain domain, Type type, Protocol protocol) {\n"
+        "    // Eden's backend is IPv4-only; fail cleanly so NPLN can retry IPv4 after IPv6.\n"
+        "    if (domain != Domain::INET && domain != Domain::Unspecified) {\n"
+        "        LOG_WARNING(Service, \\"[NEX] Unsupported socket domain={}, returning EAFNOSUPPORT\\", static_cast<u32>(domain));\n"
+        "        return {-1, Errno::AFNOSUPPORT};\n"
+        "    }\n\n",
+        "IPv6 fallback for sockets",
     )
 
     helper_anchor = """template <typename T>
@@ -167,6 +193,118 @@ std::vector<u8> ReadMMsgBuffer(HLERequestContext& ctx) {
 
 } // Anonymous namespace"""
     replace_once(bsd_cpp, helper_anchor, helper, "MMsg parser/serializer")
+
+    def replace_function(path: Path, signature: str, next_signature: str, body: str, label: str) -> None:
+        source = path.read_text(encoding="utf-8")
+        start = source.find(signature)
+        if start < 0:
+            raise RuntimeError(f"{path}: missing {label} function")
+        end = source.find(next_signature, start + len(signature))
+        if end < 0:
+            raise RuntimeError(f"{path}: missing end marker for {label}")
+        path.write_text(source[:start] + body + source[end:], encoding="utf-8")
+
+    replace_function(
+        bsd_cpp,
+        "Errno BSD::GetSockOptImpl(",
+        "Errno BSD::SetSockOptImpl(",
+        """Errno BSD::GetSockOptImpl(s32 fd, u32 level, OptName optname, std::vector<u8>& optval) {
+    if (!IsFileDescriptorValid(fd)) return Errno::BADF;
+    if (!file_descriptors[fd]->socket) return Errno::BADF;
+
+    Network::SocketBase* const socket = file_descriptors[fd]->socket.get();
+    if (level == static_cast<u32>(SocketLevel::SOCKET) && optname == OptName::ERROR_) {
+        auto [pending_err, getsockopt_err] = socket->GetPendingError();
+        if (getsockopt_err == Network::Errno::SUCCESS) {
+            const Errno translated_pending_err = Translate(pending_err);
+            if (optval.size() != sizeof(Errno)) return Errno::INVAL;
+            optval.resize(sizeof(Errno));
+            PutValue(optval, translated_pending_err);
+        }
+        return Translate(getsockopt_err);
+    }
+
+    const auto key = std::make_pair(level, static_cast<u32>(optname));
+    const auto& saved = file_descriptors[fd]->feigned_opts;
+    if (const auto it = saved.find(key); it != saved.end()) {
+        const std::size_t count = (std::min)(optval.size(), it->second.size());
+        std::fill(optval.begin(), optval.end(), u8{0});
+        std::copy_n(it->second.begin(), count, optval.begin());
+        return Errno::SUCCESS;
+    }
+    std::fill(optval.begin(), optval.end(), u8{0});
+    return Errno::SUCCESS;
+}
+
+""",
+        "DEN2-compatible GetSockOpt",
+    )
+    replace_function(
+        bsd_cpp,
+        "Errno BSD::SetSockOptImpl(",
+        "Errno BSD::ShutdownImpl(",
+        """Errno BSD::SetSockOptImpl(s32 fd, u32 level, OptName optname, std::span<const u8> optval) {
+    if (!IsFileDescriptorValid(fd)) return Errno::BADF;
+    if (!file_descriptors[fd]->socket) return Errno::BADF;
+
+    FileDescriptor& descriptor = *file_descriptors[fd];
+    Network::SocketBase* const socket = descriptor.socket.get();
+    const auto key = std::make_pair(level, static_cast<u32>(optname));
+    const auto remember = [&] {
+        descriptor.feigned_opts[key] = std::vector<u8>(optval.begin(), optval.end());
+    };
+
+    if (level != static_cast<u32>(SocketLevel::SOCKET) ||
+        static_cast<u32>(optname) == 0x80000001) {
+        remember();
+        return Errno::SUCCESS;
+    }
+
+    if (optname == OptName::LINGER) {
+        if (optval.size() != sizeof(Linger)) return Errno::INVAL;
+        const auto linger = GetValue<Linger>(optval);
+        if (linger.onoff != 0 && linger.onoff != 1) return Errno::INVAL;
+        remember();
+        return Translate(socket->SetLinger(linger.onoff != 0, linger.linger));
+    }
+
+    if (optval.size() != sizeof(u32)) {
+        remember();
+        return Errno::SUCCESS;
+    }
+    const u32 value = GetValue<u32>(optval);
+    switch (optname) {
+    case OptName::REUSEADDR:
+        remember();
+        return Translate(socket->SetReuseAddr(value != 0));
+    case OptName::KEEPALIVE:
+        remember();
+        return Translate(socket->SetKeepAlive(value != 0));
+    case OptName::BROADCAST:
+        remember();
+        return Translate(socket->SetBroadcast(value != 0));
+    case OptName::SNDBUF:
+        remember();
+        return Translate(socket->SetSndBuf(value));
+    case OptName::RCVBUF:
+        remember();
+        return Translate(socket->SetRcvBuf(value));
+    case OptName::SNDTIMEO:
+        remember();
+        return Translate(socket->SetSndTimeo(value));
+    case OptName::RCVTIMEO:
+        remember();
+        return Translate(socket->SetRcvTimeo(value));
+    case OptName::NOSIGPIPE:
+    default:
+        remember();
+        return Errno::SUCCESS;
+    }
+}
+
+""",
+        "DEN2-compatible SetSockOpt",
+    )
 
     methods_anchor = "void BSD::DuplicateSocket(HLERequestContext& ctx) {"
     methods = """void BSD::SendMMsg(HLERequestContext& ctx) {
