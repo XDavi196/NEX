@@ -2,6 +2,8 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <cctype>
 #include <cstddef>
 #include <mutex>
@@ -21,6 +23,15 @@ struct Entry {
 };
 
 inline std::vector<Entry> cache_entries;
+
+struct ResolvedRoute {
+    std::string hostname;
+    std::string ipv4;
+    std::uint16_t port{};
+};
+
+inline constexpr std::size_t MaxResolvedRoutes = 64;
+inline std::vector<ResolvedRoute> resolved_routes;
 
 inline std::optional<std::string> NormalizeHostname(const std::string& value) {
     if (value.empty() || value.size() > MaxHostnameBytes) {
@@ -96,6 +107,25 @@ inline bool IsValidIpv4(const std::string& value) {
     return parts == 4;
 }
 
+inline std::optional<std::array<std::uint8_t, 4>> ParseIpv4Address(const std::string& value) {
+    if (!IsValidIpv4(value)) {
+        return std::nullopt;
+    }
+    std::array<std::uint8_t, 4> result{};
+    std::size_t offset = 0;
+    for (std::size_t part = 0; part < result.size(); ++part) {
+        const auto separator = value.find('.', offset);
+        const auto end = separator == std::string::npos ? value.size() : separator;
+        unsigned int octet = 0;
+        for (std::size_t i = offset; i < end; ++i) {
+            octet = octet * 10U + static_cast<unsigned int>(value[i] - '0');
+        }
+        result[part] = static_cast<std::uint8_t>(octet);
+        offset = end + 1;
+    }
+    return result;
+}
+
 /** Adds/replaces one exact hostname mapping. Wildcards and hostnames-as-targets are rejected. */
 inline bool Set(const std::string& supplied_hostname, const std::string& ipv4) {
     const auto hostname = NormalizeHostname(supplied_hostname);
@@ -107,6 +137,13 @@ inline bool Set(const std::string& supplied_hostname, const std::string& ipv4) {
     const auto found = std::find_if(cache_entries.begin(), cache_entries.end(),
         [&hostname](const Entry& entry) { return entry.hostname == *hostname; });
     if (found != cache_entries.end()) {
+        if (found->ipv4 != ipv4) {
+            const auto hostname = found->hostname;
+            resolved_routes.erase(
+                std::remove_if(resolved_routes.begin(), resolved_routes.end(),
+                    [&hostname](const ResolvedRoute& entry) { return entry.hostname == hostname; }),
+                resolved_routes.end());
+        }
         found->ipv4 = ipv4;
         return true;
     }
@@ -128,10 +165,83 @@ inline std::optional<std::string> Resolve(const std::string& supplied_hostname) 
         [&hostname](const Entry& entry) { return entry.hostname == *hostname; });
     return found == cache_entries.end() ? std::nullopt : std::optional<std::string>{found->ipv4};
 }
+/**
+ * Record the address/port returned for an exact configured redirect. This
+ * bounded reverse table supports TLS SNI recovery and lost-IP BSD connects.
+ */
+inline void RecordResolved(const std::string& supplied_hostname, const std::string& ipv4,
+                           std::uint16_t port) {
+    const auto hostname = NormalizeHostname(supplied_hostname);
+    if (!hostname || !IsValidIpv4(ipv4)) {
+        return;
+    }
+    std::lock_guard lock{cache_mutex};
+    const auto configured = std::find_if(cache_entries.begin(), cache_entries.end(),
+        [&hostname](const Entry& entry) { return entry.hostname == *hostname; });
+    if (configured == cache_entries.end() || configured->ipv4 != ipv4) {
+        return;
+    }
+    resolved_routes.erase(
+        std::remove_if(resolved_routes.begin(), resolved_routes.end(),
+            [&hostname, &ipv4, port](const ResolvedRoute& entry) {
+                return entry.hostname == *hostname && entry.ipv4 == ipv4 && entry.port == port;
+            }),
+        resolved_routes.end());
+    if (resolved_routes.size() >= MaxResolvedRoutes) {
+        resolved_routes.erase(resolved_routes.begin(),
+                              resolved_routes.begin() + static_cast<std::ptrdiff_t>(
+                                  resolved_routes.size() - MaxResolvedRoutes + 1));
+    }
+    resolved_routes.push_back(ResolvedRoute{*hostname, ipv4, port});
+}
+
+/** Return a hostname only when the peer endpoint maps unambiguously to one redirect. */
+inline std::optional<std::string> HostnameForPeer(const std::string& ipv4, std::uint16_t port) {
+    std::lock_guard lock{cache_mutex};
+    std::optional<std::string> match;
+    for (auto it = resolved_routes.rbegin(); it != resolved_routes.rend(); ++it) {
+        if (it->ipv4 != ipv4 || it->port != port || port == 0) {
+            continue;
+        }
+        if (match && *match != it->hostname) {
+            return std::nullopt;
+        }
+        match = it->hostname;
+    }
+    if (match) {
+        return match;
+    }
+    // GetHostByName provides no service port; fall back only for an unambiguous IP.
+    for (const auto& entry : resolved_routes) {
+        if (entry.ipv4 != ipv4) {
+            continue;
+        }
+        if (match && *match != entry.hostname) {
+            return std::nullopt;
+        }
+        match = entry.hostname;
+    }
+    return match;
+}
+
+/** Recover a DNS-redirected IPv4 when the guest keeps only the service port. */
+inline std::optional<std::array<std::uint8_t, 4>> ResolveIpv4ForPort(std::uint16_t port) {
+    if (port == 0) {
+        return std::nullopt;
+    }
+    std::lock_guard lock{cache_mutex};
+    for (auto it = resolved_routes.rbegin(); it != resolved_routes.rend(); ++it) {
+        if (it->port == port) {
+            return ParseIpv4Address(it->ipv4);
+        }
+    }
+    return std::nullopt;
+}
 
 inline void Clear() {
     std::lock_guard lock{cache_mutex};
     cache_entries.clear();
+    resolved_routes.clear();
 }
 
 inline std::size_t Size() {
