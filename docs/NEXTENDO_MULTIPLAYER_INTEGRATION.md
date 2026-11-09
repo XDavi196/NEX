@@ -19,7 +19,9 @@ The OAuth session, game-facing `nx2.` token, account friends API and OAuth prese
 
 ### Exact-host DNS and TLS
 
-The account network settings accept the main Nextendo server IPv4 and a separate NAT-vantage IPv4 supplied by the service operator. Those values are encrypted at rest. Eden's guest DNS resolver redirects only explicitly configured hostnames; the original hostname remains available for TLS SNI and normal certificate/hostname verification. The implementation does not use wildcard Nintendo DNS redirects or a trust-all TLS mode.
+The account network settings accept the main Nextendo server IPv4 and a separate NAT-vantage IPv4 supplied by the service operator. Those values are encrypted at rest. Eden's guest DNS resolver redirects only explicitly configured hostnames and preserves the original canonical hostname. For each successful redirected resolution, NEX records the exact host/IP/service-port tuple in a bounded cache. BSD connect can recover the resolved IPv4 when a title later zeroes the destination address but keeps the service port.
+
+At TLS handshake, NEX checks that the connected peer IP matches an exact configured redirect. It preserves the game's SNI when present and restores it from the DNS cache only when it is absent. Normal redirected service hosts negotiate HTTP/1.1; NPLN/gRPC hosts may retain only the game's requested `h2` or `http/1.1` protocols. Because the Nextendo virtual host serves its own certificate for the original Nintendo hostname, certificate verification is relaxed only for an exact, user-configured NEX redirect whose peer IP matches the route. All non-redirected connections retain the stock TLS verification. There is no wildcard DNS redirect or global trust-all TLS mode.
 
 ### NNCS observation from the real guest socket
 
