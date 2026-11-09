@@ -6,7 +6,7 @@ This document describes the code present in the NEX branch and separates it from
 
 ## NEX public client identity
 
-- Nextendo public Client ID: \`nxc_yAdR-14bOEq7\`
+- Configured Nextendo public Client ID: `nxc_yAdR-14bOEq7` (production registration and attestation permission must be confirmed by Nextendo)
 - Android application ID: \`com.nex.nx\`
 - Redirect URI: \`com.nex.nx://oauth/callback\`
 - Requested scopes (matching the owner's generated portal URL): `identity friends presence profil game.matchmaking emulator.status`
@@ -33,7 +33,7 @@ The current NEX client uses these routes:
 | Remove friend | POST /api/friends/remove | nx2 game token + target pid |
 | App/game presence | \`POST /api/presence\` | OAuth access token with \`presence\` |
 
-Every REST request made by \`NextendoAuthClient\` carries the NEX Client ID header. Player-protected requests also carry the appropriate Bearer credential.
+Every REST request made by `NextendoAuthClient` carries the configured NEX Client ID header. The current code does not yet add the cryptographic client-attestation signature described by the official Ryujinx-Nextendo v1.8.7 security update; this requires a NEX-issued credential and a documented signing contract.
 
 The sign-in coordinator generates a new PKCE verifier, S256 challenge and state for each authorization. It saves the pending transaction using the Android Keystore-backed session store before opening the browser. The callback validates the NEX scheme, host and path, then exchanges the one-time code. OAuth access tokens and the separate game token are stored as different credential types.
 
@@ -104,9 +104,13 @@ NEX now owns a testable PRUDP-Lite client and WebSocket transport layer:
 
 The BAAS side now has a JWT builder and an \`AuthenticationInfo\` DataHolder encoder for the \`LoginEx.extraData\` field. Unit tests cover the public title profile, StationURL parsing, the \`nnex\` binding and local serialization. They do not prove acceptance by a live Nextendo service.
 
-**Not yet connected to a live title:** game BAAS/ACC authentication is blocked by the Nextendo founder's explicit refusal of client-generated signing keys and third-party RS256 tokens. NEX needs a new server-issued or otherwise officially approved game-authentication mechanism before LoginEx can proceed. It also needs the original SMM2 auth hostname and its DNS/TLS route, plus the secure CONNECT ticket/check payload that follows a successful LoginEx. The title key above is public, but it is not a substitute for a server-issued ticket. Complete SMM2 RMC arguments, retry policy, matchmaking and NAT/P2P lifecycle also remain unfinished.
+**Not yet connected to a live title:** NEX now contains the Citron BAAS token format and a PEM import path, but no authorized Nextendo signing PEM has been provisioned or verified for NEX. The code never generates a replacement private key and never falls back to OAuth in `nnex`. A matching public JWKS entry alone does not confirm server-side acceptance. Separately, client attestation is not implemented: the client currently sends the Client ID header but no signed application proof. Nextendo must register/authorize NEX and issue its own attestation credential/contract before protected online calls can be relied on. After that, LoginEx, secure CONNECT ticket/check payload, live SMM2 StationURL, complete RMC matchmaking and NAT/P2P still need end-to-end validation.
 
 See [the detailed SMM2 BAAS and PRUDP profile](NEXTENDO_SMM2_PROFILE.md).
+
+## Cloud-save status
+
+Nextendo's current Cloud Saves guide says the service was removed in September 2026. The NEX transfer screen no longer offers cloud-save upload or download. The BCAT seed endpoint is separate; it remains a schedule-data download, not a cloud-save backup.
 
 ## NAT and P2P
 
@@ -114,7 +118,7 @@ NEX now reads NNCS responses from the game's real emulated BSD UDP socket, not f
 
 The SSL-layer Station URL rewriter adapts the DEN2 behavior for outbound SecureConnection Register/ReplaceURL and MatchmakeExtension Create/Join/AutoMatchmake RMC requests. It changes only a private station `address=` with nonzero `natf`, retains the port and other parameters, rebuilds the length fields, and keeps the rewritten TLS write buffer stable across non-blocking retries. It does not rewrite inbound peer Station URLs because substituting this client's own public IP for a remote peer would be incorrect.
 
-`NextendoNatProbeClient` remains a separate diagnostic harness; it is not called by the app's network settings and must not be used to set the guest game's NAT mapping. The observed NNCS source ports and message layout are based on DEN2 and still need confirmation against the live SMM2 deployment. NEX does not yet implement periodic NNCS keepalives, peer discovery, matchmaking signaling, UDP hole-punching or live two-device P2P cleanup tests.
+`NextendoNatProbeClient` remains a separate diagnostic harness; it is not called by the app's network settings and must not be used to set the guest game's NAT mapping. The observed NNCS source ports and message layout are based on DEN2 and still need confirmation against the live SMM2 deployment. NEX does not yet implement periodic NNCS keepalives, peer discovery, matchmaking signaling, UDP hole-punching or live two-device P2P cleanup tests. The public Nextendo compatibility page currently marks SMM2 v3.0.3 as Experimental (70%) with matchmaking and presence untested.
 
 ## BAAS / ACC game authentication
 
