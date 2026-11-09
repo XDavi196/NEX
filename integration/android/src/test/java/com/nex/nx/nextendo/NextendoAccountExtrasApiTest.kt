@@ -98,6 +98,14 @@ class NextendoAccountExtrasApiTest {
     }
 
     @Test
+    fun parsesPublicGalleryIdsAndRejectsUnsafeOrDuplicateEntries() {
+        val ids = NextendoAccountExtrasApi.parseGalleryAvatarIds(
+            """{"avatars":["avatar_01","switch-02","../secrets","with space","avatar_01","123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890","not-a-number"]}"""
+        )
+        assertEquals(listOf("avatar_01", "switch-02"), ids)
+    }
+
+    @Test
     fun bcatHashUsesLowercaseSha256Hex() {
         assertEquals(
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
