@@ -255,7 +255,7 @@ object NextendoAuthClient {
             url = "$BASE_URL$path",
             method = "POST",
             headers = mapOf(
-                "Authorization" to "Bearer $accessToken",
+                "Authorization" to "Bearer $gameToken",
                 "Content-Type" to "application/json; charset=utf-8"
             ),
             body = json.toString().toByteArray(StandardCharsets.UTF_8)
