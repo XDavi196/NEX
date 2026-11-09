@@ -1516,37 +1516,6 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         rb.Push<u32>(static_cast<u32>(pids.size()));
     }
 
-    // Mirrors DEN2 and keeps the guest's original 0xC0 AppKeyValueStorage.
-    void UpdateUserPresence(HLERequestContext& ctx) {
-        if (ctx.CanReadBuffer() &&
-            ctx.GetReadBufferSize() >= sizeof(NextendoGuestPresenceImpl)) {
-            NextendoGuestPresenceImpl presence{};
-            std::memcpy(&presence, ctx.ReadBuffer().data(), sizeof(presence));
-            auto app_field = presence.app_key_value;
-            const bool nat_confirmed =
-                Common::NextendoNatStationRewrite::GetObservedExternalIPv4().has_value();
-            const auto normalized = Common::NextendoPresenceHle::NormalizePresence(
-                presence.status, app_field, nat_confirmed);
-            Common::NextendoFriendCache::SetLocalPresence(normalized.status, app_field);
-            if (normalized.private_battle_in_game_fixed) {
-                LOG_INFO(Service_Friend,
-                         "[NEX Nextendo] Private battle InGame flag enabled after NAT confirmation");
-            }
-            if (normalized.arms_session_active) {
-                LOG_INFO(Service_Friend,
-                         "[NEX Nextendo] ARMS JoinMode indicates an active session");
-            }
-            LOG_INFO(Service_Friend,
-                     "[NEX Nextendo] Captured guest presence status={} appFieldBytes={}",
-                     normalized.status, app_field.size());
-        } else {
-            LOG_WARNING(Service_Friend,
-                        "[NEX Nextendo] UpdateUserPresence received no valid 0xE0 presence buffer");
-        }
-        IPC::ResponseBuilder rb{ctx, 2};
-        rb.Push(ResultSuccess);
-    }
-
     void UpdateFriendInfo(HLERequestContext& ctx) {
         IPC::RequestParser rp{ctx};
         [[maybe_unused]] const auto uuid = rp.PopRaw<Common::UUID>();
@@ -1636,6 +1605,43 @@ void RespondNextendoFriendDetails(HLERequestContext& ctx, const char* label) {
         "    void CheckFriendListAvailability(HLERequestContext& ctx) {",
         new_handlers + "    void CheckFriendListAvailability(HLERequestContext& ctx) {",
     )
+
+    update_user_presence_stub = """    void UpdateUserPresence(HLERequestContext& ctx) {
+        // Stub used by Retro City Rampage
+        LOG_WARNING(Service_Friend, "(STUBBED) called");
+        IPC::ResponseBuilder rb{ctx, 2};
+        rb.Push(ResultSuccess);
+    }"""
+    update_user_presence_handler = """    void UpdateUserPresence(HLERequestContext& ctx) {
+        if (ctx.CanReadBuffer() &&
+            ctx.GetReadBufferSize() >= sizeof(NextendoGuestPresenceImpl)) {
+            NextendoGuestPresenceImpl presence{};
+            std::memcpy(&presence, ctx.ReadBuffer().data(), sizeof(presence));
+            auto app_field = presence.app_key_value;
+            const bool nat_confirmed =
+                Common::NextendoNatStationRewrite::GetObservedExternalIPv4().has_value();
+            const auto normalized = Common::NextendoPresenceHle::NormalizePresence(
+                presence.status, app_field, nat_confirmed);
+            Common::NextendoFriendCache::SetLocalPresence(normalized.status, app_field);
+            if (normalized.private_battle_in_game_fixed) {
+                LOG_INFO(Service_Friend,
+                         "[NEX Nextendo] Private battle InGame flag enabled after NAT confirmation");
+            }
+            if (normalized.arms_session_active) {
+                LOG_INFO(Service_Friend,
+                         "[NEX Nextendo] ARMS JoinMode indicates an active session");
+            }
+            LOG_INFO(Service_Friend,
+                     "[NEX Nextendo] Captured guest presence status={} appFieldBytes={}",
+                     normalized.status, app_field.size());
+        } else {
+            LOG_WARNING(Service_Friend,
+                        "[NEX Nextendo] UpdateUserPresence received no valid 0xE0 presence buffer");
+        }
+        IPC::ResponseBuilder rb{ctx, 2};
+        rb.Push(ResultSuccess);
+    }"""
+    replace_once(friend_cpp, update_user_presence_stub, update_user_presence_handler)
 
     replace_once(
         friend_cpp,
