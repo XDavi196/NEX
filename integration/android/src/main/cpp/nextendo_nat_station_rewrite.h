@@ -108,8 +108,7 @@ inline bool ObserveNncsReply(std::uint8_t vantage, std::uint16_t source_port,
 
     const IPv4 address{response[8], response[9], response[10], response[11]};
     const IPv4 responder{response[12], response[13], response[14], response[15]};
-    if (IsPrivateOrReserved(address) || responder == IPv4{0, 0, 0, 0} ||
-        responder == IPv4{255, 255, 255, 255}) {
+    if (IsPrivateOrReserved(address) || IsPrivateOrReserved(responder)) {
         return false;
     }
 

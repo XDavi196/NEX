@@ -205,6 +205,12 @@ bool TestNncsReplyCapture() {
     private_address[10] = 1;
     private_address[11] = 20;
     if (ObserveNncsReply(0, 10025, 55000, private_address)) return false;
+    Bytes private_responder = primary;
+    private_responder[12] = 10;
+    private_responder[13] = 0;
+    private_responder[14] = 0;
+    private_responder[15] = 1;
+    if (ObserveNncsReply(0, 10025, 55000, private_responder)) return false;
 
     ClearObservedExternalIPv4();
     Bytes same_responder = primary;
