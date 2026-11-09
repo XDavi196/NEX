@@ -45,6 +45,7 @@ The SSL guest write path rewrites only recognized outbound WebSocket/PRUDP-Lite/
 | RMC protocol | Method | Operation |
 |---|---:|---|
 | SecureConnection `0x0B` | `0x01` | Register |
+| SecureConnection `0x0B` | `0x04` | RegisterEx |
 | SecureConnection `0x0B` | `0x07` | ReplaceURL |
 | MatchmakeExtension `0x6D` | `0x26` | Create |
 | MatchmakeExtension `0x6D` | `0x27` | Join |
@@ -58,9 +59,11 @@ This does not rewrite inbound peer Station URLs. Replacing a remote peer address
 
 The NEX overlay now registers Eden BSD command IDs 29/30 as `RecvMMsg`/`SendMMsg`, using the same in/out buffer layout as DEN2. Messages are dispatched through the normal socket send/receive functions; a receive with a source-address buffer uses `RecvFromImpl`, so the guest-socket NNCS observer remains on the same path. The parser bounds the batch to 64 messages, 16 I/O vectors per message and 8 MiB of payload to reject malformed guest buffers safely.
 
-The previously stubbed `EventFd` command now creates a loopback UDP self-pipe, allowing pollable event notifications used by gRPC/NPLN runtimes. IPv6 socket creation returns `EAFNOSUPPORT` cleanly instead of constructing an invalid socket, so an IPv4 fallback can proceed. Socket options unsupported by Eden are recorded per descriptor and echoed by `getsockopt`; real supported `SOL_SOCKET` options still reach the host socket.
+The previously stubbed `EventFd` command creates a loopback UDP self-pipe; its `Write` enqueues 64-bit values and its `Read` drains and sums them, while only the first read may block. This gives gRPC/NPLN runtimes a pollable wake-up descriptor instead of a fake fd. BSD `Select` is no longer a zero-result stub: the HLE parses the read/write/exception descriptor sets, waits through the native poller and writes the ready sets back to the guest. IPv6 socket creation returns `EAFNOSUPPORT` cleanly so an IPv4 fallback can proceed. Socket options unsupported by Eden are stored per descriptor and echoed by `getsockopt`; supported `SOL_SOCKET` options still reach the host socket.
 
-These are emulator-side compatibility primitives, not proof of a working title session. Compilation and live NPLN validation are still required.
+The Station URL rewriter also recognizes `SecureConnection.RegisterEx` (`0x0B/0x04`) in addition to Register/ReplaceURL and SMM2 Create/Join/AutoMatchmake. All station rewriting remains limited to private addresses with non-zero `natf`, after two valid NNCS vantage replies agree on the public mapping.
+
+These are emulator-side compatibility primitives, not proof of a working title session. Build #407 has passed the overlay and unit-test stages and is still in native Android APK compilation; the newer source revision is queued for its own build. Live NPLN validation and a two-device game test are still required.
  
 ### Friends and presence
 
