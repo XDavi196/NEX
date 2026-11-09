@@ -386,7 +386,8 @@ inline bool TryFixupStationAddress(std::span<const std::uint8_t> input,
     if ((protocol_byte & 0x80U) == 0) return false; // only guest requests have stations
     const std::uint8_t protocol = protocol_byte & 0x7FU;
     const std::uint32_t method = Detail::Read32LE(rmc, 9);
-    const bool secure_connection = protocol == 0x0BU && (method == 0x01U || method == 0x07U);
+    const bool secure_connection =
+        protocol == 0x0BU && (method == 0x01U || method == 0x04U || method == 0x07U);
     const bool matchmake = protocol == 0x6DU &&
         (method == 0x26U || method == 0x27U || method == 0x28U);
     if (!secure_connection && !matchmake) return false;
