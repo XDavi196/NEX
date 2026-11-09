@@ -760,7 +760,6 @@ Java_org_yuzu_yuzu_1emu_NativeLibrary_clearNextendoBaasIdToken(
     replace_once(
         bsd_cpp,
         '#include "core/hle/service/sockets/bsd.h"\n',
-        '#include <array>\n'
         '#include "core/hle/service/sockets/bsd.h"\n'
         '#include "core/hle/service/ssl/nextendo_nat_station_rewrite.h"\n'
         '#include "core/internal_network/nextendo_dns_redirect_cache.h"\n',
