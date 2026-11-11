@@ -11,6 +11,17 @@ def replace_once(path: Path, old: str, new: str, label: str) -> None:
 def apply(eden: Path) -> None:
     bsd_cpp = eden / "src/core/hle/service/sockets/bsd.cpp"
     bsd_header = eden / "src/core/hle/service/sockets/bsd.h"
+    socket_header = eden / "src/core/hle/service/sockets/sockets.h"
+
+    # libnx's Switch BSD errno conversion table maps guest errno 97 to
+    # EAFNOSUPPORT. Eden's reduced enum omits it, so add the ABI value before
+    # the IPv6 socket-domain fallback references Errno::AFNOSUPPORT.
+    replace_once(
+        socket_header,
+        "    INPROGRESS = 115,\n    ISCONN = 106,\n",
+        "    INPROGRESS = 115,\n    AFNOSUPPORT = 97,\n    ISCONN = 106,\n",
+        "Switch BSD EAFNOSUPPORT errno",
+    )
 
     replace_once(
         bsd_cpp, '#include <memory>\n',

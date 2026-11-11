@@ -99,6 +99,9 @@ jobs:
       - name: Verify Nextendo friend IPC dispatch
         working-directory: nex
         run: python3 scripts/test_nextendo_friend_ipc.py ../eden
+      - name: Verify NEX socket errno ABI
+        working-directory: nex
+        run: python3 scripts/test_nextendo_socket_errno.py ../eden
 
       - name: Run NEX native friend-cache tests
         working-directory: nex
