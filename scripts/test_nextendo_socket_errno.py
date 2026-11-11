@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -23,30 +22,23 @@ def main() -> None:
         fail("pinned Eden socket sources are missing")
 
     header = socket_header.read_text(encoding="utf-8")
-    errno_enum = re.search(
-        r"enum class Errno\\s*:\\s*u32\\s*\\{(?P<body>.*?)\\};",
-        header,
-        re.DOTALL,
-    )
-    if errno_enum is None:
-        fail("Service::Sockets::Errno enum was not found")
-
-    values = re.findall(r"\\bAFNOSUPPORT\\s*=\\s*(\\d+)\\s*,?", errno_enum.group("body"))
+    enum_anchor = "enum class Errno : u32 {"
+    if header.count(enum_anchor) != 1:
+        fail("Service::Sockets::Errno enum was not found exactly once")
+    enum_body = header.split(enum_anchor, 1)[1].split("};", 1)[0]
+    errno_entries = [
+        line.strip() for line in enum_body.splitlines() if "AFNOSUPPORT" in line
+    ]
     # libnx nx/source/runtime/devices/convert_errno.c maps Switch BSD errno 97
-    # to EAFNOSUPPORT. Do not substitute the host Linux errno value (97 is
-    # coincidentally also Linux EAFNOSUPPORT) or the FreeBSD libc value (47).
-    if values != ["97"]:
-        fail(f"expected exactly AFNOSUPPORT = 97, found {values!r}")
+    # to EAFNOSUPPORT. The NEX guest-facing enum must use that ABI value.
+    if errno_entries != ["AFNOSUPPORT = 97,"]:
+        fail(f"expected exactly AFNOSUPPORT = 97, found {errno_entries!r}")
 
     source = bsd_cpp.read_text(encoding="utf-8")
-    socket_impl = re.search(
-        r"std::pair<s32,\\s*Errno>\\s+BSD::SocketImpl\\s*\\([^)]*\\)\\s*\\{(?P<body>.*?)\\n\\}",
-        source,
-        re.DOTALL,
-    )
-    if socket_impl is None:
-        fail("BSD::SocketImpl implementation was not found")
-    body = socket_impl.group("body")
+    function_anchor = "std::pair<s32, Errno> BSD::SocketImpl("
+    if source.count(function_anchor) != 1:
+        fail("BSD::SocketImpl implementation was not found exactly once")
+    body = source.split(function_anchor, 1)[1].split("\n}", 1)[0]
     if "domain != Domain::INET && domain != Domain::Unspecified" not in body:
         fail("IPv4/unspecified domain guard is missing")
     if "return {-1, Errno::AFNOSUPPORT};" not in body:
