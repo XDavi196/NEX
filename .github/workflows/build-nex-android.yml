@@ -95,6 +95,9 @@ jobs:
       - name: Apply NEX identity and Nextendo Android integration
         run: |
           python3 nex/scripts/apply-eden-overlay.py eden
+      - name: Verify Nextendo TLS certificate and hostname validation
+        working-directory: nex
+        run: python3 scripts/test_nextendo_tls_verification.py ../eden
 
       - name: Verify Nextendo friend IPC dispatch
         working-directory: nex

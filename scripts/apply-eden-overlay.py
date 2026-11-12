@@ -1195,20 +1195,24 @@ void ClearParkedNextendoUdpSockets() {
                 return record_handshake(CheckOpenSSLErrors());
             }
 
-            // This certificate exception is limited to endpoints in the NEX redirect cache.
-            skip_cert_verification = true;
-            SSL_set_verify(ssl, SSL_VERIFY_NONE, nullptr);
-            SSL_set1_host(ssl, nullptr);
-            SSL_set_hostflags(ssl, 0);
+            // Only the destination IP changes. The original SNI hostname remains the
+            // authenticated TLS identity, even if the guest requested insecure TLS.
+            if (!SSL_set1_host(ssl, redirected_host.c_str())) {
+                LOG_ERROR(Service_SSL,
+                          "[NEX] Could not enable hostname verification for '{}'",
+                          redirected_host);
+                return record_handshake(CheckOpenSSLErrors());
+            }
+            SSL_set_verify(ssl, SSL_VERIFY_PEER, nullptr);
+            skip_cert_verification = false;
             LOG_INFO(Service_SSL,
-                     "[NEX] Redirected TLS host '{}' uses SNI and ALPN '{}'",
+                     "[NEX] Redirected TLS host '{}' uses verified SNI and ALPN '{}'",
                      redirected_host, is_npln ? "game-requested" : "http/1.1");
         }
 
-        SSL_set_verify_result(ssl, X509_V_OK);
         const int ret = SSL_do_handshake(ssl);
 
-        if (!skip_cert_verification) {
+        if (redirected || !skip_cert_verification) {
             const long verify_result = SSL_get_verify_result(ssl);
             if (verify_result != X509_V_OK) {
                 LOG_ERROR(Service_SSL, "SSL cert verification failed because: {}",
