@@ -1,6 +1,6 @@
 # Nextendo multiplayer integration notes
 
-This document describes the current NEX-side adaptation of the networking behavior implemented independently by DEN2 and Citron. It distinguishes code that is now connected to the guest networking stack from the service-side and peer-to-peer work that remains blocked or unverified.
+This document describes NEX-owned networking integration built against public protocol documentation and reproducible protocol observations. Other emulator implementations may be used only as public behavioral references; their credentials, keys, attestations, user tokens and session data are never reused. It distinguishes code connected to the guest networking stack from the service-side and peer-to-peer work that remains blocked or unverified.
 
 ## NEX identity and account boundary
 
@@ -11,7 +11,7 @@ NEX continues to use its own public OAuth client identity:
 - Redirect URI: `com.nex.nx://oauth/callback`
 - Authorization Code + PKCE (S256); no client secret is embedded in the APK.
 
-No DEN2/Citron Client ID, build secret, game token, private key or attestation material is reused. NEX supports an explicit user-selected import of DEN/Citron's nextendo_account.txt; the bearer session is validated with Nextendo and re-encrypted by Android Keystore. NEX continues using its own Client ID for all API requests and requests a fresh game token through that client.
+No DEN2/Citron Client ID, build secret, game token, private key, attestation, OAuth token or session data is imported or reused. NEX signs in only through its own public Client ID and Authorization Code + PKCE flow. An encrypted NEX-format backup may restore a session previously created by NEX.
 
 The OAuth session, game-facing `nx2.` token, account friends API and OAuth presence heartbeat remain separate credential paths. An OAuth access token is not substituted for a game token.
 
@@ -21,7 +21,7 @@ The OAuth session, game-facing `nx2.` token, account friends API and OAuth prese
 
 The account network settings accept the main Nextendo server IPv4 and a separate NAT-vantage IPv4 supplied by the service operator. Those values are encrypted at rest. Eden's guest DNS resolver redirects only explicitly configured hostnames and preserves the original canonical hostname. For each successful redirected resolution, NEX records the exact host/IP/service-port tuple in a bounded cache. BSD connect can recover the resolved IPv4 when a title later zeroes the destination address but keeps the service port.
 
-At TLS handshake, NEX checks that the connected peer IP matches an exact configured redirect. It preserves the game's SNI when present and restores it from the DNS cache only when it is absent. Normal redirected service hosts negotiate HTTP/1.1; NPLN/gRPC hosts may retain only the game's requested `h2` or `http/1.1` protocols. Because the Nextendo virtual host serves its own certificate for the original Nintendo hostname, certificate verification is relaxed only for an exact, user-configured NEX redirect whose peer IP matches the route. All non-redirected connections retain the stock TLS verification. There is no wildcard DNS redirect or global trust-all TLS mode.
+At TLS handshake, NEX checks that the connected peer IP matches an exact configured redirect. It preserves the game's SNI when present and restores it from the DNS cache only when it is absent. Normal redirected service hosts negotiate HTTP/1.1; NPLN/gRPC hosts may retain only the game's requested `h2` or `http/1.1` protocols. Redirected Nextendo connections force certificate-chain verification and hostname verification against the original SNI hostname, even if the guest requested insecure TLS. The NEX overlay does not use SSL_VERIFY_NONE or clear the hostname check. All other connections retain the stock TLS behavior. There is no wildcard DNS redirect or global trust-all TLS mode.
 
 ### NNCS observation from the real guest socket
 

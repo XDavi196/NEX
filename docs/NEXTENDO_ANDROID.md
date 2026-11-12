@@ -12,7 +12,7 @@ This document describes the code present in the NEX branch and separates it from
 - Requested scopes (matching the owner's generated portal URL): `identity friends presence profil game.matchmaking emulator.status`
 - Application identity header: \`X-Nextendo-Client-Id: nxc_yAdR-14bOEq7\`
 
-NEX is a public Android OAuth client. It uses Authorization Code + PKCE (S256); no client secret or bot token is embedded in the APK. NEX does not import another emulator's Client ID, build secret, signing key or attestation material. A player may explicitly import DEN/Citron's nextendo_account.txt session file; its bearer token is validated and re-encrypted locally, while NEX continues to identify every API request with its own Client ID.
+NEX is a public Android OAuth client. It uses Authorization Code + PKCE (S256); no client secret or bot token is embedded in the APK. NEX does not import another emulator's Client ID, build secret, signing key, attestation, OAuth token or session data. Account sign-in is performed only through NEX's own registered Client ID. Only encrypted backups exported by NEX may be restored.
 
 The app owner's current portal-generated URL selects six scopes: `identity friends presence profil game.matchmaking emulator.status`. NEX requests those exact names, including the portal's spelling `profil`. A requested scope is not assumed to be granted: the authorization response's `scope` field remains the source of truth. The meaning and live API contract for `profil` and `emulator.status` still require confirmation; requesting them does not imply that NEX already calls their APIs.
 
@@ -36,20 +36,6 @@ The current NEX client uses these routes:
 Every REST request made by `NextendoAuthClient` carries the configured NEX Client ID header. Presence publishing uses the OAuth access token with the `presence` scope as described by the Developer Documentation; the `nx2.` game token is not sent to `/api/presence`. The current code does not yet add the cryptographic client-attestation signature described by the official Ryujinx-Nextendo v1.8.7 security update; this requires a NEX-issued credential and a documented signing contract.
 
 The sign-in coordinator generates a new PKCE verifier, S256 challenge and state for each authorization. It saves the pending transaction using the Android Keystore-backed session store before opening the browser. The callback validates the NEX scheme, host and path, then exchanges the one-time code. OAuth access tokens and the separate game token are stored as different credential types.
-
-### Importing a DEN/Citron account file
-
-The account panel's **Servidores e backup** section opens the Android document picker for a user-selected `nextendo_account.txt`. The parser accepts DEN's `pid`, `username`, `friend_code`, `token`, optional `refresh_token` and `token_expiry` fields. The access token is checked against `/api/oauth/userinfo`; the PID returned by Nextendo must exactly match the file before the import replaces the current session. The plaintext file is not copied into shared storage or logged. Accepted data is stored in the same AES-GCM / Android Keystore session store as a NEX PKCE login.
-
-The import does **not** import DEN's application Client ID or any local BAAS signing key. The game-facing `nx2.` token is requested again from `/api/nex-token` using NEX's `X-Nextendo-Client-Id`. A capability such as `game.matchmaking` or `presence` is only recorded after the corresponding protected operation succeeds. A refresh token created for another OAuth client may not be redeemable with NEX's Client ID; if it is rejected or expires, sign in through NEX's own browser/PKCE flow.
-
-The current Developer Documentation states:
-
-- OAuth access token lifetime: one hour.
-- OAuth refresh token lifetime: 30 days; successful refresh rotates the token, so NEX persists the full response immediately.
-- Game token lifetime: 24 hours. The token is an opaque \`nx2.\` value and is refreshed by requesting a new game token.
-
-\`NextendoGameTokenParser\` requires the documented \`nx2.\` prefix, positive PID, username and positive \`expires_in\`. It calculates expiry from the response and does not decode or forge the token.
 
 ## Public API contract discrepancy
 
@@ -102,9 +88,9 @@ NEX now owns a testable PRUDP-Lite client and WebSocket transport layer:
 - The RMC envelope codec supports request, success and error messages. Outbound sends are restricted to requests.
 - The SMM2 DataStore protocol identifier 115 and publicly documented method identifiers are recorded in code.
 
-The BAAS side now has a JWT builder and an \`AuthenticationInfo\` DataHolder encoder for the \`LoginEx.extraData\` field. Unit tests cover the public title profile, StationURL parsing, the \`nnex\` binding and local serialization. They do not prove acceptance by a live Nextendo service.
+The BAAS client-side JWT builder, signing-key import and JWK registration path have been removed. The public contract confirms the `nx2.` game token and `nnex` claim, but does not authorize a third-party client-generated RS256 token for NEX. The ACC bridge remains fail-closed and sends no BAAS token.
 
-**Not yet connected to a live title:** NEX now contains the Citron BAAS token format and a PEM import path, but no authorized Nextendo signing PEM has been provisioned or verified for NEX. The code never generates a replacement private key and never falls back to OAuth in `nnex`. A matching public JWKS entry alone does not confirm server-side acceptance. Separately, client attestation is not implemented: the client currently sends the Client ID header but no signed application proof. Nextendo must register/authorize NEX and issue its own attestation credential/contract before protected online calls can be relied on. After that, LoginEx, secure CONNECT ticket/check payload, live SMM2 StationURL, complete RMC matchmaking and NAT/P2P still need end-to-end validation.
+**Not yet connected to a live title:** NEX has no client-side BAAS signer, no imported PEM/JWK and no account-session import from another emulator. The public service contract does not authorize third-party client-generated RS256 tokens or publish a complete NEX signing/attestation contract. NEX therefore keeps the ACC token cache empty. Nextendo must provide an approved NEX game-authentication flow before LoginEx can proceed. Secure CONNECT, the live SMM2 StationURL, matchmaking and NAT/P2P still need end-to-end validation.
 
 See [the detailed SMM2 BAAS and PRUDP profile](NEXTENDO_SMM2_PROFILE.md).
 
@@ -126,18 +112,11 @@ The SSL-layer Station URL rewriter adapts the DEN2 behavior for outbound SecureC
 
 ## BAAS / ACC game authentication
 
-The public Nextendo core's \`authbinding.go\` and \`authbinding_test.go\` now confirm the payload placement: the signed compact JWT is the \`Token\` field of an \`AuthenticationInfo\` DataHolder carried in TicketGranting \`LoginEx.extraData\`. Its payload carries the string-valued \`nnex\` claim with the \`nx2.\` game token; the service also recognizes optional \`tv\`. The public BAAS-JWKS service selects the matching RSA key with \`kid\` and publishes it at the URL carried in the JWS \`jku\` header.
+The official Developer Documentation says the OAuth access token and `nx2.` game token are separate, and that the exact server-issued `nx2.` value belongs in the `nnex` claim of the BAAS token sent with LoginEx. The public Nextendo NEX core extracts `nnex` from a JWT embedded in LoginEx extraData, but does not publish the complete third-party signing contract.
 
-NEX now has:
-- An RS256 JWT builder with provisioned \`kid\` and HTTPS \`jku\`, plus externally supplied \`iss\`, \`aud\` and \`sub\`; it sets the public profile's \`hm=true\` claim and the current \`nnex\` token.
-- An NEX DataHolder encoder for \`AuthenticationInfo\` with the SMM2 NEX server version fields.
-- Unit tests for the token-to-\`nnex\` binding and LoginEx extraData serialization.
+The retired BAAS registration proposal states that third-party client-generated RS256 tokens and per-installation JWK registration are not accepted. NEX has removed the client-side builder, signer, PEM import and JWK registration path. The ACC cache remains empty until Nextendo supplies an approved NEX-specific game-authentication flow, including the exact claims, expiry, PID binding, signing and attestation contract.
 
-**Still not provisioned or wired:** the NEX-specific RSA private key, its registered public JWK, the issuer/audience/subject mapping, any required client-attestation material, and the Eden ACC/LoginEx lifecycle hook. The code uses test signers in unit tests only; it does not invent a production key or token.
-
-The BAAS JWT belongs in LoginEx extraData, **not** in the PRUDP CONNECT packet. Secure CONNECT happens after LoginEx and requires the issued Kerberos ticket plus the encrypted check request. The generic PRUDP session does not yet construct that payload.
-
-No BAAS JWT or attestation is fabricated. The ACC HLE identity bridge must not be treated as completed game authentication.
+No BAAS JWT or attestation is fabricated. The ACC HLE bridge is not completed game authentication.
 
 ## DNS, TLS and SNI
 
@@ -169,14 +148,10 @@ When title routing is implemented, it must preserve the original hostname for SN
 The launcher uses NEX adaptive-icon resources with the original artwork inset in the Android safe area; Android applies its launcher mask. The Games header uses Eden's original MaterialTextView title and displays the text `NEX`, not a large image. The fragment-wide glass treatment has been removed. Buttons, bars, switches and panels keep Eden's original Material styling.
 
 
-## BAAS signing boundary — Citron profile implemented; production authorization blocked
+## BAAS signing boundary — disabled pending an official NEX contract
 
-NEX has a Citron-compatible BAAS path in code: `NextendoCitronBaasSigner` parses an operator-supplied RSA PEM, `NextendoCitronBaasProfile` creates the Citron claim set, and `NextendoBaasRuntime` verifies the derived public modulus/exponent against the live Nextendo JWKS before encrypting the PEM with Android Keystore. On process restart, it revalidates the stored key. No private key is bundled, generated as a fallback, copied from another emulator, or accepted without a live JWKS match. The BAAS JWT is cached to Eden ACC only when both the signer and a valid server-issued `nx2.` token are present.
+NEX does not ship a Citron/DEN BAAS profile, client-side RS256 signer, imported PEM, generated JWK registration request or account-file import. `NextendoBaasRuntime` clears the Eden ACC token cache and reports `nex_baas_contract_not_provisioned` while the approved NEX game-authentication flow is unavailable. Legacy BAAS PEM fields from earlier experimental builds are removed from the encrypted session store.
 
-This is a protocol implementation, not proof of production authorization. NEX does not currently possess an operator-authorized BAAS PEM, and Nextendo has not confirmed in this integration that the fixed Citron `kid=nextendo-baas-key-1` identity may be used with NEX's configured public Client ID. A matching JWKS entry proves only that the public key is published; it does not prove that the account gateway or game server accepts NEX's token. The earlier Nextendo response about rejecting third-party client-generated BAAS keys and refusing per-installation JWK registration remains an external blocker. Do not import or distribute an unapproved PEM and do not copy DEN/Citron local fallback keys.
+The official v1.8.7 client-attestation requirement remains separate from BAAS. NEX sends its own public Client ID header but has no NEX-issued cryptographic attestation credential or documented signing contract. Nextendo must explicitly authorize the NEX client and provide the required attestation flow, if one applies to public Android clients.
 
-The official v1.8.7 client-attestation requirement is a separate blocker from BAAS. NEX currently sends its Client ID header but has no NEX-issued cryptographic attestation credential or documented signing contract. The registration portal is currently limited to the Nextendo team; Nextendo must confirm that this Client ID is registered/allowed and issue or authorize the required NEX-specific attestation path. No official Ryujinx/Citron private key, client secret or attestation material may be reused.
-
-Even after those credentials are authorized, the live title path still needs validation: the ACC hook must deliver the signed JWT in `LoginEx.extraData`, the auth service must accept LoginEx and issue its ticket/StationURL, and the secure client must complete CONNECT using the service-issued ticket plus encrypted check request. The current PRUDP harness and DataHolder codec do not prove those live steps.
-
-The BAAS JWT belongs in LoginEx extraData, not in the PRUDP CONNECT packet. Secure CONNECT happens after LoginEx and requires the ticket issued by the service plus the encrypted check request.
+Even after that authorization, the live title path must be validated: the approved credential must reach the guest ACC/LoginEx flow, the auth service must accept LoginEx and issue a ticket/StationURL, and the secure client must complete CONNECT using the service-issued ticket and encrypted check request. The current PRUDP harness does not prove those live steps.

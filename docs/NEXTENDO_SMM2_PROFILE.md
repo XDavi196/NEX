@@ -4,26 +4,15 @@ Updated: 8 November 2026.
 
 This document separates values confirmed in the public SMM2 server source from deployment values that must be discovered at runtime. It does not claim that NEX is already connected to the live service.
 
-## BAAS id_token for NEX
+## BAAS and LoginEx readiness
 
-The public Nextendo core confirms the login placement:
+The official Developer Documentation confirms that the OAuth access token is not a game credential: NEX must request `game.matchmaking`, obtain the server-issued `nx2.` token, and bind that exact token as the string-valued `nnex` claim in the BAAS token used for LoginEx. The public [Nextendo NEX core](https://github.com/NextendoNetwork/nextendo-nex/blob/main/authbinding.go) confirms extraction of `nnex` from a JWT embedded in LoginEx extraData.
 
-1. NEX obtains a fresh `nx2.` game token from the documented game-token endpoint. The OAuth access token is not a game token.
-2. NEX signs a compact BAAS `id_token` with RS256.
-3. The JWT payload contains the string claim `nnex`, whose value is the exact server-issued `nx2.` token.
-4. The JWS header carries the provisioned `kid` and HTTPS `jku`; the matching public JWK must be registered with the BAAS verification service.
-5. The JWT is the `Token` field in a NEX `AuthenticationInfo` DataHolder. The DataHolder is sent as the raw `extraData` after the LoginEx username NEX String.
+This does not establish a supported client-side signing contract. The public contract does not define a third-party NEX issuer/audience/subject mapping, accepted signing key, expiry policy, JWK registration or application-attestation procedure. Nextendo's retired BAAS registration proposal explicitly says third-party client-generated RS256 tokens and per-installation JWK registration are not accepted.
 
-The current NEX implementation now has:
-- `NextendoBaasIdTokenBuilder`: RS256 compact-JWT construction using a runtime signer, registered `kid`, HTTPS `jku`, and externally provisioned `iss`, `aud` and `sub`.
-- `NextendoBaasAuthenticationInfo`: NEX DataHolder serialization for `AuthenticationInfo`, including NGSVersion 3, TokenType 1 and ServerVersion 40000.
-- `NextendoBaasRuntime`: connects the builder to Eden's ACC cache only when a NEX-specific signing provider is installed; it clears the cache for missing/expired tokens, absent provider, logout or invalid claims.
-- The Eden overlay adds a bounded native cache, JNI methods and application ACC handlers. ACC serves the actual compact JWT or returns a byte-count of zero. It no longer returns a dummy 256-byte zero buffer.
-- Unit tests cover JWT shape, the `nnex` binding and AuthenticationInfo serialization.
+Accordingly, NEX has removed the client-side JWT builder, PEM/JWK import and Citron/DEN signing paths. `NextendoBaasRuntime` clears Eden's ACC cache and reports `nex_baas_contract_not_provisioned` while the official NEX flow is unavailable. The native ACC bridge is retained as an empty fail-closed boundary; it does not fabricate a token or substitute an OAuth access token.
 
-**Still not live:** the NEX-specific RSA private key or approved signing provider, public JWK registration, `kid`, JKU, issuer/audience/subject mapping and any required client attestation have not been provisioned. No provider is installed in the current branch, so no production BAAS JWT is sent to ACC.
-
-Do not put the BAAS JWT in the PRUDP CONNECT payload. The JWT belongs in `LoginEx.extraData`. The later secure PRUDP CONNECT carries the server ticket and encrypted check request returned from LoginEx.
+`NextendoSmm2SessionClient` remains a protocol probe that requires caller-supplied AuthenticationInfo bytes, original auth hostname and negotiated PRUDP station parameters. It is not wired to the guest game's socket lifecycle and cannot complete LoginEx without the approved BAAS credential. No two-device SMM2 login has been verified.
 
 ## Public SMM2 client profile
 
@@ -55,7 +44,7 @@ The public Nextendo SMM2 server source includes DataStore handlers for the playe
 
 ## What remains before an SMM2 session can start
 
-- Provision the NEX BAAS signer, matching public JWK/JWKS URL, key ID, issuer, audience, subject/PID mapping and any required client-attestation material, then install the provider in the NEX runtime.
+- Obtain a Nextendo-approved NEX game-authentication flow or server-issued BAAS id_token, with its exact claims, expiry, PID binding, signature and attestation contract. Do not generate a client JWK or sign a token locally.
 - Confirm the live SMM2 auth hostname, DNS destination, TLS certificate coverage/SNI and negotiated virtual PRUDP station parameters.
 - Connect the guest's actual DNS/socket path to those runtime values; validate ACC cache delivery and guest LoginEx with the provisioned token.
 - Validate the parsed LoginEx ticket and secure CONNECT against the live service. The local codecs already have synthetic wire-format tests.
@@ -85,6 +74,6 @@ The public Nextendo compatibility tracker currently marks SMM2 **Experimental / 
 
 Before attempting game login, the account must have a verified email, a Discord account linked through the official verification flow and membership in the Nextendo Discord. The account must not already be online from another emulator/device. The official [Discord linking guide](https://wiki.nextendo.network/guide/discord-link) identifies missing Discord linkage as a common rejection reason; the [security guide](https://wiki.nextendo.network/guide/account-security) explains how to revoke stale sessions.
 
-The NEX Android Keystore key still requires server-side registration. Nextendo must publish the matching public JWK at the approved HTTPS JKU and confirm the accepted key ID, issuer, audience, subject/PID binding, token lifetime and any application-attestation requirement. Until that happens, NEX deliberately sends no BAAS token through ACC. Den2's older static BAAS claims, fallback to an OAuth session token, private signing key and application identity are not portable credentials and must not be copied into NEX.
+NEX does not generate a BAAS signing key or register a public JWK. Nextendo must publish a supported server-issued or approved NEX-specific game-authentication contract, including exact claims, PID binding, expiry and any required application attestation. Until then, NEX deliberately sends no BAAS token through ACC. No DEN/Citron credential, key, token or session data is imported.
 
 The public SMM2 service code and local PRUDP/RMC test harness do not provide a verified end-to-end matchmaking contract. Do not invent room methods, payloads, secure-server addresses or NNCS probe endpoints. The next online milestone is a service-confirmed BAAS registration plus a real guest LoginEx/secure connection; matchmaking and two-device tests remain gated by the server's published support status.

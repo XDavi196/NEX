@@ -98,6 +98,9 @@ jobs:
       - name: Verify Nextendo TLS certificate and hostname validation
         working-directory: nex
         run: python3 scripts/test_nextendo_tls_verification.py ../eden
+      - name: Verify NEX credential isolation and fail-closed BAAS
+        working-directory: nex
+        run: python3 scripts/test_nextendo_credential_isolation.py .
 
       - name: Verify Nextendo friend IPC dispatch
         working-directory: nex
