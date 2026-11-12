@@ -6,7 +6,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * 16-byte big-endian NCS probe used by the public Nextendo NNCS implementation.
+ * 16-byte big-endian NNCS message type 101, verified against the public Pretendo NNCS implementation.
  * This codec is not assigned any hostname or port; title-specific routing is external.
  */
 internal object NextendoNatProbeCodec {
@@ -14,7 +14,7 @@ internal object NextendoNatProbeCodec {
         val testId: Long,
         val externalPort: Int,
         val externalAddress: Inet4Address,
-        val serverAddress: Inet4Address
+        val localAddress: Inet4Address
     )
 
     fun encodeRequest(testId: Long): ByteArray {
@@ -41,12 +41,12 @@ internal object NextendoNatProbeCodec {
             require(testId == expectedTestId) { "NAT probe response test id does not match." }
         }
         val externalAddress = readIpv4(buffer.int)
-        val serverAddress = readIpv4(buffer.int)
+        val localAddress = readIpv4(buffer.int)
         return Response(
             testId = testId,
             externalPort = externalPortValue.toInt(),
             externalAddress = externalAddress,
-            serverAddress = serverAddress
+            localAddress = localAddress
         )
     }
 
@@ -116,11 +116,9 @@ internal class NextendoNatProbeTracker(vantageIds: Set<String>) : AutoCloseable 
         if (observations.size < requiredVantages.size) return null
 
         val results = requiredVantages.map { observations.getValue(it) }
-        val distinctServers = results.map { it.serverAddress }.toSet()
         val distinctExternalAddresses = results.map { it.externalAddress }.toSet()
 
         val type = when {
-            distinctServers.size != requiredVantages.size -> NatType.UNKNOWN
             distinctExternalAddresses.size != 1 -> NatType.UNKNOWN
             results.map { it.externalPort }.toSet().size == 1 -> NatType.CONE
             else -> NatType.SYMMETRIC

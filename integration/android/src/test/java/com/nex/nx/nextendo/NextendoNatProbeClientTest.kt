@@ -19,13 +19,13 @@ class NextendoNatProbeClientTest {
             bindAddress = "127.0.0.1",
             externalPort = 45_000,
             externalAddress = "198.51.100.20",
-            serverAddress = "203.0.113.10"
+            localAddress = "192.0.2.1"
         )
         val second = FakeNncsServer(
             bindAddress = "127.0.0.2",
             externalPort = 45_000,
             externalAddress = "198.51.100.20",
-            serverAddress = "203.0.113.11"
+            localAddress = "192.0.2.1"
         )
 
         try {
@@ -57,10 +57,10 @@ class NextendoNatProbeClientTest {
     @Test
     fun reportsDifferentExternalPortsAsSymmetricMapping() {
         val first = FakeNncsServer(
-            "127.0.0.1", 45_000, "198.51.100.20", "203.0.113.10"
+            "127.0.0.1", 45_000, "198.51.100.20", "192.0.2.1"
         )
         val second = FakeNncsServer(
-            "127.0.0.2", 45_001, "198.51.100.20", "203.0.113.11"
+            "127.0.0.2", 45_001, "198.51.100.20", "192.0.2.1"
         )
 
         try {
@@ -102,7 +102,7 @@ class NextendoNatProbeClientTest {
         bindAddress: String,
         private val externalPort: Int,
         private val externalAddress: String,
-        private val serverAddress: String
+        private val localAddress: String
     ) : Closeable {
         private val socket = DatagramSocket(
             InetSocketAddress(InetAddress.getByName(bindAddress), 0)
@@ -144,7 +144,7 @@ class NextendoNatProbeClientTest {
                     .putInt(messageType)
                     .putInt(externalPort)
                     .putInt(ipv4ToInt(externalAddress))
-                    .putInt(ipv4ToInt(serverAddress))
+                    .putInt(ipv4ToInt(localAddress))
                     .array()
                 socket.send(
                     DatagramPacket(

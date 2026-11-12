@@ -3,6 +3,7 @@ package com.nex.nx.nextendo
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -433,6 +434,36 @@ class NextendoPrudpLiteSessionTest {
         )
         val closed = session.receive(NextendoPrudpLiteCodec.encode(disconnect))
         assertTrue(closed.events.single() is NextendoPrudpLiteSession.Event.Disconnected)
+        assertEquals(NextendoPrudpLiteSession.State.CLOSED, session.state())
+    }
+    @Test
+    fun closeIsIdempotentAndClearsSensitiveSessionState() {
+        val connectPayload = ByteArray(24) { (it + 1).toByte() }
+        val config = config(connectPayload = connectPayload)
+        val session = NextendoPrudpLiteSession(config)
+        connect(session, config, nowMs = 1_000L)
+
+        val request = NextendoRmcCodec.encodeRequest(
+            protocolId = NextendoSmm2DataStore.PROTOCOL_ID,
+            methodId = NextendoSmm2DataStore.GET_USERS.toLong(),
+            callId = 90L
+        )
+        session.sendRmc(request, nowMs = 2_000L)
+        assertTrue(session.pendingReliableCount() > 0)
+
+        session.close()
+        assertEquals(NextendoPrudpLiteSession.State.CLOSED, session.state())
+        assertEquals(0, session.pendingReliableCount())
+
+        val keyField = NextendoPrudpLiteSession::class.java.getDeclaredField("runtimeAccessKey")
+        keyField.isAccessible = true
+        assertNull(keyField.get(session))
+
+        val payloadField = NextendoPrudpLiteSession::class.java.getDeclaredField("connectPayload")
+        payloadField.isAccessible = true
+        assertArrayEquals(ByteArray(connectPayload.size), payloadField.get(session) as ByteArray)
+
+        session.close()
         assertEquals(NextendoPrudpLiteSession.State.CLOSED, session.state())
     }
 }
