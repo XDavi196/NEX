@@ -105,20 +105,20 @@ class NextendoNatProbeTest {
         testId,
         externalPort,
         ipv4(externalAddress),
-        ipv4(serverAddress)
+        ipv4(localAddress)
     )
 
     private fun response(
         testId: Long,
         externalPort: Int,
         externalAddress: Inet4Address,
-        serverAddress: Inet4Address
+        localAddress: Inet4Address
     ): ByteArray {
         val buffer = ByteBuffer.allocate(16).order(ByteOrder.BIG_ENDIAN)
         buffer.putInt(testId.toInt())
         buffer.putInt(externalPort)
         buffer.putInt(ipv4ToInt(externalAddress))
-        buffer.putInt(ipv4ToInt(serverAddress))
+        buffer.putInt(ipv4ToInt(localAddress))
         return buffer.array()
     }
 
