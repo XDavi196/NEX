@@ -24,8 +24,6 @@ object NextendoSessionStore {
     private const val SESSION_CIPHERTEXT = "session_ciphertext"
     private const val PENDING_IV = "pending_iv"
     private const val PENDING_CIPHERTEXT = "pending_ciphertext"
-    private const val BAAS_KEY_IV = "baas_signing_key_iv"
-    private const val BAAS_KEY_CIPHERTEXT = "baas_signing_key_ciphertext"
     private const val PENDING_MAX_AGE_SECONDS = 10L * 60L
 
     data class Session(
@@ -48,48 +46,16 @@ object NextendoSessionStore {
     )
 
     /**
-     * Stores the operator-provided Citron-compatible RSA PEM encrypted with the
-     * installation's Android Keystore AES-GCM key. The PEM is never exported.
+     * Removes PEM fields persisted by older experimental BAAS builds.
+     * NEX no longer accepts or stores client signing keys.
      */
-    fun saveBaasSigningKeyPem(context: Context, pem: String) {
-        val normalized = pem.trim()
-        require(normalized.length in 100..(32 * 1024)) {
-            "O arquivo de chave BAAS deve ter entre 100 bytes e 32 KiB."
-        }
-        require(
-            normalized.contains("-----BEGIN PRIVATE KEY-----") ||
-                normalized.contains("-----BEGIN RSA PRIVATE KEY-----")
-        ) {
-            "O arquivo precisa conter uma chave RSA PEM PKCS#8 ou PKCS#1 não criptografada."
-        }
-        val (iv, ciphertext) = encrypt(normalized)
-        val saved = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-            .edit()
-            .putString(BAAS_KEY_IV, iv)
-            .putString(BAAS_KEY_CIPHERTEXT, ciphertext)
-            .commit()
-        check(saved) { "Não foi possível salvar a chave BAAS criptografada." }
-    }
-
-    /** Decrypts the local BAAS PEM only for in-memory signing and JWKS validation. */
-    fun loadBaasSigningKeyPem(context: Context): String? {
-        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-        val iv = preferences.getString(BAAS_KEY_IV, null) ?: return null
-        val ciphertext = preferences.getString(BAAS_KEY_CIPHERTEXT, null) ?: return null
-        return runCatching { decrypt(iv, ciphertext) }
-            .getOrElse {
-                clearBaasSigningKeyPem(context)
-                null
-            }
-    }
-
-    fun clearBaasSigningKeyPem(context: Context) {
+    fun clearLegacyBaasSigningKey(context: Context) {
         val cleared = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit()
-            .remove(BAAS_KEY_IV)
-            .remove(BAAS_KEY_CIPHERTEXT)
+            .remove("baas_signing_key_iv")
+            .remove("baas_signing_key_ciphertext")
             .commit()
-        check(cleared) { "Não foi possível remover a chave BAAS." }
+        check(cleared) { "Não foi possível remover a chave BAAS legada." }
     }
 
     fun saveOAuthTokens(context: Context, tokens: NextendoAuthClient.OAuthTokens) {
@@ -188,27 +154,6 @@ object NextendoSessionStore {
     fun importEncryptedBackup(context: Context, backup: String, passphrase: CharArray) {
         val restored = NextendoSessionBackupCodec.decode(backup, passphrase)
         saveSession(context, restored)
-        clearPendingAuthorization(context)
-    }
-
-    /**
-     * Imports the DEN/Citron key=value account file into this installation's
-     * encrypted session store. The source file itself is never copied or retained.
-     */
-    internal fun importDenAccountFile(context: Context, account: NextendoAccountTxtCodec.Account) {
-        saveSession(
-            context,
-            Session(
-                accessToken = account.accessToken,
-                refreshToken = account.refreshToken,
-                accessTokenExpiresAtEpochSeconds = account.tokenExpiryEpochSeconds,
-                grantedScopes = emptySet(),
-                pid = account.pid,
-                username = account.username,
-                friendCode = account.friendCode,
-                gameTokenDiagnostic = "imported_waiting_for_server_validation"
-            )
-        )
         clearPendingAuthorization(context)
     }
 
