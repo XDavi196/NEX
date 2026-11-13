@@ -9,6 +9,7 @@ base = root / "integration/android/src/main/java/com/nex/nx/nextendo"
 auth = (base / "NextendoAuthManager.kt").read_text(encoding="utf-8")
 store = (base / "NextendoSessionStore.kt").read_text(encoding="utf-8")
 runtime = (base / "NextendoBaasRuntime.kt").read_text(encoding="utf-8")
+profiles = (base / "NextendoGameNetworkProfiles.kt").read_text(encoding="utf-8")
 overlay = (root / "scripts/apply-eden-overlay.py").read_text(encoding="utf-8")
 
 for label, text, forbidden in (
@@ -48,6 +49,9 @@ if "currentProvider(): NextendoBaasTokenProvider? = null" not in runtime:
     raise SystemExit("BAAS provider must remain uninstalled until Nextendo authorizes NEX.")
 if "NextendoNativeBridge.clearBaasIdToken()" not in runtime:
     raise SystemExit("BAAS runtime must clear the guest-visible ACC token cache.")
+
+if "NextendoCitronBaasProfile" in profiles or "baasHosts" in profiles:
+    raise SystemExit("DNS routing must not depend on a removed or cross-emulator BAAS profile.")
 
 for filename in (
     "NextendoAccountImportActivity.kt",

@@ -41,11 +41,12 @@ internal object NextendoGameNetworkProfiles {
         "dragonst.hac.lp1.dragons.nintendo.net"
     )
 
-    /** BAAS host used by Citron-compatible ACC id_token verification. */
-    val baasHosts: List<String> = listOf(NextendoCitronBaasProfile.HOSTNAME)
-
-    /** Hosts whose original SNI must be preserved by Eden's resolver. */
+    /**
+     * Hosts whose original SNI must be preserved by Eden's resolver.
+     *
+     * BAAS is deliberately not routed here: NEX has no authorized BAAS
+     * provider yet, and must not inherit a hostname from another emulator.
+     */
     val allExactAuthHosts: List<String> =
-        (profiles.map { it.authHostname } + deviceAuthHosts + baasHosts)
-            .distinct()
+        (profiles.map { it.authHostname } + deviceAuthHosts).distinct()
 }
