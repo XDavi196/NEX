@@ -1129,6 +1129,26 @@ void ClearParkedNextendoUdpSockets() {
 
         const bool redirected = !redirected_host.empty();
         if (redirected) {
+            // A peer-IP fallback may recover a DNS route when the guest omitted SNI.
+            // If the guest supplied SNI, it must identify that exact route; otherwise
+            // reject before the handshake instead of sending one SNI and validating
+            // a certificate for another virtual host.
+            if (const char* current_sni =
+                    SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)) {
+                const auto normalized_sni =
+                    Common::NextendoDnsRedirectCache::NormalizeHostname(current_sni);
+                const auto normalized_route =
+                    Common::NextendoDnsRedirectCache::NormalizeHostname(redirected_host);
+                if (!normalized_sni.has_value() || !normalized_route.has_value() ||
+                    *normalized_sni != *normalized_route) {
+                    SSL_set_verify(ssl, SSL_VERIFY_PEER, nullptr);
+                    skip_cert_verification = false;
+                    LOG_ERROR(Service_SSL,
+                              "[NEX] Refusing redirected TLS peer because SNI '{}' does not match DNS route '{}'",
+                              current_sni, redirected_host);
+                    return record_handshake(ResultInternalError);
+                }
+            }
             if (!SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name)) {
                 if (!SSL_set_tlsext_host_name(ssl, redirected_host.c_str())) {
                     LOG_ERROR(Service_SSL,

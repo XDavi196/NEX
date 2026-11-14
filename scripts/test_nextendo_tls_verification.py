@@ -29,6 +29,8 @@ required = {
     "forced verification state": "skip_cert_verification = false;",
     "post-handshake certificate result": "SSL_get_verify_result(ssl)",
     "redirected connections always verify": "if (redirected || !skip_cert_verification)",
+    "SNI is normalized against the exact DNS route": "Common::NextendoDnsRedirectCache::NormalizeHostname(current_sni)",
+    "mismatched SNI fails closed": "Refusing redirected TLS peer because SNI",
 }
 for label, needle in required.items():
     if needle not in handshake:
@@ -44,4 +46,9 @@ for needle in forbidden:
     if needle in handshake:
         raise SystemExit(f"insecure TLS override remains in redirected handshake: {needle}")
 
-print("NEX redirected TLS peer and hostname verification: PASS")
+mismatch_guard = handshake.find("Refusing redirected TLS peer because SNI")
+handshake_call = handshake.find("const int ret = SSL_do_handshake(ssl);")
+if mismatch_guard < 0 or handshake_call < 0 or mismatch_guard > handshake_call:
+    raise SystemExit("mismatched SNI must be rejected before the TLS handshake")
+
+print("NEX redirected TLS peer, SNI binding and hostname verification: PASS")
